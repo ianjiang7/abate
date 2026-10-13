@@ -3,37 +3,59 @@
 The five things to bring, in order. Owners and anything marked *proposed* still need the team's
 sign-off.
 
-## 1. The one assumption we are testing
+## 1. Our hypothesis and the two assumptions behind it
 
-> Tenants with an unresolved repair, once they see what they may be owed, will document it
-> (photos and dates) and send a formal follow-up to their landlord.
+> **Hypothesis:** a documented case with a dollar figure attached gets stalled repairs moving. It
+> makes tenants escalate in writing, and it makes management respond faster than texts and calls
+> do.
 
-**Why this one.** It's the open question Sprint 1 left us with: will tenants act while the issue
-is still happening? Everything later in the chain (tracking, pressure, the estimate, a success
-fee) needs a tenant who collects evidence and escalates while the problem is live. Our
-interviewees chased management by text and phone, but almost none kept a record or knew about
-abatements. If seeing the money doesn't change that, the business doesn't work.
+The hypothesis holds only if both assumptions hold, and the prototype tests each one directly.
 
-**Pass marks, set before testing:**
+### Assumption 1: tenants will act
 
-| Metric | Pass |
-| --- | --- |
-| Finish a case with at least one photo | 7 of 10 |
-| Send the follow-up letter (verified through the CC address) | 5 of 10 |
-| Tap "help me recover this" after seeing the 25% fee | 3 of 10 |
+Once tenants with an open repair see what they may be owed, they will document it (photos and
+dates) and send a formal follow-up letter.
 
-If fewer than 3 send the letter, tenants want information rather than action, and we rethink
-the product before building more.
+- **Why it's risky:** today tenants chase by text and phone and keep no records, and most had
+  never heard of an abatement. If a dollar figure doesn't change that, there's no evidence and no
+  pressure. This was the open question Sprint 1 left us with.
+- **How we test it:** the prototype's own funnel. Did they finish a case with a photo? Did they
+  send the letter? The CC address confirms the send.
+- **Pass:** 7 of 10 testers finish a case with a photo, and at least half of the testers with an
+  open issue send the letter within 48 hours.
 
-**Second hypothesis, for the Oct 29 presentation (efficacy):** management responds faster after
-a documented letter. Our landlord interview suggests it does. We measure the days from letter to
-reply or fix for testers who send, through the CC inbox and check-in texts on day 3 and day 7.
+### Assumption 2: management will respond
 
-## 2. The smallest thing that tests it
+A documented letter gets management to reply or schedule the repair faster than the tenant's
+earlier texts and calls did.
+
+- **Why it's risky:** the pain we heard most was follow-ups going unanswered. Our landlord said
+  informed tenants and compensation emails speed up repairs, but that's one landlord. If
+  management ignores the letter too, documentation alone isn't leverage.
+- **How we test it:** when tenants log a case, we ask how long they've been following up. After
+  they send the letter, we track the days until management replies or schedules the repair,
+  using the CC inbox and check-in texts on day 3 and day 7.
+- **Pass:** at least half of the sent letters get a reply or a scheduled repair within 7 days.
+- **Caveat:** a handful of letters and no comparison group, so this is directional evidence.
+  Letters need to go out by Oct 22 to get a full 7 days before Oct 29.
+
+### What the results tell us
+
+| Assumption 1 | Assumption 2 | What it means |
+| --- | --- | --- |
+| Pass | Pass | The hypothesis holds. Next test: will tenants hand us the case and pay 25%? |
+| Pass | Fail | Tenants act, but a letter isn't leverage. The value has to come from the next steps up: HPD complaints, small claims, negotiated rent credits. |
+| Fail | Can't test | Tenants won't escalate on their own, even with a dollar figure. The hypothesis is wrong as stated. Next test: will they let us send it for them? |
+
+The "help me recover this" button stays in the prototype as an early read on willingness to pay
+the 25% fee, but it isn't one of the two assumptions.
+
+## 2. The smallest thing that tests them
 
 One flow on a phone-first web page, with the team doing follow-ups by hand behind it.
 
-1. **Log the repair** (about 3 minutes): issue type, dates, rent, management contact, one photo.
+1. **Log the repair** (about 3 minutes): issue type, dates, how long they've been following up,
+   rent, management contact, one photo.
 2. **See the case:** a timeline and an estimate. "You may be owed $X to $Y so far, growing about
    $Z a day."
 3. **Send the letter:** a pre-filled follow-up, sent from the tenant's own email with the team
@@ -115,7 +137,7 @@ quote.
 | Fri Oct 16 | Advisor: MVP scoping. Bring the cut list and the legal question. |
 | Oct 16 to 19 | Letter, fake door, deploy. First 3 tests with Sprint 1 interviewees. |
 | Tue Oct 20 | Standup: the funnel from the first 3 tests |
-| Oct 21 to 23 | Fix what blocked them; tests 4 to 7. Advisor on Fri Oct 23. |
+| Oct 21 to 23 | Fix what blocked them; tests 4 to 7. Letters out by Oct 22 so assumption 2 gets 7 days. Advisor on Fri Oct 23. |
 | Oct 24 to 28 | Tests 8 to 10; collect quotes and numbers; rehearse; record a backup video |
 | Thu Oct 29 | Present |
 

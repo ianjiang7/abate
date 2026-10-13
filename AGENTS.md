@@ -34,19 +34,30 @@ management, so I can live normally and get back the rent I overpaid."
 recover part of the rent they paid while conditions were unlivable. NYC small claims habitability
 judgments we found range from about $1,700 to $4,700. HPD fines go to the city, not the tenant.
 
-## The one assumption this MVP tests
+## The hypothesis this MVP tests
 
-> Tenants with an unresolved repair, once they see what they may be owed, will document it
-> (photos and dates) and send a formal follow-up to their landlord.
+> **Hypothesis:** a documented case with a dollar figure attached gets stalled repairs moving. It
+> makes tenants escalate in writing, and it makes management respond faster than texts and calls
+> do.
 
-If this is wrong, nothing downstream works: no evidence, no pressure on the landlord, no claim,
-no fee. Every feature must help test it. Target with 10 testers: at least 7 finish a case with a
-photo, at least 5 send the letter, at least 3 ask us to help recover the money.
+It holds only if both of these assumptions hold. Every feature must help test one of them.
+
+1. **Tenants will act.** Once tenants with an open repair see what they may be owed, they will
+   document it (photos and dates) and send a formal follow-up letter. *Pass:* 7 of 10 testers
+   finish a case with a photo, and at least half of the testers with an open issue send the
+   letter within 48 hours.
+2. **Management will respond.** A documented letter gets management to reply or schedule the
+   repair faster than the tenant's earlier texts and calls did. *Pass:* at least half of the sent
+   letters get a reply or a scheduled repair within 7 days.
+
+The "help me recover this" button (the fake door) is an early read on willingness to pay. It is
+not one of the two assumptions.
 
 ## What we are building: one flow, phone-first
 
 1. **Log the repair:** issue type, when it started, when management was first told and how,
-   monthly rent, address and unit, management name and email, at least one photo.
+   how many times they've followed up since, monthly rent, address and unit, management name and
+   email, at least one photo.
 2. **See the case:** a timeline (started, reported, days unresolved) and an estimated abatement
    range so far, clearly labeled as an estimate, not legal advice.
 3. **Take the next step:** a pre-filled follow-up letter to management. The tenant sends it from
@@ -67,6 +78,9 @@ Data stays small: `cases`, `photos`, `events`. Case links use a long random toke
 
 - **The follow-up agent:** a teammate texts the tenant reminders and drafts further follow-ups
   manually. No automated emails or texts.
+- **Tracking management's response:** a teammate records when management replies or schedules
+  the repair, from the CC inbox and check-in texts on day 3 and day 7. A date field on the case
+  that the team fills in through Supabase is enough.
 - **Recovering money:** we talk to tenants who tap "help me". No negotiation, court or attorney
   features.
 - **Reviewing cases:** the team uses the Supabase dashboard. No admin UI.
