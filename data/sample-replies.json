@@ -1,0 +1,290 @@
+[
+  {
+    "id": "sched-01-tmrw",
+    "receivedOn": "2026-10-14",
+    "issue": "a plumbing problem",
+    "text": "plumber coming tmrw 10am",
+    "expectedCategory": "scheduled",
+    "expectedDate": "2026-10-15"
+  },
+  {
+    "id": "sched-02-formal-quoted",
+    "receivedOn": "2026-10-20",
+    "issue": "pests",
+    "text": "Dear Resident,\n\nThank you for your patience. We have scheduled a licensed exterminator to service your apartment on 10/23 between 9:00 AM and 1:00 PM. Please remove items from under the kitchen sink before the visit.\n\nBest regards,\nTenant Relations\nTessaly Property Services\n(212) 555-0147\n\nOn Mon, Oct 19, 2026 at 8:02 AM Alex R. <alex.r@example.com> wrote:\n> Hello, I'm following up again about the mice in my kitchen. It has been 3 weeks.\n> Please reply with a date.",
+    "expectedCategory": "scheduled",
+    "expectedDate": "2026-10-23"
+  },
+  {
+    "id": "sched-03-next-monday-key",
+    "receivedOn": "2026-10-15",
+    "issue": "a broken window, door or lock",
+    "text": "Hi, we spoke with the window contractor and he'll do the replacement next Monday. The super will let him in with the master key if you're not home.",
+    "expectedCategory": "scheduled",
+    "expectedDate": "2026-10-19"
+  },
+  {
+    "id": "sched-04-month-name",
+    "receivedOn": "2026-10-21",
+    "issue": "a leak and water damage",
+    "text": "Your ceiling repair has been booked for October 27th. The crew will patch and paint once the area is fully dry.\n\nMarrowstone Residential",
+    "expectedCategory": "scheduled",
+    "expectedDate": "2026-10-27"
+  },
+  {
+    "id": "sched-05-blame-but-visit",
+    "receivedOn": "2026-10-19",
+    "issue": "an electrical problem",
+    "text": "This should have been reported sooner and some of this looks like it came from something plugged in on your end. That said, our handyman will be there Thursday to look at the outlet.",
+    "expectedCategory": "scheduled",
+    "expectedDate": "2026-10-22"
+  },
+  {
+    "id": "sched-06-rescheduled",
+    "receivedOn": "2026-10-26",
+    "issue": "a plumbing problem",
+    "text": "Rescheduled: the plumber had an emergency at another building today, he will come Friday Oct 30 instead. Sorry for the delay.",
+    "expectedCategory": "scheduled",
+    "expectedDate": "2026-10-30"
+  },
+  {
+    "id": "fixed-01-restored",
+    "receivedOn": "2026-10-16",
+    "issue": "no heat or hot water",
+    "text": "The heat was restored this morning after the boiler part was replaced. Please let us know if your radiators are still cold.",
+    "expectedCategory": "says_fixed",
+    "expectedDate": "2026-10-16"
+  },
+  {
+    "id": "fixed-02-terse-yesterday",
+    "receivedOn": "2026-10-08",
+    "issue": "a broken window, door or lock",
+    "text": "fixed it yesterday. lmk",
+    "expectedCategory": "says_fixed",
+    "expectedDate": "2026-10-07"
+  },
+  {
+    "id": "fixed-03-work-order-closed",
+    "receivedOn": "2026-10-14",
+    "issue": "a plumbing problem",
+    "text": "Good afternoon,\n\nPer our maintenance records, work order #58213 (bathroom sink leak) was completed on 10/12/2026 and has been closed. If you continue to experience issues, please submit a new request through the resident portal.\n\nRegards,\nQuillfeather Management LLC\nResident Services",
+    "expectedCategory": "says_fixed",
+    "expectedDate": "2026-10-12"
+  },
+  {
+    "id": "fixed-04-past-weekday",
+    "receivedOn": "2026-10-24",
+    "issue": "an electrical problem",
+    "text": "The electrician replaced the breaker on Monday, everything is working now.",
+    "expectedCategory": "says_fixed",
+    "expectedDate": "2026-10-19"
+  },
+  {
+    "id": "fixed-05-conditional-access",
+    "receivedOn": "2026-10-11",
+    "issue": "a leak and water damage",
+    "text": "We repaired the roof drain that was causing the leak. If water comes through again please let the super in so he can check the ceiling.\n\nSent from my iPhone",
+    "expectedCategory": "says_fixed",
+    "expectedDate": null
+  },
+  {
+    "id": "fixed-06-rude",
+    "receivedOn": "2026-10-23",
+    "issue": "pests",
+    "text": "We already took care of this twice. It's done. Stop emailing the office.",
+    "expectedCategory": "says_fixed",
+    "expectedDate": null
+  },
+  {
+    "id": "access-01-nobody-home",
+    "receivedOn": "2026-10-13",
+    "issue": "no heat or hot water",
+    "text": "The super stopped by today at 2pm but no one answered. Please let us know when someone will be home so we can get in.",
+    "expectedCategory": "needs_access",
+    "expectedDate": "2026-10-13"
+  },
+  {
+    "id": "access-02-terse",
+    "receivedOn": "2026-10-09",
+    "issue": "no heat or hot water",
+    "text": "need access to ur apt to check the radiator. when r u home?",
+    "expectedCategory": "needs_access",
+    "expectedDate": null
+  },
+  {
+    "id": "access-03-formal-original-message",
+    "receivedOn": "2026-10-15",
+    "issue": "mold",
+    "text": "Dear Tenant,\n\nIn order to address the mold condition reported in your bathroom, our contractor requires access to the unit for an inspection. Kindly reply with two or three dates and times this week when an adult will be present.\n\nSincerely,\nBrightwater Holdings Management\n\n-----Original Message-----\nFrom: Priya T. <priya.t@example.org>\nSent: Wednesday, October 14, 2026 9:41 PM\nTo: service@brightwater-mgmt.example\nSubject: Mold in bathroom - Apt 5C\n\nThe mold is back and spreading. Please fix it by Friday.",
+    "expectedCategory": "needs_access",
+    "expectedDate": null
+  },
+  {
+    "id": "access-04-which-day",
+    "receivedOn": "2026-10-17",
+    "issue": "a broken window, door or lock",
+    "text": "Hi, we can send the locksmith Wednesday or Thursday afternoon. Which day works for you?",
+    "expectedCategory": "needs_access",
+    "expectedDate": "2026-10-21"
+  },
+  {
+    "id": "access-05-refused-entry",
+    "receivedOn": "2026-10-07",
+    "issue": "pests",
+    "text": "Our records show the exterminator came on 10/5 and was not given entry. Tenants are responsible for providing access. Call the super at 917-555-0122 to set up a time.",
+    "expectedCategory": "needs_access",
+    "expectedDate": "2026-10-05"
+  },
+  {
+    "id": "access-06-leave-key",
+    "receivedOn": "2026-10-20",
+    "issue": "a plumbing problem",
+    "text": "Please leave a key with the doorman so the plumber can get in while you're at work.\n\n- Front desk",
+    "expectedCategory": "needs_access",
+    "expectedDate": null
+  },
+  {
+    "id": "dispute-01-meets-requirements",
+    "receivedOn": "2026-10-18",
+    "issue": "no heat or hot water",
+    "text": "The heat in the building meets city requirements. We checked the boiler and it is running normally. No further action is needed.",
+    "expectedCategory": "disputes_or_refuses",
+    "expectedDate": null
+  },
+  {
+    "id": "dispute-02-terse-insurance",
+    "receivedOn": "2026-10-10",
+    "issue": "a leak and water damage",
+    "text": "not our problem. call ur insurance",
+    "expectedCategory": "disputes_or_refuses",
+    "expectedDate": null
+  },
+  {
+    "id": "dispute-03-tenant-maintenance",
+    "receivedOn": "2026-10-12",
+    "issue": "mold",
+    "text": "Mold in bathrooms is caused by tenants not using the exhaust fan. Please clean it with bleach and keep the window open. This is a tenant maintenance item per your lease.",
+    "expectedCategory": "disputes_or_refuses",
+    "expectedDate": null
+  },
+  {
+    "id": "dispute-04-no-leak-found",
+    "receivedOn": "2026-10-13",
+    "issue": "a leak and water damage",
+    "text": "Hello,\n\nWe inspected the unit above yours on October 9 and found no active leak. The stain on your ceiling is old and cosmetic. We will not be repainting at this time.\n\nThank you,\nOstrander Realty Partners\nProperty Management Division\n\nCONFIDENTIALITY NOTICE: This email and any attachments are for the exclusive use of the intended recipient.",
+    "expectedCategory": "disputes_or_refuses",
+    "expectedDate": "2026-10-09"
+  },
+  {
+    "id": "dispute-05-charge-tenant",
+    "receivedOn": "2026-10-16",
+    "issue": "a broken window, door or lock",
+    "text": "The lock was damaged by your guest. Replacement will be charged to your account at $185. We are not responsible for tenant damage.",
+    "expectedCategory": "disputes_or_refuses",
+    "expectedDate": null
+  },
+  {
+    "id": "dispute-06-move-out",
+    "receivedOn": "2026-10-27",
+    "issue": "no heat or hot water",
+    "text": "Stop sending us these letters. If you are unhappy you can move out when your lease ends.",
+    "expectedCategory": "disputes_or_refuses",
+    "expectedDate": null
+  },
+  {
+    "id": "ack-01-forwarded",
+    "receivedOn": "2026-10-06",
+    "issue": "a plumbing problem",
+    "text": "Received, thank you. We have forwarded your request to maintenance.",
+    "expectedCategory": "acknowledged_no_date",
+    "expectedDate": null
+  },
+  {
+    "id": "ack-02-terse",
+    "receivedOn": "2026-10-09",
+    "issue": "an electrical problem",
+    "text": "ok will look into it",
+    "expectedCategory": "acknowledged_no_date",
+    "expectedDate": null
+  },
+  {
+    "id": "ack-03-auto-ticket",
+    "receivedOn": "2026-10-12",
+    "issue": "no heat or hot water",
+    "text": "Thank you for contacting Fennimore Property Co. Your service request #77120 has been received and assigned to a technician. A member of our team will contact you to schedule. Please do not reply to this automated message.",
+    "expectedCategory": "acknowledged_no_date",
+    "expectedDate": null
+  },
+  {
+    "id": "ack-04-parts-next-week",
+    "receivedOn": "2026-10-14",
+    "issue": "no heat or hot water",
+    "text": "We're aware of the hot water issue in your line. Parts are on order and should arrive next week, we will update you then.\n\nBest,\nJoanne",
+    "expectedCategory": "acknowledged_no_date",
+    "expectedDate": null
+  },
+  {
+    "id": "ack-05-quoted-thread",
+    "receivedOn": "2026-10-16",
+    "issue": "a plumbing problem",
+    "text": "Hi Sam,\n\nSorry for the slow response. I've passed this along to our super and he will reach out to you soon.\n\nKind regards,\nLeasing Office\n\nOn Thu, Oct 15, 2026, 7:30 PM Sam <sam.placeholder@example.com> wrote:\n> Hi, I am writing again about the leak under my sink. I reported it on October 1 and on October 8. It still isn't fixed. Please tell me what day the plumber will come.\n> Thanks,\n> Sam",
+    "expectedCategory": "acknowledged_no_date",
+    "expectedDate": null
+  },
+  {
+    "id": "ack-06-be-patient",
+    "receivedOn": "2026-10-21",
+    "issue": "mold",
+    "text": "We got your email the first 3 times. We're working on it. Be patient.",
+    "expectedCategory": "acknowledged_no_date",
+    "expectedDate": null
+  },
+  {
+    "id": "unclear-01-out-of-office",
+    "receivedOn": "2026-10-20",
+    "issue": "a leak and water damage",
+    "text": "I am out of the office until Monday, October 26 with limited access to email. For maintenance emergencies please call 212-555-0199.",
+    "expectedCategory": "unclear",
+    "expectedDate": null
+  },
+  {
+    "id": "unclear-02-which-apartment",
+    "receivedOn": "2026-10-08",
+    "issue": "pests",
+    "text": "Which apartment is this for?",
+    "expectedCategory": "unclear",
+    "expectedDate": null
+  },
+  {
+    "id": "unclear-03-see-attached",
+    "receivedOn": "2026-10-15",
+    "issue": "a leak and water damage",
+    "text": "Please see attached.\n\nSent from my Galaxy",
+    "expectedCategory": "unclear",
+    "expectedDate": null
+  },
+  {
+    "id": "unclear-04-rent-reminder",
+    "receivedOn": "2026-10-28",
+    "issue": "an electrical problem",
+    "text": "Reminder: rent for November is due on the 1st. Late fees apply after the 5th.",
+    "expectedCategory": "unclear",
+    "expectedDate": null
+  },
+  {
+    "id": "unclear-05-send-photo",
+    "receivedOn": "2026-10-11",
+    "issue": "mold",
+    "text": "Can you send a photo and tell us when this started?",
+    "expectedCategory": "unclear",
+    "expectedDate": null
+  },
+  {
+    "id": "unclear-06-who-is-this",
+    "receivedOn": "2026-10-19",
+    "issue": "no heat or hot water",
+    "text": "who is this",
+    "expectedCategory": "unclear",
+    "expectedDate": null
+  }
+]
