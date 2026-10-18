@@ -3,6 +3,22 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-18: First build
+
+- **Look:** the Sprint 1 deck's palette (deep indigo, periwinkle, lavender) and Work Sans, phone
+  first. *Why:* consistent with what the class has seen, and calm rather than aggressive.
+- **The case agent always has a fallback.** Without an API key, or when Claude fails, a keyword
+  stand-in reads the reply and the tenant can correct it. *Why:* a tester should never be stuck.
+  Tenant corrections drive the ladder; the agent's original reading is kept to measure
+  assumption 2.
+- **Building data counts the tenant's building (BIN), not the whole tax lot.** *Why:* large
+  complexes, our target segment, share one lot across many buildings; lot totals overstated
+  problems tenfold or more.
+- **Messages tell management a dated record is being kept, but don't name Abate.** *Why:* the
+  tenant's voice is calmer and lowers retaliation risk; the CC address is visible anyway.
+- **Process:** two modules were built by separate agents in their own branches, each reviewed by a
+  skeptical second agent; all 16 confirmed findings were fixed with tests before merging.
+
 ## 2026-10-18: Abate does the chasing
 
 - **Direction:** instead of a one-off letter, Abate runs timed, escalating follow-ups for the

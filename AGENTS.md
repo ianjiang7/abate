@@ -224,8 +224,27 @@ tenant attorney or legal aid before real testers see them.
 
 ## How to run and test
 
-No app code exists yet. The first build task scaffolds the app and must replace this section
-with the real commands (install, dev server, tests, deploy) and the env variable names.
+Setup, env variables and every command are in [README.md](README.md). In short:
+`npm run dev` (app at http://localhost:3000), `npm test`, `npm run typecheck`, `npm run lint`,
+`npm run e2e` (full tenant flow at 375px against a production build; needs Supabase),
+`npm run db:push` (apply `supabase/migrations`), `npm run score-agent`.
+
+Code map:
+
+- `src/lib/domain/`: pure logic with tests (dates in New York time, estimate, ladder, templates,
+  mailto). No I/O.
+- `src/lib/cases/`: the data layer (`repo.ts`), operations (`service.ts`), validation and the
+  view helpers for the case page. Server-only.
+- `src/lib/agent/`: the case agent (Claude reader, stand-in reader, guardrails).
+- `src/lib/building/`: NYC GeoSearch and Open Data, cached in `building_cache`.
+- `src/app/`: pages (`/`, `/start`, `/case/[token]`), server actions next to their pages, and
+  `api/address` and `api/invite` route handlers.
+- `src/components/`: UI. Design tokens (Sprint 1 indigo palette, Work Sans) live in
+  `src/app/globals.css`.
+
+Next.js 16 with `cacheComponents` is not the Next.js most models remember: the case page reads data
+inside `<Suspense>`, actions call `refresh()` after mutations, and nothing reads the clock during
+prerender. Read the bundled docs in `node_modules/next/dist/docs/` before changing rendering.
 
 ## How to work here
 

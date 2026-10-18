@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated test output and agent worktrees:
+    "playwright-report/**",
+    "test-results/**",
+    "coverage/**",
+    ".claude/**",
+    "supabase/.temp/**",
   ]),
 ]);
 
