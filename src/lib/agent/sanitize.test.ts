@@ -59,8 +59,45 @@ describe("sanitizeReplyReference", () => {
     expect(sanitizeReplyReference(ref, ON)).toBeNull();
   });
 
+  it.each([
+    "On October 17 you admitted you are negligent and liable.",
+    "On October 17 you wrote that I am in breach of the lease.",
+    "On October 17 you said you would credit two weeks of rent.",
+    "On October 17 you agreed to pay for my hotel stay.",
+    "On October 17 you said the plumber was paid.",
+    "On October 17 you offered a free month.",
+    "On October 17 you said the rent covers it.",
+    "On October 17 you said the plumber would come, and I demand a repair by Friday.",
+    "On October 17 you said the plumber would come, so fix it by Friday or I will call 311.",
+    "On October 17 you said the plumber would come, which is unacceptable.",
+    "On October 17 you said the plumber would come, you slumlord.",
+  ])("drops legal, money, demand or judgment language: %s", (ref) => {
+    expect(sanitizeReplyReference(ref, ON)).toBeNull();
+  });
+
+  it.each([
+    "On October 17 you said the plumber would come. Fix it by Friday or I will call the city.",
+    "On October 17 you said the plumber would come. Please confirm.",
+    'On October 17 you replied: "We will come Tuesday." Please confirm.',
+    "On October 17 you said the plumber would come… Please confirm.",
+  ])("drops references with more than one sentence: %s", (ref) => {
+    expect(sanitizeReplyReference(ref, ON)).toBeNull();
+  });
+
+  it("keeps one sentence with abbreviations or a quoted reply inside it", () => {
+    for (const ref of [
+      "On October 17 you wrote that the super would come by at 10 a.m. on Tuesday.",
+      "On October 17 you wrote that Mr. K would come on Oct. 22.",
+      'On October 17 you replied: "The plumber will come Tuesday. He has the key."',
+      'On October 17 you wrote "Received" and said the super would call.',
+    ]) {
+      expect(sanitizeReplyReference(ref, ON)).toBe(ref);
+    }
+  });
+
   it("does not trip on words that merely contain a blocked word", () => {
     expect(sanitizeReplyReference("On October 17 you wrote that the issue was in the courtyard drain.", ON)).not.toBeNull();
+    expect(sanitizeReplyReference("On October 17 you wrote that the current pipe would be replaced.", ON)).not.toBeNull();
   });
 
   it("drops non-strings and empty strings", () => {

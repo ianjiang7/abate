@@ -4,6 +4,7 @@
 
 import { addDays, isIsoDate, type IsoDate } from "@/lib/domain/dates";
 import { isReplyCategory, type ReplyCategory } from "@/lib/domain/ladder";
+import { splitSentences } from "./text";
 import type { ReplyReading } from "./types";
 
 export const SUMMARY_MAX = 140;
@@ -12,15 +13,28 @@ export const REFERENCE_MAX = 220;
 export const DATE_WINDOW = { daysBefore: 7, daysAfter: 90 } as const;
 
 const LEGAL_OR_MONEY =
-  /\b(warrant(?:y|ies)|habitab\w*|abat\w*|owe|owed|owes|owing|rent reductions?|reduc\w* (?:the |your |my )?rent|sue|sued|sues|suing|lawsuits?|courts?|lawyers?|attorneys?|legal\w*|illegal\w*|violations?|judges?|damages|compensat\w*|refunds?|refunded|reimburs\w*|penalt\w*|fees?|fined|fines|dollars?|money|costs?|charged?|charges|billed|billing|hpd|dhcr|statutes?|laws?)\b|\$/i;
+  /\b(warrant(?:y|ies)|habitab\w*|abat\w*|owe|owed|owes|owing|rents?|sue|sued|sues|suing|lawsuits?|courts?|lawyers?|attorneys?|legal\w*|illegal\w*|violations?|judges?|damages|compensat\w*|refunds?|refunded|reimburs\w*|penalt\w*|fees?|fined|fines|dollars?|money|costs?|charged?|charges|billed|billing|hpd|dhcr|statutes?|laws?|liab\w*|negligen\w*|breach\w*|leases?|pay|pays|paid|paying|payments?|credit\w*|free months?|deposits?)\b|\$/i;
 const THREAT =
-  /\b(threat\w*|or else|consequences|evict\w*|retaliat\w*|police|cops?|arrest\w*|report (?:you|this|them)|withhold\w*|rent strike|warning)\b/i;
+  /\b(threat\w*|or else|consequences|evict\w*|retaliat\w*|police|cops?|arrest\w*|report (?:you|this|them)|withhold\w*|rent strike|warning|demand\w*|or i will|or i'll|311)\b/i;
+// The reference reports what management said, without judging them.
+const JUDGMENT = /\b(slumlords?|liars?|lied|lying|incompetent|pathetic|disgusting|ridiculous|unacceptable|shameful|outrageous|lazy)\b/i;
 const PROFANITY = /\b(f+u+c+k\w*|shit\w*|bitch\w*|asshole\w*|bastard\w*|damn\w*|crap)\b/i;
 const LINK_OR_EMAIL = /https?:\/\/|www\.|[\w.+-]+@[\w-]+\.[\w.]+/i;
 
-/** True if the text has legal or money language, a threat, profanity, or a link. */
+/** True if the text has legal or money language, a threat or demand, a judgment, profanity, or a link. */
 export function hasBlockedLanguage(text: string): boolean {
-  return LEGAL_OR_MONEY.test(text) || THREAT.test(text) || PROFANITY.test(text) || LINK_OR_EMAIL.test(text);
+  return [LEGAL_OR_MONEY, THREAT, JUDGMENT, PROFANITY, LINK_OR_EMAIL].some((re) => re.test(text.replace(/[‘’]/g, "'")));
+}
+
+/**
+ * True if the text is a single sentence. A quoted reply counts as part of the sentence around it,
+ * but a sentence ending inside the quote still ends the sentence, so `you replied: "Received." Fix it.`
+ * is two sentences.
+ */
+export function isOneSentence(text: string): boolean {
+  if (/…\s/.test(text)) return false;
+  const quotesBlanked = text.replace(/[“"]([^”"]*)[”"]/g, (_m, inner: string) => (/[.!?…]\s*$/.test(inner) ? '"Q".' : '"Q"'));
+  return splitSentences(quotesBlanked).length === 1;
 }
 
 /** "October 17" for the reply reference. */
@@ -62,6 +76,7 @@ export function sanitizeReplyReference(value: unknown, receivedOn: IsoDate): str
   if (ref.length > REFERENCE_MAX) return null;
   const prefix = new RegExp(`^On ${monthDay(receivedOn)},? you\\b`);
   if (!prefix.test(ref)) return null;
+  if (!isOneSentence(ref)) return null;
   if (hasBlockedLanguage(ref)) return null;
   return ref;
 }
