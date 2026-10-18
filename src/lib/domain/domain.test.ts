@@ -1,0 +1,199 @@
+import { describe, expect, it } from "vitest";
+import { addDays, daysBetween, isIsoDate, nyDate } from "./dates";
+import { estimateAbatement } from "./estimate";
+import { dueSummary, nextAction, type LadderMessage } from "./ladder";
+import { buildMailto, trackingAddress } from "./mailto";
+import { buildMessage, unfilledPlaceholders, type TemplateContext } from "./templates";
+
+describe("dates", () => {
+  it("uses New York's calendar date, not UTC's", () => {
+    // 11pm in New York on Oct 18 is already Oct 19 in UTC.
+    expect(nyDate("2026-10-19T03:00:00Z")).toBe("2026-10-18");
+    expect(nyDate("2026-10-19T05:00:00Z")).toBe("2026-10-19");
+  });
+
+  it("counts and adds whole days across the end of daylight saving time", () => {
+    expect(daysBetween("2026-10-30", "2026-11-03")).toBe(4);
+    expect(addDays("2026-10-30", 4)).toBe("2026-11-03");
+    expect(daysBetween("2026-10-20", "2026-10-18")).toBe(-2);
+  });
+
+  it("validates ISO dates", () => {
+    expect(isIsoDate("2026-10-18")).toBe(true);
+    expect(isIsoDate("2026-02-30")).toBe(false);
+    expect(isIsoDate("10/18/2026")).toBe(false);
+  });
+});
+
+describe("estimateAbatement", () => {
+  it("matches the worked example: a sink broken 3 weeks at $1,800 rent", () => {
+    const e = estimateAbatement({ monthlyRent: 1800, issueType: "plumbing", noticeOn: "2026-09-27", endOn: "2026-10-18" });
+    expect(e.days).toBe(21);
+    expect(e.low).toBe(120);
+    expect(e.high).toBe(310);
+  });
+
+  it("uses the higher range for no heat", () => {
+    const e = estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-04", endOn: "2026-10-18" });
+    expect(e.days).toBe(14);
+    expect(e.low).toBe(140); // 1500*12/365*14*0.2 = 138.08
+    expect(e.high).toBe(350); // ... *0.5 = 345.2
+    expect(e.perDayHigh).toBeCloseTo(24.66, 1);
+  });
+
+  it("never goes negative and handles bad rent", () => {
+    expect(estimateAbatement({ monthlyRent: 2000, issueType: "mold", noticeOn: "2026-10-20", endOn: "2026-10-18" }).high).toBe(0);
+    expect(estimateAbatement({ monthlyRent: Number.NaN, issueType: "mold", noticeOn: "2026-10-01", endOn: "2026-10-18" }).high).toBe(0);
+  });
+});
+
+describe("nextAction", () => {
+  const open = { status: "open" as const };
+  const sentNotice: LadderMessage = { direction: "outgoing", step: "notice", at: "2026-10-18T14:00:00Z" };
+
+  it("starts with a notice due today", () => {
+    expect(nextAction(open, [], "2026-10-18")).toMatchObject({ kind: "send", step: "notice", dueOn: "2026-10-18" });
+  });
+
+  it("schedules the reminder 3 days after the notice", () => {
+    expect(nextAction(open, [sentNotice], "2026-10-19")).toMatchObject({ kind: "send", step: "reminder", dueOn: "2026-10-21" });
+  });
+
+  it("keeps at least 2 days after the last message we sent", () => {
+    const msgs: LadderMessage[] = [
+      sentNotice,
+      { direction: "incoming", classification: "acknowledged_no_date", at: "2026-10-19T15:00:00Z" },
+      { direction: "outgoing", step: "ask_date", at: "2026-10-20T15:00:00Z" },
+    ];
+    // Reminder would be due Oct 21 (notice + 3) but ask_date went out Oct 20, so Oct 22.
+    expect(nextAction(open, msgs, "2026-10-20")).toMatchObject({ kind: "send", step: "reminder", dueOn: "2026-10-22" });
+  });
+
+  it("walks the timed ladder: reminder, formal notice, 311 guide, then all sent", () => {
+    const msgs: LadderMessage[] = [sentNotice, { direction: "outgoing", step: "reminder", at: "2026-10-21T14:00:00Z" }];
+    expect(nextAction(open, msgs, "2026-10-22")).toMatchObject({ step: "formal_notice", dueOn: "2026-10-23" });
+    msgs.push({ direction: "outgoing", step: "formal_notice", at: "2026-10-23T14:00:00Z" });
+    expect(nextAction(open, msgs, "2026-10-24")).toMatchObject({ step: "guide_311", dueOn: "2026-10-25" });
+    msgs.push({ direction: "outgoing", step: "guide_311", at: "2026-10-25T14:00:00Z" });
+    expect(nextAction(open, msgs, "2026-10-26").kind).toBe("all_sent");
+  });
+
+  it("answers each kind of reply", () => {
+    const reply = (classification: LadderMessage["classification"]): LadderMessage[] => [
+      sentNotice,
+      { direction: "incoming", classification, at: "2026-10-19T15:00:00Z" },
+    ];
+    expect(nextAction(open, reply("acknowledged_no_date"), "2026-10-19")).toMatchObject({ step: "ask_date" });
+    expect(nextAction(open, reply("scheduled"), "2026-10-19")).toMatchObject({ step: "confirm_schedule" });
+    expect(nextAction(open, reply("needs_access"), "2026-10-19")).toMatchObject({ step: "offer_access" });
+    expect(nextAction(open, reply("disputes_or_refuses"), "2026-10-19")).toMatchObject({ step: "formal_notice" });
+    expect(nextAction(open, reply("says_fixed"), "2026-10-19").kind).toBe("confirm_fixed");
+    expect(nextAction(open, reply("unclear"), "2026-10-19").kind).toBe("team_review");
+    expect(nextAction(open, reply(null), "2026-10-19").kind).toBe("team_review");
+  });
+
+  it("goes to 311 when they refuse after the formal notice", () => {
+    const msgs: LadderMessage[] = [
+      sentNotice,
+      { direction: "outgoing", step: "formal_notice", at: "2026-10-19T14:00:00Z" },
+      { direction: "incoming", classification: "disputes_or_refuses", at: "2026-10-20T14:00:00Z" },
+    ];
+    expect(nextAction(open, msgs, "2026-10-20")).toMatchObject({ step: "guide_311" });
+  });
+
+  it("waits for a scheduled repair, then checks in", () => {
+    const msgs: LadderMessage[] = [
+      sentNotice,
+      { direction: "incoming", classification: "scheduled", at: "2026-10-19T15:00:00Z" },
+      { direction: "outgoing", step: "confirm_schedule", at: "2026-10-19T16:00:00Z" },
+    ];
+    const c = { status: "open" as const, repairScheduledFor: "2026-10-22" };
+    expect(nextAction(c, msgs, "2026-10-22").kind).toBe("waiting_for_repair");
+    expect(nextAction(c, msgs, "2026-10-23").kind).toBe("checkin");
+  });
+
+  it("asks for a new date when a scheduled repair is missed", () => {
+    const msgs: LadderMessage[] = [sentNotice, { direction: "outgoing", step: "confirm_schedule", at: "2026-10-19T16:00:00Z" }];
+    const c = { status: "open" as const, repairScheduledFor: null, repairMissedAt: "2026-10-23T12:00:00Z" };
+    expect(nextAction(c, msgs, "2026-10-23")).toMatchObject({ step: "missed_repair", dueOn: "2026-10-23" });
+  });
+
+  it("is done once fixed", () => {
+    expect(nextAction({ status: "fixed" }, [sentNotice], "2026-10-25").kind).toBe("done");
+  });
+
+  it("summarizes what's due for teammates", () => {
+    expect(dueSummary({ kind: "send", step: "reminder", dueOn: "2026-10-21", reason: "" }, "2026-10-19")).toEqual({ nextStep: "reminder", nextDueOn: "2026-10-21" });
+    expect(dueSummary({ kind: "team_review", reason: "" }, "2026-10-19")).toEqual({ nextStep: "team_review", nextDueOn: "2026-10-19" });
+    expect(dueSummary({ kind: "done", reason: "" }, "2026-10-19")).toEqual({ nextStep: null, nextDueOn: null });
+  });
+});
+
+describe("templates", () => {
+  const ctx: TemplateContext = {
+    today: "2026-10-18",
+    tenantName: "Maria Lopez",
+    address: "123 Example St, Bronx, NY 10452",
+    unit: "4B",
+    mgmtName: "Acme Management",
+    issueType: "heat",
+    issueDescription: "Radiators cold since Oct 5.",
+    startedOn: "2026-10-05",
+    firstReportedOn: "2026-10-06",
+    firstReportedVia: "text",
+    priorFollowups: 3,
+    daysSinceReport: 12,
+    estimate: estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-06", endOn: "2026-10-18" }),
+    sentOn: { notice: "2026-10-12", reminder: "2026-10-15" },
+    openViolations: 14,
+  };
+
+  it("writes a factual first notice with a reply-by date", () => {
+    const m = buildMessage("notice", ctx);
+    expect(m.subject).toBe("Repair needed at 123 Example St, Bronx, NY 10452, Apt 4B");
+    expect(m.body).toContain("Hello Acme Management,");
+    expect(m.body).toContain("no heat or hot water (Radiators cold since Oct 5)");
+    expect(m.body).toContain("October 6, 2026 by text message, and followed up 3 times since");
+    expect(m.body).toContain("12 days");
+    expect(m.body).toContain("Please reply by Wednesday, October 21");
+    expect(m.body).not.toMatch(/\b(abatement|warranty|owed)\b/i);
+  });
+
+  it("puts the timeline, estimate and violations in the formal notice, hedged", () => {
+    const m = buildMessage("formal_notice", ctx);
+    expect(m.body).toContain("- October 12, 2026: written notice sent");
+    expect(m.body).toContain("warranty of habitability");
+    expect(m.body).toContain("may be between $120 and $300");
+    expect(m.body).toContain("14 open violations");
+    expect(m.body).not.toMatch(/you owe|you are owed|will get|lawsuit|sue/i);
+  });
+
+  it("inserts the agent's reply reference only where the template allows", () => {
+    const m = buildMessage("ask_date", { ...ctx, replyReference: "On October 17 you wrote that you would look into it." });
+    expect(m.body).toContain("On October 17 you wrote that you would look into it.\n\nCould you please confirm");
+  });
+
+  it("flags placeholders the tenant must fill in", () => {
+    expect(unfilledPlaceholders(buildMessage("guide_311", ctx).body)).toEqual(["[add your 311 number]"]);
+    expect(unfilledPlaceholders(buildMessage("notice", ctx).body)).toEqual([]);
+  });
+
+  it("handles a missing unit, manager name and description", () => {
+    const m = buildMessage("notice", { ...ctx, unit: null, mgmtName: null, issueDescription: null, priorFollowups: 0 });
+    expect(m.body.startsWith("Hello,")).toBe(true);
+    expect(m.body).toContain("at 123 Example St, Bronx, NY 10452: no heat or hot water.");
+    expect(m.body).not.toContain("followed up");
+  });
+});
+
+describe("mailto", () => {
+  it("plus-addresses the team inbox per case", () => {
+    expect(trackingAddress("abate.team@gmail.com", "AB12CD")).toBe("abate.team+ab12cd@gmail.com");
+    expect(trackingAddress("", "AB12CD")).toBeNull();
+  });
+
+  it("encodes subject, body line breaks and cc", () => {
+    const link = buildMailto({ to: "mgmt@example.com", cc: "t+ab@gmail.com", subject: "Repair & more", body: "Line 1\nLine 2" });
+    expect(link).toBe("mailto:mgmt@example.com?cc=t%2Bab%40gmail.com&subject=Repair%20%26%20more&body=Line%201%0D%0ALine%202");
+  });
+});

@@ -1,14 +1,27 @@
-# Secrets
-.env
-.env*.local
+# Secrets: every .env file except the committed example
+.env*
+!.env.example
 
 # Dependencies and builds
-node_modules/
-.next/
-out/
-build/
-.vercel/
+/node_modules
+/.next/
+/out/
+/build
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# Tests
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# Supabase CLI
+supabase/.temp/
+supabase/.branches/
 
 # OS and editor
 .DS_Store
+*.pem
 *.log
