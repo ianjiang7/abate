@@ -48,9 +48,11 @@ describe("heat query", () => {
     expect(normalizeBorough("Hoboken")).toBeNull();
   });
 
-  it("counts back from New York's date", () => {
-    // 11pm Oct 18 in New York is Oct 19 in UTC.
-    expect(heatSince(7, new Date("2026-10-19T03:00:00Z"))).toBe("2026-10-11");
+  it("covers exactly N calendar days ending with New York's today", () => {
+    // 11pm Oct 18 in New York is Oct 19 in UTC. 7 days is Oct 12 through Oct 18.
+    expect(heatSince(7, new Date("2026-10-19T03:00:00Z"))).toBe("2026-10-12");
+    expect(heatSince(1, new Date("2026-10-19T03:00:00Z"))).toBe("2026-10-18");
+    expect(heatSince(14, new Date("2026-10-18T16:00:00Z"))).toBe("2026-10-05");
   });
 
   it("builds the $where clause from validated options", () => {
@@ -79,7 +81,7 @@ describe("heat query", () => {
     expect(url.searchParams.get("$group")).toBe("bbl");
     expect(url.searchParams.get("$order")).toBe("n DESC, bbl");
     expect(url.searchParams.get("$limit")).toBe("40");
-    expect(url.searchParams.get("$where")).toContain("created_date >= '2026-10-11T00:00:00'");
+    expect(url.searchParams.get("$where")).toContain("created_date >= '2026-10-12T00:00:00'");
     // No alias may shadow a column used in $where.
     expect(url.searchParams.get("$select")).not.toMatch(/as (borough|incident_zip|bbl|created_date)\b/);
 

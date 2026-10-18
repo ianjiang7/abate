@@ -10,7 +10,8 @@
 // - HPD Housing Maintenance Code Violations, wvxf-dwi5. Fields: bbl (text, 10 digits), bin (text),
 //   boroid/block/lot, class ("A", "B", "C", and "I" for info-only orders), violationstatus
 //   ("Open" or "Close"). We count open violations by class with
-//   $where=bbl='<bbl>' AND violationstatus='Open' and $group=class.
+//   $where=bbl='<bbl>' AND bin='<bin>' AND violationstatus='Open' and $group=class. About 0.1% of
+//   open violations have no bin.
 // - HPD Housing Maintenance Code Complaints and Problems, ygpa-z7cr. This is the current HPD
 //   complaints dataset (updated daily; it had same-day rows on Oct 18). One row per problem, so a
 //   complaint (complaint_id) can have several rows. Fields: bbl (number), bin (number),
@@ -23,8 +24,8 @@
 //   311 HEAT/HOT WATER calls are routed to HPD and show up in ygpa-z7cr too (Oct 11 to 16: 2,022
 //   in 311 vs 2,139 HPD heat complaints), so we never add the two together.
 // - HPD Multiple Dwelling Registrations, tesw-yqqr. No bbl field: filter by boroid, block, lot
-//   (numbers). Fields: registrationid, bin, lastregistrationdate. A lot can have many
-//   registrations (garden complexes), so we prefer the one matching the building's BIN.
+//   (numbers). Fields: registrationid, bin (number), lastregistrationdate. A lot can have hundreds
+//   of registrations (Parkchester's lot 2-3944-7501 has 55), so we filter by the building's BIN.
 // - HPD Registration Contacts, feu5-w2e2. Filter by registrationid. Fields: type (Agent,
 //   CorporateOwner, IndividualOwner, JointOwner, HeadOfficer, Officer, SiteManager, Shareholder,
 //   Lessee), corporationname, firstname, lastname. Agents have either a person's name or a
@@ -77,15 +78,17 @@ export function soqlUrl(dataset: DatasetId, query: SoqlQuery): string {
 export async function soql<T extends SoqlRow = SoqlRow>(
   dataset: DatasetId,
   query: SoqlQuery,
-  opts: { timeoutMs?: number } = {},
+  /** `signal` lets several queries share one deadline; the per-query timeout still applies. */
+  opts: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<T[]> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = process.env.NYC_OPEN_DATA_APP_TOKEN;
   if (token) headers["X-App-Token"] = token;
 
+  const timeout = AbortSignal.timeout(opts.timeoutMs ?? OPEN_DATA_TIMEOUT_MS);
   const res = await fetch(soqlUrl(dataset, query), {
     headers,
-    signal: AbortSignal.timeout(opts.timeoutMs ?? OPEN_DATA_TIMEOUT_MS),
+    signal: opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout,
     cache: "no-store",
   });
   if (!res.ok) throw new Error(`NYC Open Data ${dataset} returned HTTP ${res.status}`);

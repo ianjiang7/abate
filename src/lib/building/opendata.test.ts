@@ -90,6 +90,19 @@ describe("soql()", () => {
     expect((secondInit.headers as Record<string, string>)["X-App-Token"]).toBe("test-token");
   });
 
+  it("combines a shared signal with its own timeout", async () => {
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.signal?.aborted) throw init.signal.reason;
+      return Response.json([]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const shared = new AbortController();
+    await expect(soql("wvxf-dwi5", {}, { signal: shared.signal })).resolves.toEqual([]);
+    shared.abort(new DOMException("deadline", "TimeoutError"));
+    await expect(soql("wvxf-dwi5", {}, { signal: shared.signal })).rejects.toThrow("deadline");
+  });
+
   it("throws on an HTTP error or a body that isn't an array", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ message: "bad query" }, { status: 400 })));
     await expect(soql("wvxf-dwi5", {})).rejects.toThrow("HTTP 400");
