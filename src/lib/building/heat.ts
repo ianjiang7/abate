@@ -89,9 +89,12 @@ export function heatWhere(opts: HeatOptions, since: IsoDate): string {
   return clauses.join(" AND ");
 }
 
-/** First day counted: `days` days before New York's today. */
+/**
+ * First day counted, so the window is `days` calendar days ending with New York's today: 7 on
+ * Oct 18 is Oct 12 to 18, and 1 is today only.
+ */
 export function heatSince(days: number, now: Date = new Date()): IsoDate {
-  return addDays(nyDate(now), -days);
+  return addDays(nyDate(now), -(days - 1));
 }
 
 export async function fetchHeatBuildings(opts: HeatOptions, now: Date = new Date()): Promise<HeatBuilding[]> {
