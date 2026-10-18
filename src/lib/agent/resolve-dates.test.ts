@@ -37,6 +37,29 @@ describe("resolveFirstDate", () => {
     expect(resolveFirstDate(text, SAT)).toBe(expected);
   });
 
+  it.each([
+    ["The super stopped by this Monday but nobody answered.", "2026-10-12"],
+    ["We came by this Thursday and no one was home.", "2026-10-15"],
+    ["We came by this Saturday morning.", "2026-10-17"],
+  ])("'this <weekday>' in a past-tense sentence resolves backward: %s", (text, expected) => {
+    expect(resolveFirstDate(text, SAT)).toBe(expected);
+  });
+
+  it.each([
+    "The plumber will replace the 1/2 inch valve soon.",
+    'We need a 1/2" valve.',
+    "We need a 1/2-inch valve.",
+    "We need to order a 3/4 pipe fitting.",
+    "The pipe is 1 1/2 in. wide.",
+    "About 1/2 of the ceiling is stained.",
+  ])("does not read a fraction as a date: %s", (text) => {
+    expect(resolveFirstDate(text, SAT)).toBeNull();
+  });
+
+  it("still reads a month/day date followed by ordinary words", () => {
+    expect(resolveFirstDate("We will be there 10/23 in the morning.", SAT)).toBe("2026-10-23");
+  });
+
   it("does not read a passive future as the past", () => {
     expect(resolveFirstDate("The heat will be fixed Tuesday.", SAT)).toBe("2026-10-20");
   });

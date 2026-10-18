@@ -22,6 +22,10 @@ const MONTH =
   "(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
 
 const NUMERIC = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?\b/g;
+// "1/2 inch valve", "3/4 pipe", "1 1/2" or "1/2 of the ceiling" are fractions, not month/day.
+const FRACTION_AFTER =
+  /^\s*(?:["”″]|''|-?\s*inch(?:es)?\b|-in\b|\s?in\.|\s?(?:ft|mm|cm)\b|\s?(?:foot|feet)\b|\s+(?:pipe|valve|fitting|line|copper|pvc|pex|drain|nut|bolt|screw|thread|turn|cup|gallon)s?\b|\s+of (?:an?|the)\b)/i;
+const FRACTION_BEFORE = /\d[\s-]$/;
 const MONTH_DAY = new RegExp(`\\b${MONTH}\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4}))?`, "gi");
 const DAY_OF_MONTH = new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+of\\s+${MONTH}\\b(?:,?\\s+(\\d{4}))?`, "gi");
 const ORDINAL_DAY = /\bthe\s+(\d{1,2})(st|nd|rd|th)\b(?!\s*(?:floor|fl\b|ave|avenue|street|st\b|of\b))/gi;
@@ -36,8 +40,9 @@ const AMBIGUOUS_LOWERCASE = new Set(["mon", "wed", "sat", "sun"]);
 
 const PAST =
   /\b(was|were|did|had|came|went|stopped|tried|fixed|repaired|replaced|completed|inspected|visited|checked|sealed|serviced|treated|restored|finished|installed|attempted|cleared|unclogged|patched|painted|answered|knocked|showed up|ago|yesterday|already|earlier)\b/gi;
+// "was rescheduled to Thursday" or "postponed to Thursday" points ahead even after "was".
 const FUTURE =
-  /\b(will|shall|going to|gonna|can|could|plans? to|planning to|scheduled|booked|coming|come|arriv\w*|expect\w*|set for)\b|'ll\b/gi;
+  /\b(will|shall|going to|gonna|can|could|plans? to|planning to|scheduled|resched\w*|postponed to|pushed (?:back )?to|booked|coming|come|arriv\w*|expect\w*|set for)\b|'ll\b/gi;
 
 function weekdayOf(date: IsoDate): number {
   return new Date(`${date}T12:00:00Z`).getUTCDay();
@@ -132,6 +137,8 @@ export function findDateMentions(text: string, receivedOn: IsoDate): DateMention
   };
 
   for (const m of text.matchAll(NUMERIC)) {
+    const end = (m.index ?? 0) + m[0].length;
+    if (!m[3] && (FRACTION_AFTER.test(text.slice(end)) || FRACTION_BEFORE.test(text.slice(0, m.index)))) continue;
     const month = Number(m[1]);
     const day = Number(m[2]);
     const year = fullYear(m[3]);
@@ -179,10 +186,13 @@ export function findDateMentions(text: string, receivedOn: IsoDate): DateMention
     if (nextToExplicit) continue;
     const target = WEEKDAY_INDEX[token.slice(0, 3).toLowerCase()];
     const modifier = m[1]?.toLowerCase();
+    const past = tenseAround(text, m.index, end) === "past";
     let date: IsoDate;
     if (modifier === "last" || modifier === "this past") date = previousWeekday(target, receivedOn);
+    // "We came by this Monday" is the Monday just gone (or today, if today is Monday).
+    else if (modifier === "this" && past) date = weekdayOf(receivedOn) === target ? receivedOn : previousWeekday(target, receivedOn);
     else if (modifier) date = nextWeekday(target, receivedOn, modifier === "this");
-    else if (tenseAround(text, m.index, end) === "past") date = previousWeekday(target, receivedOn);
+    else if (past) date = previousWeekday(target, receivedOn);
     else date = nextWeekday(target, receivedOn, false);
     add(m, date, false);
   }
