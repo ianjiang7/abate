@@ -26,6 +26,24 @@ describe("stripQuoted", () => {
     expect(stripQuoted(text)).toBe("We fixed it.");
   });
 
+  it("keeps a forwarded vendor note when the text above only points to it", () => {
+    const text =
+      "Hi Sam,\nSee below from our plumber.\n\nThanks,\nOffice\n\n---------- Forwarded message ---------\nFrom: Ace Plumbing <dispatch@example.com>\nDate: Fri, Oct 16, 2026 at 4:10 PM\nSubject: 4B\nTo: office@example.com\n\nWe will be at the building Tuesday 9am for unit 4B.\n\nOn Thu, Oct 15, 2026 at 9:00 AM Office <office@example.com> wrote:\n> Can you go to 4B?";
+    expect(cleanReply(text)).toBe("Hi Sam,\nSee below from our plumber.\n\nWe will be at the building Tuesday 9am for unit 4B.");
+  });
+
+  it("keeps an Apple Mail or Outlook forward under a pointer", () => {
+    expect(stripQuoted("FYI\n\nBegin forwarded message:\n\nFrom: Super <s@example.com>\nSubject: 4B\n\nI can come Monday.")).toBe("FYI\n\nI can come Monday.");
+    expect(
+      stripQuoted("See the note below.\n________________________________\nFrom: Ace Plumbing\nSent: Friday, October 16, 2026 4:10 PM\nTo: Office\nSubject: FW: 4B\n\nWe will come Tuesday."),
+    ).toBe("See the note below.\n\nWe will come Tuesday.");
+  });
+
+  it("cuts a forward when the text above says something of its own", () => {
+    const text = "Forwarding this to our super, he will handle it.\n\n---------- Forwarded message ---------\nFrom: Tenant <t@example.com>\nSubject: Heat\n\nThe plumber will come Tuesday? Still no heat.";
+    expect(stripQuoted(text)).toBe("Forwarding this to our super, he will handle it.");
+  });
+
   it("keeps a line that merely starts with On", () => {
     expect(stripQuoted("On Monday the plumber will come.")).toBe("On Monday the plumber will come.");
   });
