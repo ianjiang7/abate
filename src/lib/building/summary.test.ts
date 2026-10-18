@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildingWhere,
   daysOpen,
   fetchBuildingSummary,
   fetchBuildingSummaryResult,
@@ -56,22 +57,42 @@ function routeOf(url: URL): Route {
   throw new Error(`Unexpected request ${url}`);
 }
 
-/** Stubs fetch with the fixtures; routes listed in `fail` return HTTP 500. */
-function stubOpenData(fail: Route[] = [], overrides: Partial<Record<Route, unknown>> = {}) {
+/**
+ * Stubs fetch with the fixtures; routes listed in `fail` return HTTP 500. Registrations honor a
+ * `bin=` filter and `$limit` like the live API, newest first. Each response waits `delayMs` and
+ * gives up when the request's signal aborts, like a real fetch.
+ */
+function stubOpenData(fail: Route[] = [], overrides: Partial<Record<Route, unknown>> = {}, delayMs = 0) {
   const urls: URL[] = [];
+  const respond = (url: URL): Response => {
+    const route = routeOf(url);
+    if (fail.includes(route)) return new Response("error", { status: 500 });
+    if (route in overrides) return Response.json(overrides[route]);
+    const where = url.searchParams.get("$where") ?? "";
+    if (route === "contacts") {
+      const id = where.match(/registrationid=(\d+)/)?.[1] ?? "";
+      return Response.json(FIXTURES.contacts[id] ?? []);
+    }
+    if (route === "registrations") {
+      const bin = where.match(/\bbin=(\d+)/)?.[1];
+      const limit = Number(url.searchParams.get("$limit") ?? 1000);
+      return Response.json(FIXTURES.registrations.filter((r) => !bin || r.bin === bin).slice(0, limit));
+    }
+    return Response.json(FIXTURES[route]);
+  };
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (input: string) => {
+    vi.fn(async (input: string, init?: RequestInit) => {
       const url = new URL(input);
       urls.push(url);
-      const route = routeOf(url);
-      if (fail.includes(route)) return new Response("error", { status: 500 });
-      if (route in overrides) return Response.json(overrides[route]);
-      if (route === "contacts") {
-        const id = url.searchParams.get("$where")?.match(/registrationid=(\d+)/)?.[1] ?? "";
-        return Response.json(FIXTURES.contacts[id] ?? []);
-      }
-      return Response.json(FIXTURES[route]);
+      if (!delayMs) return respond(url);
+      return new Promise<Response>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(respond(url)), delayMs);
+        init?.signal?.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(init.signal?.reason);
+        });
+      });
     }),
   );
   return urls;
@@ -124,28 +145,71 @@ describe("fetchBuildingSummary", () => {
     });
   });
 
-  it("sends validated, correctly scoped queries", async () => {
+  it("scopes every query to the building's BIN, with the right literal type per dataset", async () => {
     const urls = stubOpenData();
     await fetchBuildingSummary(BBL, BIN, { now: NOW });
-    const where = (route: Route) => urls.find((u) => routeOf(u) === route)?.searchParams.get("$where");
+    const wheres = (route: Route) => urls.filter((u) => routeOf(u) === route).map((u) => u.searchParams.get("$where"));
 
-    expect(where("violations")).toBe(`bbl='${BBL}' AND violationstatus='Open'`);
-    expect(where("complaintCounts")).toBe(`bbl=${BBL} AND received_date >= '2026-10-01T00:00:00'`);
-    expect(where("closedComplaints")).toBe(`bbl=${BBL} AND complaint_status='CLOSE' AND received_date >= '2024-10-18T00:00:00'`);
-    expect(where("registrations")).toBe("boroid=2 AND block=1234 AND lot=56");
-    expect(where("contacts")).toBe("registrationid=900001");
+    // Violations store bbl and bin as text; complaints and registrations as numbers.
+    expect(wheres("violations")).toEqual([`bbl='${BBL}' AND bin='${BIN}' AND violationstatus='Open'`]);
+    expect(wheres("complaintCounts")).toEqual([`bbl=${BBL} AND bin=${BIN} AND received_date >= '2026-10-01T00:00:00'`]);
+    expect(wheres("closedComplaints")).toEqual([
+      `bbl=${BBL} AND bin=${BIN} AND complaint_status='CLOSE' AND received_date >= '2024-10-18T00:00:00'`,
+    ]);
+    // The building's own registration is asked for directly, so one query is enough.
+    expect(wheres("registrations")).toEqual([`boroid=2 AND block=1234 AND lot=56 AND bin=${BIN}`]);
+    expect(wheres("contacts")).toEqual(["registrationid=900001"]);
 
     const closed = urls.find((u) => routeOf(u) === "closedComplaints")!;
     expect(Number(closed.searchParams.get("$limit"))).toBeLessThanOrEqual(1000);
     expect(closed.searchParams.get("$order")).toBe("received_date DESC");
+    const registration = urls.find((u) => routeOf(u) === "registrations")!;
+    expect(registration.searchParams.get("$order")).toBe("lastregistrationdate DESC");
+    expect(registration.searchParams.get("$limit")).toBe("1");
   });
 
-  it("uses the newest registration on the lot when there is no BIN", async () => {
-    stubOpenData();
+  it("counts the whole lot and uses its newest registration when there is no BIN", async () => {
+    const urls = stubOpenData();
     const summary = await fetchBuildingSummary(BBL, null, { now: NOW });
+    const wheres = (route: Route) => urls.filter((u) => routeOf(u) === route).map((u) => u.searchParams.get("$where"));
+
+    expect(wheres("violations")).toEqual([`bbl='${BBL}' AND violationstatus='Open'`]);
+    expect(wheres("complaintCounts")).toEqual([`bbl=${BBL} AND received_date >= '2026-10-01T00:00:00'`]);
+    expect(wheres("closedComplaints")).toEqual([
+      `bbl=${BBL} AND complaint_status='CLOSE' AND received_date >= '2024-10-18T00:00:00'`,
+    ]);
+    expect(wheres("registrations")).toEqual(["boroid=2 AND block=1234 AND lot=56"]);
     expect(summary?.bin).toBeNull();
     expect(summary?.managingAgent).toEqual({ name: null, company: "OTHER BUILDING AGENT INC" });
     expect(summary?.owner).toBeNull();
+  });
+
+  it("finds the building's registration even when another building on the lot registered more recently", async () => {
+    // Ours is the second newest on the lot; the stub, like the API, returns only the first $limit rows.
+    stubOpenData();
+    const summary = await fetchBuildingSummary(BBL, BIN, { now: NOW });
+    expect(summary?.owner).toBe("EXAMPLE HOLDINGS LLC");
+    expect(summary?.managingAgent?.company).toBe("SAMPLE MANAGEMENT CO");
+  });
+
+  it("falls back to the lot's newest registration when the BIN has none", async () => {
+    const urls = stubOpenData();
+    const summary = await fetchBuildingSummary(BBL, "2099995", { now: NOW });
+    const wheres = urls.filter((u) => routeOf(u) === "registrations").map((u) => u.searchParams.get("$where"));
+    expect(wheres).toEqual(["boroid=2 AND block=1234 AND lot=56 AND bin=2099995", "boroid=2 AND block=1234 AND lot=56"]);
+    expect(summary?.managingAgent).toEqual({ name: null, company: "OTHER BUILDING AGENT INC" });
+  });
+
+  it("shares one deadline across every query, including the registration chain", async () => {
+    // Each response takes 60ms. Registrations then contacts would finish at 120ms, past the 100ms
+    // deadline, so contacts are cut off while the parallel queries still load.
+    stubOpenData([], {}, 60);
+    const result = await fetchBuildingSummaryResult(BBL, BIN, { now: NOW, timeoutMs: 100 });
+    expect(result?.complete).toBe(false);
+    expect(result?.summary.openViolations.total).toBe(10);
+    expect(result?.summary.complaintsThisSeason.heat).toBe(6);
+    expect(result?.summary.managingAgent).toBeNull();
+    expect(result?.summary.owner).toBeNull();
   });
 
   it("returns partial data with zeros and nulls when some queries fail", async () => {
@@ -204,6 +268,15 @@ describe("fetchBuildingSummary", () => {
 });
 
 describe("helpers", () => {
+  it("builds the building filter for text and number datasets", () => {
+    expect(buildingWhere(BBL, BIN, "text")).toBe(`bbl='${BBL}' AND bin='${BIN}'`);
+    expect(buildingWhere(BBL, BIN, "number")).toBe(`bbl=${BBL} AND bin=${BIN}`);
+    expect(buildingWhere(BBL, null, "number")).toBe(`bbl=${BBL}`);
+    expect(buildingWhere(BBL, "2000000", "text")).toBe(`bbl='${BBL}'`);
+    expect(buildingWhere(BBL, "2099991' OR '1'='1", "text")).toBe(`bbl='${BBL}'`);
+    expect(() => buildingWhere("2012340056' OR '1'='1", null, "text")).toThrow();
+  });
+
   it("picks the agent's person and company names", () => {
     expect(pickAgent([{ type: "Agent", firstname: "ALEX", lastname: "PLACEHOLDER" }])).toEqual({ name: "ALEX PLACEHOLDER", company: null });
     expect(pickAgent([{ type: "Agent", corporationname: " SAMPLE  MGMT " }])).toEqual({ name: null, company: "SAMPLE MGMT" });
