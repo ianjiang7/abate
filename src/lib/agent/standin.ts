@@ -2,8 +2,11 @@
 // the Claude API fails, so the ladder keeps moving. A teammate checks every reading either way.
 //
 // Precedence, when a reply carries more than one signal (the Claude prompt uses the same order):
-//   1. scheduled            a concrete future date for a visit or repair ("will come Tuesday")
-//   2. says_fixed           says the repair is done ("we fixed it", "heat is back on")
+//   1. scheduled            a concrete future date for a visit or repair ("will come Tuesday"), not
+//                           a cancelled or refused one ("can't come Tuesday"), a recurring one
+//                           ("every Tuesday") or one about something else ("we'll respond Monday")
+//   2. says_fixed           says the repair is done ("we fixed it", "heat is back on"), not a
+//                           promise ("heat will be back once the part arrives")
 //   3. needs_access         asks to get in, or offers times to pick from ("which day works?")
 //   4. disputes_or_refuses  denies the problem or responsibility, or refuses ("not our responsibility")
 //   5. acknowledged_no_date answers without a date ("received", "we'll look into it", "next week")
@@ -22,9 +25,30 @@ const QUOTE_MAX = 140;
 const OUT_OF_OFFICE =
   /\b(out of (the )?office|out of office|on vacation|on leave|away from (my|the) desk|limited access to (e-?mail|email))\b/;
 
+// "can" but not "can't": a refusal is not a plan.
 const VISIT_INTENT =
-  /\b(will|shall|going to|gonna|can|could|plans? to|planning to|scheduled|rescheduled|booked|coming|come|be there|be by|stop by|arriv\w*|appointment|visit|set for|expect\w*)\b|'ll\b/;
+  /\b(will|shall|going to|gonna|could|plans? to|planning to|scheduled|rescheduled|booked|coming|come|be there|be by|stop by|arriv\w*|appointment|visit|set for|expect\w*)\b|\bcan\b(?!'t)|'ll\b/;
+// A scheduled reply must be about someone coming, the work, or the broken thing itself, not just
+// any future date ("we will respond Monday", "rent will be due on the 1st").
+const REPAIR_WORDS =
+  /\b(plumbers?|super|superintendent|handyman|technicians?|tech|electricians?|exterminators?|contractors?|locksmith|maintenance|crew|team|workers?|vendor|inspector|porter|staff|someone|somebody|repair\w*|fix\w*|replac\w*|install\w*|inspect\w*|treat\w*|servic\w*|patch\w*|paint\w*|address\w*|handl\w*|check|look at|come|comes|coming|come by|drop by|stop by|stop in|swing by|be there|be by|be at|visit\w*|appointment|scheduled|rescheduled|booked|set for|arriv\w*|send\w*|work|apartment|apt|unit|heat|hot water|water|boiler|radiators?|leak\w*|pipes?|sink|toilet|tub|shower|drain|window|door|lock|mold|outlets?|lights?|power|ceiling|elevator|pests?|mice|rats?|roaches|bedbugs)\b/;
 const OFFER = /\?|\bwhich (day|days|time|times|works?)\b|\b(does|do|would|will) (that|this|it|any of (these|those)) work\b|\bworks? (best )?for you\b/;
+// "can't come Tuesday", "won't be coming", "no one will be there", "not until Monday at the earliest".
+const NEGATED =
+  /\b(not|never|cannot|unable|no longer|no one|nobody|noone|cant|wont|dont|didnt|couldnt)\b|n't\b|\bat the earliest\b|\bno earlier than\b/;
+const CANCELLED = /\b(cancel\w*|called off|call(?:ing)? off|postpon\w*|pushed back)\b/;
+// "postponed to Thursday" or "moved from Tuesday to Thursday": the new date is the one that counts.
+const NEW_DATE_BEFORE = /\b(to|until|till|for)\s+(the\s+)?$/;
+const OLD_DATE_BEFORE = /\bfrom\s+(the\s+)?$/;
+const MOVED = /\b(resched\w*|moved|postpon\w*|pushed|changed)\b/;
+// Dates that aren't about the repair: when the office will answer, rent, a standing building schedule.
+const NOT_ABOUT_REPAIR =
+  /\b(respond|response|reply|replies|get back to|follow up|update you|let you know|be in touch|reach out|call you|email you|text you|contact you|reopen\w*|rent|rents|payments?|late fees?|invoice|lease|renewal)\b|\b(we are|we're|office is|office will be|we will be) closed\b|\bdue\b(?!\s+to\b)/;
+const RECURRING =
+  /\b(every|each)\s+(other\s+|second\s+|third\s+)?(day|week|month|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues?|weds?|thu(rs?)?|fri|sat|sun)\b|\b(daily|weekly|biweekly|monthly)\b/;
+// Clause boundaries within a sentence, so "We can't come Monday, but we will come Tuesday" reads as Tuesday.
+// A colon between digits ("10:30") is a time, not a boundary.
+const CLAUSE_BREAK = /[,;()]|:(?!\d)|\s[-–—]\s|\b(?:but|however|although|though|whereas)\b/gi;
 
 const FIXED_PATTERNS = [
   /\b(has|have|had) been (fixed|repaired|replaced|resolved|restored|completed|taken care of|addressed|serviced|treated|sealed|patched|cleared|unclogged)\b/,
@@ -32,14 +56,23 @@ const FIXED_PATTERNS = [
   /\b(we|i|he|she|they|super|plumber|electrician|technician|tech|handyman|exterminator|contractor|maintenance|crew|team|someone|porter)\b[^.!?]{0,40}\b(fixed|repaired|replaced|resolved|restored|sealed|patched|unclogged|completed|took care of|exterminated|treated|installed)\b/,
   /^(fixed|done|repaired|all set|resolved|completed|taken care of)\b/,
   /\balready (fixed|repaired|took care|taken care|handled|done|replaced)\b/,
-  /\b(heat|hot water|water|power|electricity|lights?|gas|elevator|outlet|toilet|sink)\b[^.!?]{0,25}\b(is|are|should be)\b[^.!?]{0,10}\b(back( on| up)?|restored|working (again|now)|on again)\b/,
+  /\b(heat|hot water|water|power|electricity|lights?|gas|elevator|outlet|toilet|sink)\b[^.!?]{0,25}\b(is|are)\b[^.!?]{0,10}\b(back( on| up)?|restored|working (again|now)|on again)\b/,
   /\b(working|functioning|running) (again|now|properly now|fine now)\b/,
-  /\bshould be (working|fine|good|all set|back)( now)?\b/,
+  // "should be back" alone is a promise; "should be working now" reports a repair.
+  /\bshould (now )?be (working|fine|good|all set|back)( on| up)?( again)? now\b|\bshould now be (working|fine|good|all set|back)\b/,
   /\bwork order\b[^.!?]{0,60}\b(completed|closed)\b/,
   /\b(it'?s|it is|that'?s|this is) (all )?(done|fixed|all set|taken care of|resolved)\b/,
 ];
 const FIXED_NEGATION = /\b(not|isn'?t|wasn'?t|aren'?t|haven'?t|hasn'?t|never|yet to)\b/;
-const FUTURE_MARKER = /\b(will|going to|gonna|plans? to|scheduled|need to|needs to|to be|once|until|when)\b|'ll\b/;
+// Words that turn "the heat is back" into a promise or a condition, when they come before it in
+// the clause ("once the heat is back", "we hope the heat is back") or right after ("back soon").
+const FIX_HEDGE_BEFORE =
+  /\b(will|going to|gonna|plans? to|planning to|scheduled|need to|needs to|to be|once|until|till|when|hope|hopefully|expect\w*|as soon as|by the time|if)\b|'ll\b/;
+const FIX_HEDGE_AFTER = /\b(once|until|till|soon|shortly|as soon as)\b/;
+const SHOULD = /\bshould\b(?!\s+have\b)/;
+// "The elevator is working again but we still need to look at your radiator" isn't a finished repair.
+const STILL_OPEN =
+  /\bstill (need|needs|have to|has to|waiting|working on|broken|out|leaking|not|cold|no)\b|\bbut\b[^.!?]*\b(still|need to|needs to|have to|has to)\b/;
 
 const ACCESS_PATTERNS = [
   /\b(access|entry|enter)\b/,
@@ -84,7 +117,8 @@ const ACK_PATTERNS = [
   /\b(forwarded|passed (this |it |that )?(along|on)|sent (this|it) to|escalated|notified|informed|let (the|our) \w+ know)\b/,
   /\bwork order\b|\bticket\b|\bservice request\b|\brequest #?\d+/,
   /\b(we are|we're|i am|i'm) (aware|on it|working on)\b|\bworking on (it|this)\b|\bon it\b/,
-  /\b(will|'ll) (follow up|get back|reach out|contact you|be in touch|update you|keep you|let you know|send someone|have someone|take care of|fix|repair|address|handle|get (someone|it))\b/,
+  /\b(will|'ll) (follow up|get back|reach out|contact you|be in touch|update you|keep you|let you know|send someone|have someone|take care of|fix|repair|address|handle|reschedule|get (someone|it))\b/,
+  /\b(should|will) be (back|working|fixed|repaired|restored|done)\b|\bonce the parts? (arrives?|comes? in|is in|are in)\b/,
   /\b(asap|as soon as possible|shortly|soon|in the queue|on (the|our) list|next week|this week|in a few days|be patient)\b/,
   /\bparts? (are|is) (on order|ordered|coming)\b/,
   /\bnoted\b|\bthanks? (you )?for (letting us know|reaching out|your patience|the heads up|your (email|message))\b/,
@@ -98,8 +132,24 @@ function readSentences(cleaned: string, receivedOn: IsoDate): Sentence[] {
   return splitSentences(cleaned).map((text) => ({
     text,
     lower: normalizeText(text).toLowerCase(),
-    mentions: findDateMentions(text, receivedOn),
+    // A date the sanitizer would drop anyway can't decide the category either.
+    mentions: findDateMentions(text, receivedOn).filter((m) => sanitizeDate(m.date, receivedOn) !== null),
   }));
+}
+
+/** The clause of `text` around [index, end): bounded by commas, colons, "but" and the like. */
+function clauseAt(text: string, index: number, end: number): { start: number; stop: number } {
+  let start = 0;
+  let stop = text.length;
+  for (const m of text.matchAll(CLAUSE_BREAK)) {
+    const at = m.index ?? 0;
+    if (at + m[0].length <= index) start = at + m[0].length;
+    else if (at >= end) {
+      stop = at;
+      break;
+    }
+  }
+  return { start, stop };
 }
 
 const isFutureMention = (m: DateMention, receivedOn: IsoDate) =>
@@ -112,25 +162,62 @@ function offersDates(s: Sentence, receivedOn: IsoDate): boolean {
   return OFFER.test(s.lower) || (future.length > 1 && /\bor\b/.test(s.lower));
 }
 
+/**
+ * The date of a visit or repair this sentence sets, or null. Each future date is checked in its own
+ * clause: skipped when that clause cancels or negates the visit ("can't come Tuesday", "Tuesday's
+ * appointment is cancelled"), repeats on a schedule ("every Tuesday"), or is about something other
+ * than the repair ("we will respond Monday", "rent is due on the 1st").
+ */
+function plannedVisitDate(s: Sentence, receivedOn: IsoDate): IsoDate | null {
+  if (!VISIT_INTENT.test(s.lower) || !REPAIR_WORDS.test(s.lower) || offersDates(s, receivedOn)) return null;
+  const sentenceNegated = NEGATED.test(s.lower) || CANCELLED.test(s.lower);
+  for (const m of s.mentions) {
+    if (!isFutureMention(m, receivedOn)) continue;
+    const { start, stop } = clauseAt(s.lower, m.index, m.end);
+    const clause = s.lower.slice(start, stop);
+    const before = s.lower.slice(0, m.index);
+    if (RECURRING.test(clause) || NOT_ABOUT_REPAIR.test(clause) || NEGATED.test(clause)) continue;
+    if (CANCELLED.test(clause) && !NEW_DATE_BEFORE.test(before)) continue;
+    if (MOVED.test(s.lower) && OLD_DATE_BEFORE.test(before)) continue;
+    // "Unfortunately, Tuesday, the plumber can't come": the clause must state the plan on its own.
+    if (sentenceNegated && !VISIT_INTENT.test(clause)) continue;
+    return m.date;
+  }
+  return null;
+}
+
+/** True if the sentence says the repair is already done, not promised or conditional. */
+function saysFixed(lower: string): boolean {
+  if (FIXED_NEGATION.test(lower) || STILL_OPEN.test(lower)) return false;
+  return FIXED_PATTERNS.some((re) => {
+    const m = re.exec(lower);
+    if (!m) return false;
+    const matchEnd = m.index + m[0].length;
+    const { start, stop } = clauseAt(lower, matchEnd - 1, matchEnd);
+    const before = lower.slice(Math.min(start, m.index), matchEnd);
+    const after = lower.slice(matchEnd, stop);
+    if (FIX_HEDGE_BEFORE.test(before) || FIX_HEDGE_AFTER.test(after)) return false;
+    return !(SHOULD.test(before) && !/\bnow\b/.test(lower.slice(start, stop)));
+  });
+}
+
 type Verdict = { category: ReplyCategory; sentence: string | null; date: IsoDate | null };
 
 function classify(cleaned: string, receivedOn: IsoDate): Verdict {
   const sentences = readSentences(cleaned, receivedOn);
   const firstDate = (s: Sentence) => s.mentions[0]?.date ?? sentences.find((x) => x.mentions.length)?.mentions[0].date ?? null;
-  const firstMatching = (patterns: RegExp[], extra?: (lower: string) => boolean) =>
-    sentences.find((s) => patterns.some((re) => re.test(s.lower)) && (!extra || extra(s.lower))) ?? null;
+  const firstMatching = (patterns: RegExp[]) => sentences.find((s) => patterns.some((re) => re.test(s.lower))) ?? null;
 
   if (OUT_OF_OFFICE.test(normalizeText(cleaned).toLowerCase())) return { category: "unclear", sentence: null, date: null };
 
   // 1. A concrete future date for a visit or repair, stated as a plan rather than offered as a choice.
   for (const s of sentences) {
-    const future = s.mentions.filter((m) => isFutureMention(m, receivedOn));
-    if (future.length === 0 || !VISIT_INTENT.test(s.lower) || offersDates(s, receivedOn)) continue;
-    return { category: "scheduled", sentence: s.text, date: future[0].date };
+    const date = plannedVisitDate(s, receivedOn);
+    if (date) return { category: "scheduled", sentence: s.text, date };
   }
 
   // 2. Says the repair is done.
-  const fixed = firstMatching(FIXED_PATTERNS, (t) => !FIXED_NEGATION.test(t) && !futureBeforeFix(t));
+  const fixed = sentences.find((s) => saysFixed(s.lower)) ?? null;
   if (fixed) return { category: "says_fixed", sentence: fixed.text, date: firstDate(fixed) };
 
   // 3. Offers times to choose from, or asks to get in.
@@ -146,13 +233,6 @@ function classify(cleaned: string, receivedOn: IsoDate): Verdict {
   if (ack) return { category: "acknowledged_no_date", sentence: ack.text, date: null };
 
   return { category: "unclear", sentence: null, date: null };
-}
-
-/** "We will have it fixed" talks about the future, not a finished repair. */
-function futureBeforeFix(sentence: string): boolean {
-  const fix = sentence.search(/\b(fixed|repaired|replaced|resolved|restored|completed|done|taken care of|sealed|patched)\b/);
-  if (fix < 0) return false;
-  return FUTURE_MARKER.test(sentence.slice(0, fix));
 }
 
 /** The sentence to quote back: the one that decided the category, else the first one with content. */

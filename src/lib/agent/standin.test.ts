@@ -144,3 +144,99 @@ describe("stand-in reader output", () => {
     expect(read("Which apartment is this for?").replyReference).toBeNull();
   });
 });
+
+// Phrasings a reviewer found misread. They were used to write the fixes, so they live here as
+// regression tests rather than in HELD_OUT. 2026-10-17 is a Saturday.
+describe("stand-in reader: cancelled, refused and negated visits", () => {
+  const read = (text: string, receivedOn = "2026-10-17") => readReplyStandIn(input({ text, receivedOn, issue: "a plumbing problem" }));
+
+  it.each([
+    ["The plumber cannot come Tuesday. We will update you.", "acknowledged_no_date"],
+    ["Sorry, the plumber can't make it tomorrow, we will reschedule.", "acknowledged_no_date"],
+    ["We will not be sending anyone Tuesday. This is not our responsibility.", "disputes_or_refuses"],
+    ["The plumber won't be coming Monday, the appointment is cancelled.", "unclear"],
+    ["Tuesday's appointment is cancelled, we will reach out.", "acknowledged_no_date"],
+    ["Repairs can't be done until Monday at the earliest.", "unclear"],
+    ["No one will be coming Tuesday.", "unclear"],
+  ])("does not read %j as scheduled", (text, expected) => {
+    const r = read(text);
+    expect(r.category).toBe(expected);
+    expect(r.summary).not.toMatch(/set for/);
+  });
+
+  it("still reads the new date when one visit is cancelled and another is set", () => {
+    expect(read("We can't come Monday, but the plumber will come Tuesday.")).toMatchObject({ category: "scheduled", mentionedDate: "2026-10-20" });
+    expect(read("The plumber can't come Tuesday. He will come Thursday instead.")).toMatchObject({ category: "scheduled", mentionedDate: "2026-10-22" });
+    expect(read("Tuesday's appointment is postponed to Thursday.")).toMatchObject({ category: "scheduled", mentionedDate: "2026-10-22" });
+    expect(read("The visit was rescheduled from Tuesday to Thursday.")).toMatchObject({ category: "scheduled", mentionedDate: "2026-10-22" });
+  });
+
+  it("keeps a plan next to an unrelated negative", () => {
+    expect(read("Don't worry, the plumber will come Tuesday.")).toMatchObject({ category: "scheduled", mentionedDate: "2026-10-20" });
+  });
+});
+
+describe("stand-in reader: promised fixes are not finished fixes", () => {
+  const read = (text: string) => readReplyStandIn(input({ text, receivedOn: "2026-10-17", issue: "no heat or hot water" }));
+
+  it.each([
+    "The heat will be working again once the boiler part arrives.",
+    "Hot water should be back once the part comes in.",
+    "We hope the heat is back soon, the part is on order.",
+    "Once the heat is back on we will let you know.",
+    "We will pay for your hotel until the heat is back.",
+    "The elevator is working again but we still need to look at your radiator.",
+    "Let us know if the heat is back on.",
+  ])("does not read %j as says_fixed", (text) => {
+    expect(read(text).category).not.toBe("says_fixed");
+  });
+
+  it("still reads finished repairs as says_fixed", () => {
+    expect(read("The heat is back on.").category).toBe("says_fixed");
+    expect(read("Heat should be back on now, please check.").category).toBe("says_fixed");
+    expect(read("We fixed the radiator yesterday, let us know if anything else comes up.").category).toBe("says_fixed");
+    expect(read("When we checked, the heat was working again.").category).toBe("says_fixed");
+  });
+});
+
+describe("stand-in reader: dates that aren't a repair date", () => {
+  const read = (text: string, receivedOn = "2026-10-17") => readReplyStandIn(input({ text, receivedOn, issue: "a plumbing problem" }));
+
+  it.each([
+    ["Our office is closed today for the holiday. We will respond Monday.", "2026-10-17"],
+    ["Rent will be due on the 1st as usual.", "2026-10-28"],
+    ["The exterminator comes every Tuesday, you can sign up in the lobby.", "2026-10-17"],
+    ["We will call you Monday.", "2026-10-17"],
+  ])("does not read %j as scheduled", (text, receivedOn) => {
+    expect(read(text, receivedOn).category).not.toBe("scheduled");
+  });
+
+  it("does not read a pipe size as a date", () => {
+    expect(read("The plumber will replace the 1/2 inch valve soon.")).toMatchObject({ category: "acknowledged_no_date", mentionedDate: null });
+    expect(read("We need to order a 3/4 pipe fitting, will update you.")).toMatchObject({ category: "acknowledged_no_date", mentionedDate: null });
+  });
+
+  it("does not call a reply scheduled on a date the sanitizer would drop", () => {
+    // 3/4 resolves to March 4, outside the 90-day window, so it can't make the reply "scheduled".
+    expect(read("The plumber will come 3/4.").category).not.toBe("scheduled");
+  });
+
+  it("resolves a past 'this Monday' backward", () => {
+    expect(read("The super stopped by this Monday but nobody answered.")).toMatchObject({ category: "needs_access", mentionedDate: "2026-10-12" });
+  });
+
+  it("reads a vendor note that management forwarded", () => {
+    const reply =
+      "See below from our plumber.\n\n---------- Forwarded message ---------\nFrom: Ace Plumbing <dispatch@example.com>\nDate: Fri, Oct 16, 2026 at 4:10 PM\nSubject: 4B\nTo: office@example.com\n\nWe will be at the building Tuesday 9am for unit 4B.";
+    expect(read(reply)).toMatchObject({ category: "scheduled", mentionedDate: "2026-10-20" });
+  });
+});
+
+describe("stand-in reader: quotes", () => {
+  const read = (text: string) => readReplyStandIn(input({ text, receivedOn: "2026-10-17", issue: "a leak and water damage" }));
+
+  it("drops a quote with legal words", () => {
+    expect(read("We are not liable for damage caused by tenant negligence.")).toMatchObject({ category: "disputes_or_refuses", replyReference: null });
+    expect(read("You are in breach of your lease for blocking access.").replyReference).toBeNull();
+  });
+});
