@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* Abate design tokens, taken from the Sprint 1 deck: deep indigo, periwinkle, lavender. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-work-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@theme {
+  --color-ink: #08014e;          /* primary text and buttons */
+  --color-ink-soft: #1d1670;     /* hover */
+  --color-slate: #5b6290;        /* secondary text (AA on white and mist) */
+  --color-periwinkle: #aeb4df;   /* accents */
+  --color-periwinkle-soft: #c9cee8;
+  --color-lavender: #e6e8f7;     /* tinted surfaces */
+  --color-mist: #f5f5ff;         /* page background */
+  --color-steel: #80a2c9;
+  --color-line: #dde0f2;         /* borders */
+
+  --color-good: #17714d;
+  --color-good-soft: #e2f4ec;
+  --color-warn: #8a5300;
+  --color-warn-soft: #fff3d9;
+  --color-bad: #b42318;
+  --color-bad-soft: #fdecea;
+
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(8 1 78 / 0.04), 0 8px 24px -12px rgb(8 1 78 / 0.12);
+  --shadow-lift: 0 2px 4px rgb(8 1 78 / 0.06), 0 16px 40px -16px rgb(8 1 78 / 0.28);
+
+  --animate-rise: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
   }
 }
 
+:root {
+  color-scheme: light;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-mist);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Larger, friendlier focus ring for keyboard users. */
+:focus-visible {
+  outline: 3px solid var(--color-periwinkle);
+  outline-offset: 2px;
+}
+
+/* iOS zooms into inputs under 16px; keep form text at 16px. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
