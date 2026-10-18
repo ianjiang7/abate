@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import ws from "ws";
 
 let client: SupabaseClient | null = null;
 
@@ -21,6 +22,9 @@ export function db(): SupabaseClient {
   }
   client = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    // Node 20 has no built-in WebSocket, and supabase-js refuses to start without one. We never use
+    // realtime, but the client is created eagerly, so hand it the standard ws package.
+    realtime: { transport: ws as unknown as typeof WebSocket },
   });
   return client;
 }

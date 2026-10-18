@@ -43,5 +43,7 @@ export async function readReplyWith(input: ReadReplyInput, claude: Reader | null
 }
 
 export async function readReply(input: ReadReplyInput): Promise<ReplyReading> {
-  return readReplyWith(input, process.env.ANTHROPIC_API_KEY ? getClaudeReader() : null);
+  // ABATE_AGENT=standin forces the deterministic stand-in (the end-to-end test sets it).
+  const useClaude = Boolean(process.env.ANTHROPIC_API_KEY) && process.env.ABATE_AGENT !== "standin";
+  return readReplyWith(input, useClaude ? getClaudeReader() : null);
 }

@@ -70,9 +70,11 @@ create table public.messages (
   -- Incoming replies
   received_at timestamptz,
   logged_by text check (logged_by in ('tenant', 'team')),
-  classification text,
+  classification text,                      -- category the ladder uses (tenant corrections win)
+  ai_classification text,                   -- what the agent originally said, for measuring it
   classification_summary text,
   classification_date date,
+  reply_reference text,                     -- agent's factual sentence the next message may quote
   ai_source text,                           -- model id, or 'stand-in'
   team_verdict text check (team_verdict in ('correct', 'incorrect')),
   team_note text
@@ -117,8 +119,8 @@ create view public.cases_due as
 
 -- Replies waiting for a teammate to check the agent's reading.
 create view public.replies_to_check as
-  select m.id, c.code, m.received_at, m.classification, m.classification_summary,
-         m.classification_date, m.ai_source, m.body
+  select m.id, c.code, m.received_at, m.ai_classification, m.classification, m.classification_summary,
+         m.classification_date, m.reply_reference, m.ai_source, m.body
   from public.messages m
   join public.cases c on c.id = m.case_id
   where m.direction = 'incoming' and m.team_verdict is null and not c.is_test

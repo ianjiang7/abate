@@ -189,12 +189,14 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       };
 
     case "missed_repair": {
-      const when = ctx.repairScheduledFor ? formatFullDate(ctx.repairScheduledFor) : "the scheduled date";
+      const opening = ctx.repairScheduledFor
+        ? `The repair of ${problem(ctx)} at ${where} that was scheduled for ${formatFullDate(ctx.repairScheduledFor)} did not happen, and the problem is still not fixed.`
+        : `I was told the repair of ${problem(ctx)} at ${where} was complete, but the problem is still not fixed.`;
       return {
-        subject: `Repair did not happen: ${where}`,
+        subject: ctx.repairScheduledFor ? `Repair did not happen: ${where}` : `Still not fixed: ${where}`,
         body: [
           greeting(ctx),
-          `The repair of ${problem(ctx)} at ${where} that was scheduled for ${when} did not happen, and the problem is still not fixed.`,
+          opening,
           `It has been ${days(ctx.daysSinceReport)} since I first reported it on ${firstReported}. Please reply by ${replyBy(ctx)} with a new repair date.`,
           RECORD_LINE,
           signature(ctx),
