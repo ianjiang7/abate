@@ -2,6 +2,7 @@
 
 import { ArrowLeft, ArrowRight, Building2, Camera, Check, Minus, Plus, Users, X } from "lucide-react";
 import Link from "next/link";
+import { unstable_isUnrecognizedActionError, unstable_rethrow } from "next/navigation";
 import { startTransition, useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createCaseAction, type StartState } from "@/app/start/actions";
 import { Logo } from "@/components/brand/logo";
@@ -111,7 +112,20 @@ export function StartForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const today = useToday();
   const [state, formAction, pending] = useActionState<StartState, FormData>(async (prev, fd) => {
-    const result = await createCaseAction(prev, fd);
+    let result: StartState;
+    try {
+      result = await createCaseAction(prev, fd);
+    } catch (err) {
+      // Let the success redirect through; anything else (a dropped connection, a body the server
+      // rejected, a deploy that replaced this page's actions) must not wipe four steps of answers.
+      unstable_rethrow(err);
+      submittedRef.current = false;
+      return {
+        message: unstable_isUnrecognizedActionError(err)
+          ? "Abate was just updated. Your answers are still here: reload the page, then tap Create my case again."
+          : "We couldn't reach Abate. Your answers are still here. Check your connection and tap Create my case again.",
+      };
+    }
     // Server-side validation errors: jump back to the first step that has one.
     if (result.errors) {
       const errs = result.errors;
@@ -180,8 +194,12 @@ export function StartForm() {
     const e = validateStep(step, fields, photos, today);
     setErrors(e);
     if (Object.keys(e).length > 0) {
-      // Bring the first problem into view; on a phone it's often below the fold.
-      requestAnimationFrame(() => document.querySelector('[role="alert"], .text-bad')?.scrollIntoView({ behavior: "smooth", block: "center" }));
+      // Move focus to the first problem (on a phone it's often below the fold) so it's seen and read out.
+      requestAnimationFrame(() => {
+        const target = document.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"] input, [data-invalid="true"] button');
+        target?.focus({ preventScroll: true });
+        (target ?? document.querySelector('[role="alert"]'))?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       return;
     }
     if (step < STEPS.length - 1) setStep(step + 1);
@@ -215,7 +233,7 @@ export function StartForm() {
               <Logo />
             </Link>
           ) : (
-            <button type="button" onClick={() => setStep(step - 1)} className="-ml-2 inline-flex items-center gap-1 rounded-full px-2 py-1.5 text-sm font-semibold hover:bg-lavender">
+            <button type="button" onClick={() => setStep(step - 1)} className="-ml-2 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-sm font-semibold hover:bg-lavender">
               <ArrowLeft className="size-4" aria-hidden="true" /> Back
             </button>
           )}
@@ -269,32 +287,34 @@ export function StartForm() {
 
             {step === 1 ? (
               <>
-                <fieldset>
+                <fieldset data-invalid={errors.issueType ? "true" : undefined} aria-describedby={errors.issueType ? "issueType-error" : undefined}>
                   <legend className="text-[15px] font-semibold">What&apos;s wrong?</legend>
-                  <div className="mt-3 grid grid-cols-2 gap-2.5" role="radiogroup" aria-invalid={Boolean(errors.issueType)}>
+                  <div className="mt-3 grid grid-cols-2 gap-2.5">
                     {ISSUE_TYPES.map((t) => {
                       const active = fields.issueType === t.id;
                       return (
-                        <button
+                        <label
                           key={t.id}
-                          type="button"
-                          role="radio"
-                          aria-checked={active}
-                          onClick={() => set("issueType", t.id)}
                           className={cn(
-                            "flex min-h-[88px] flex-col items-start justify-between gap-2 rounded-2xl bg-white p-3.5 text-left text-[14px] font-semibold leading-snug ring-1 transition",
+                            "flex min-h-[88px] cursor-pointer flex-col items-start justify-between gap-2 rounded-2xl bg-white p-3.5 text-left text-[14px] font-semibold leading-snug ring-1 transition",
+                            "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
                             active ? "ring-2 ring-ink shadow-[var(--shadow-card)]" : "ring-line hover:ring-periwinkle",
                           )}
                         >
+                          <input type="radio" name="issueType" value={t.id} checked={active} onChange={() => set("issueType", t.id)} className="sr-only" />
                           <span className={cn("grid size-9 place-items-center rounded-xl", active ? "bg-ink text-white" : "bg-lavender text-ink")}>
                             <IssueIcon type={t.id} />
                           </span>
                           {t.label}
-                        </button>
+                        </label>
                       );
                     })}
                   </div>
-                  {errors.issueType ? <p className="mt-2 text-sm font-medium text-bad">{errors.issueType}</p> : null}
+                  {errors.issueType ? (
+                    <p id="issueType-error" role="alert" className="mt-2 text-sm font-medium text-bad">
+                      {errors.issueType}
+                    </p>
+                  ) : null}
                 </fieldset>
 
                 <Field label="Describe it in a sentence" htmlFor="issueDescription" optional hint="This goes into your messages, so keep it factual.">
@@ -330,27 +350,32 @@ export function StartForm() {
                   />
                 </Field>
 
-                <fieldset>
+                <fieldset data-invalid={errors.firstReportedVia ? "true" : undefined} aria-describedby={errors.firstReportedVia ? "firstReportedVia-error" : undefined}>
                   <legend className="text-[15px] font-semibold">How did you tell them?</legend>
-                  <div className="mt-3 flex flex-wrap gap-2" role="radiogroup">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {REPORT_CHANNELS.map((c) => {
                       const active = fields.firstReportedVia === c.id;
                       return (
-                        <button
+                        <label
                           key={c.id}
-                          type="button"
-                          role="radio"
-                          aria-checked={active}
-                          onClick={() => set("firstReportedVia", c.id)}
-                          className={cn("inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold ring-1 transition", active ? "bg-ink text-white ring-ink" : "bg-white ring-line hover:ring-periwinkle")}
+                          className={cn(
+                            "inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold ring-1 transition",
+                            "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
+                            active ? "bg-ink text-white ring-ink" : "bg-white ring-line hover:ring-periwinkle",
+                          )}
                         >
+                          <input type="radio" name="firstReportedVia" value={c.id} checked={active} onChange={() => set("firstReportedVia", c.id)} className="sr-only" />
                           {active ? <Check className="size-4" aria-hidden="true" /> : null}
                           {c.label}
-                        </button>
+                        </label>
                       );
                     })}
                   </div>
-                  {errors.firstReportedVia ? <p className="mt-2 text-sm font-medium text-bad">{errors.firstReportedVia}</p> : null}
+                  {errors.firstReportedVia ? (
+                    <p id="firstReportedVia-error" role="alert" className="mt-2 text-sm font-medium text-bad">
+                      {errors.firstReportedVia}
+                    </p>
+                  ) : null}
                 </fieldset>
 
                 <div className="space-y-2">
@@ -388,17 +413,28 @@ export function StartForm() {
                 <Field label="Monthly rent" htmlFor="monthlyRent" error={errors.monthlyRent} hint="Only used to estimate what you may be owed. It never goes in a message unless you add it.">
                   <MoneyInput id="monthlyRent" value={fields.monthlyRent} onChange={(e) => set("monthlyRent", e.target.value)} placeholder="1,850" aria-invalid={Boolean(errors.monthlyRent)} />
                 </Field>
-                <Field label="Phone or email for reminders" htmlFor="tenantContact" optional hint="Our team will text you when your next step is ready. We never share it.">
+                <Field label="Phone or email for reminders" htmlFor="tenantContact" optional hint="Our team will remind you when your next step is ready. We never share it.">
                   <Input id="tenantContact" value={fields.tenantContact} onChange={(e) => set("tenantContact", e.target.value)} autoComplete="tel" maxLength={120} />
                 </Field>
                 <label className={cn("flex gap-3 rounded-2xl bg-white p-4 ring-1", errors.aiConsent ? "ring-bad" : "ring-line")}>
-                  <input type="checkbox" checked={fields.aiConsent} onChange={(e) => set("aiConsent", e.target.checked)} className="mt-0.5 size-5 shrink-0 accent-[#08014E]" />
+                  <input
+                    type="checkbox"
+                    checked={fields.aiConsent}
+                    onChange={(e) => set("aiConsent", e.target.checked)}
+                    aria-invalid={Boolean(errors.aiConsent)}
+                    aria-describedby={errors.aiConsent ? "aiConsent-error" : undefined}
+                    className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
+                  />
                   <span className="text-[14px] leading-relaxed text-slate">
                     <span className="font-semibold text-ink">I agree.</span> Abate can use what I share to draft my messages, including an AI service that reads
                     replies from management. Abate isn&apos;t a law firm, and estimates aren&apos;t legal advice.
                   </span>
                 </label>
-                {errors.aiConsent ? <p className="-mt-3 text-sm font-medium text-bad">{errors.aiConsent}</p> : null}
+                {errors.aiConsent ? (
+                  <p id="aiConsent-error" role="alert" className="-mt-3 text-sm font-medium text-bad">
+                    {errors.aiConsent}
+                  </p>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -441,6 +477,7 @@ function AddressField({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [loading, setLoading] = useState(false);
+  const [lookup, setLookup] = useState<"idle" | "results" | "empty" | "error">("idle");
   const typedRef = useRef(false);
 
   useEffect(() => {
@@ -453,11 +490,15 @@ function AddressField({
       fetch(`/api/address?q=${encodeURIComponent(q)}`, { signal: controller.signal })
         .then((r) => r.json())
         .then((data: { matches: AddressMatch[] }) => {
-          setMatches(data.matches ?? []);
+          const found = data.matches ?? [];
+          setMatches(found);
           setActive(-1);
           setOpen(true);
+          setLookup(found.length > 0 ? "results" : "empty");
         })
-        .catch(() => {})
+        .catch((err: unknown) => {
+          if (!(err instanceof DOMException && err.name === "AbortError")) setLookup("error");
+        })
         .finally(() => setLoading(false));
     }, 250);
     return () => {
@@ -466,7 +507,17 @@ function AddressField({
     };
   }, [value, selected]);
 
-  const visible = value.trim().length >= 3 && !selected ? matches : [];
+  const searching = value.trim().length >= 3 && !selected;
+  const visible = searching ? matches : [];
+  const listShown = open && visible.length > 0;
+  const lookupNote =
+    !searching || loading
+      ? ""
+      : lookup === "empty"
+        ? "No match found. Check the spelling, or continue with what you typed."
+        : lookup === "error"
+          ? "Address lookup isn't working right now. You can continue with what you typed."
+          : "";
 
   const pick = (m: AddressMatch) => {
     onPick(m);
@@ -485,14 +536,15 @@ function AddressField({
         <Input
           id="address"
           role="combobox"
-          aria-expanded={open && visible.length > 0}
-          aria-controls="address-options"
+          aria-expanded={listShown}
+          aria-controls={listShown ? "address-options" : undefined}
+          aria-describedby={error || !selected ? "address-desc" : undefined}
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 ? `address-option-${active}` : undefined}
           aria-invalid={Boolean(error)}
           value={value}
           placeholder="e.g. 245 East 7th Street"
-          autoComplete="street-address"
+          autoComplete="address-line1"
           onChange={(e) => {
             typedRef.current = true;
             onType(e.target.value);
@@ -500,6 +552,11 @@ function AddressField({
           onFocus={() => visible.length > 0 && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={(e) => {
+            if (!open && e.key === "ArrowDown" && visible.length > 0) {
+              e.preventDefault();
+              setOpen(true);
+              return;
+            }
             if (!open || visible.length === 0) return;
             if (e.key === "ArrowDown") {
               e.preventDefault();
@@ -517,7 +574,7 @@ function AddressField({
           className="pr-10"
         />
         {loading ? <span className="absolute right-4 top-1/2 size-4 -translate-y-1/2 animate-spin rounded-full border-2 border-periwinkle border-t-ink" aria-hidden="true" /> : null}
-        {open && visible.length > 0 ? (
+        {listShown ? (
           <ul id="address-options" role="listbox" className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-2xl bg-white shadow-[var(--shadow-lift)] ring-1 ring-line">
             {visible.map((m, i) => (
               <li
@@ -544,6 +601,9 @@ function AddressField({
           </ul>
         ) : null}
       </div>
+      <p role="status" aria-live="polite" className={lookupNote ? "text-sm font-medium text-warn" : "sr-only"}>
+        {lookupNote || (listShown ? `${visible.length} ${visible.length === 1 ? "building" : "buildings"} found. Use the arrow keys to choose.` : "")}
+      </p>
       {selected ? (
         <p className="flex items-center gap-1.5 text-sm font-medium text-good">
           <Check className="size-4" aria-hidden="true" /> Found your building in NYC records
@@ -603,15 +663,18 @@ function PhotoPicker({
     });
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-invalid={error ? "true" : undefined}>
       <p className="text-[15px] font-semibold">Photos</p>
       <div className="grid grid-cols-3 gap-2.5">
         {photos.map((p) => (
           <div key={p.id} className="relative aspect-square overflow-hidden rounded-2xl bg-lavender ring-1 ring-line">
             {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
             <img src={p.url} alt="Photo of the problem" className="size-full object-cover" />
-            <button type="button" onClick={() => remove(p.id)} aria-label="Remove photo" className="absolute right-1.5 top-1.5 grid size-7 place-items-center rounded-full bg-ink/80 text-white">
-              <X className="size-4" />
+            {/* 44px tap target around a small visible circle */}
+            <button type="button" onClick={() => remove(p.id)} aria-label="Remove photo" className="absolute right-0 top-0 grid size-11 place-items-center">
+              <span className="grid size-7 place-items-center rounded-full bg-ink/80 text-white">
+                <X className="size-4" />
+              </span>
             </button>
           </div>
         ))}
@@ -630,8 +693,12 @@ function PhotoPicker({
           </button>
         ) : null}
       </div>
-      <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" onChange={(e) => add(e.target.files)} aria-label="Choose photos" />
-      {error ? <p className="text-sm font-medium text-bad">{error}</p> : problem ? <p className="text-sm font-medium text-warn">{problem}</p> : <p className="text-sm text-slate">Up to {MAX_PHOTOS}. They stay private to your case.</p>}
+      <input ref={inputRef} type="file" accept="image/*" multiple className="sr-only" tabIndex={-1} onChange={(e) => add(e.target.files)} aria-label="Choose photos" />
+      {error ? (
+        <p role="alert" className="text-sm font-medium text-bad">
+          {error}
+        </p>
+      ) : problem ? <p className="text-sm font-medium text-warn">{problem}</p> : <p className="text-sm text-slate">Up to {MAX_PHOTOS}. They stay private to your case.</p>}
     </div>
   );
 }

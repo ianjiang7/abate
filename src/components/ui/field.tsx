@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { cloneElement, isValidElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { cn } from "./cn";
 
 const control =
@@ -21,19 +21,27 @@ export function Field({
   children: ReactNode;
   className?: string;
 }) {
+  // Link the hint or error to the control so screen readers read it on focus.
+  const describedBy = htmlFor && (error || hint) ? `${htmlFor}-desc` : undefined;
+  const control =
+    describedBy && isValidElement(children)
+      ? cloneElement(children as ReactElement<{ "aria-describedby"?: string }>, { "aria-describedby": describedBy })
+      : children;
   return (
     <div className={cn("space-y-2", className)}>
       <label htmlFor={htmlFor} className="flex items-baseline justify-between gap-2 text-[15px] font-semibold">
         <span>{label}</span>
         {optional ? <span className="text-xs font-medium text-slate">Optional</span> : null}
       </label>
-      {children}
+      {control}
       {error ? (
-        <p className="text-sm font-medium text-bad" role="alert">
+        <p id={describedBy} className="text-sm font-medium text-bad" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="text-sm text-slate">{hint}</p>
+        <p id={describedBy} className="text-sm text-slate">
+          {hint}
+        </p>
       ) : null}
     </div>
   );

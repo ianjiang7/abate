@@ -50,10 +50,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Larger, friendlier focus ring for keyboard users. */
+/* High-contrast focus ring for keyboard users (WCAG 1.4.11 needs 3:1); periwinkle on dark surfaces. */
 :focus-visible {
-  outline: 3px solid var(--color-periwinkle);
+  outline: 3px solid var(--color-ink);
   outline-offset: 2px;
+}
+.bg-ink :focus-visible {
+  outline-color: var(--color-periwinkle);
 }
 
 /* iOS zooms into inputs under 16px; keep form text at 16px. */

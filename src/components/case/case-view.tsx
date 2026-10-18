@@ -5,6 +5,7 @@ import { IssueIcon } from "@/components/issue-icon";
 import { Badge, Notice } from "@/components/ui/card";
 import { isCaseToken } from "@/lib/cases/ids";
 import { getCaseBundle } from "@/lib/cases/repo";
+import { getBuildingSummary } from "@/lib/building";
 import { draftFor } from "@/lib/cases/service";
 import { buildTimeline, ladderInputs, ladderProgress, messageTime } from "@/lib/cases/view";
 import { hasDatabase } from "@/lib/db/client";
@@ -44,14 +45,24 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
     endOn: record.fixedOn ?? today,
   });
 
-  const draft = action.kind === "send" ? await draftFor(record, messages, action.step, today) : null;
+  // The formal notice cites the building's open violations; look the count up once and use the same
+  // number for the draft and for judging later whether the tenant edited it.
+  let openViolations: number | null = null;
+  if (action.kind === "send" && action.step === "formal_notice" && record.bbl) {
+    try {
+      openViolations = (await getBuildingSummary(record.bbl, record.bin))?.openViolations.total ?? null;
+    } catch {
+      openViolations = null;
+    }
+  }
+  const draft = action.kind === "send" ? await draftFor(record, messages, action.step, today, { openViolations }) : null;
   const stepIndex = action.kind === "send" ? TIMED_STEPS.findIndex((s) => s.step === action.step) : -1;
 
   // The latest reply, if we haven't answered it yet, so the tenant can see and correct how it was read.
   const sorted = [...messages].sort((a, b) => messageTime(a).localeCompare(messageTime(b)));
   const last = sorted[sorted.length - 1];
   const latestReply: LatestReply | null =
-    last && last.direction === "incoming" ? { id: last.id, category: last.classification, summary: last.classificationSummary, text: last.body } : null;
+    last && last.direction === "incoming" ? { id: last.id, category: last.classification, summary: last.classificationSummary } : null;
 
   const fixedSummary =
     record.status === "fixed" && record.fixedOn
@@ -99,6 +110,9 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         scheduledFor={record.repairScheduledFor}
         latestReply={latestReply}
         fixedSummary={fixedSummary}
+        hasContact={Boolean(record.tenantContact)}
+        draftedOn={today}
+        openViolations={openViolations}
       />
 
       <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} />
@@ -113,7 +127,7 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
 
       <PhotosCard photos={photos} />
 
-      {record.status === "open" ? <InviteCard token={token} code={record.code} /> : null}
+      {record.status === "open" && record.bbl ? <InviteCard token={token} code={record.code} /> : null}
 
       {record.status === "open" && action.kind !== "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize={false} /> : null}
     </div>

@@ -17,7 +17,14 @@ portfolio and the Nov 5 memo.
 - **Messages tell management a dated record is being kept, but don't name Abate.** *Why:* the
   tenant's voice is calmer and lowers retaliation risk; the CC address is visible anyway.
 - **Process:** two modules were built by separate agents in their own branches, each reviewed by a
-  skeptical second agent; all 16 confirmed findings were fixed with tests before merging.
+  skeptical second agent; all 16 confirmed findings were fixed with tests before merging. A final
+  four-part review of the rest of the app (security, correctness, Next.js, accessibility and copy)
+  confirmed 27 more findings; all were fixed.
+- **Cut: adding photos or notes after a case starts.** Photos are taken when the case starts, and
+  replies are pasted in. *Why:* neither assumption needs it, and the sprint is short.
+- **Abuse guards for a public link:** at most 40 new cases an hour across everyone, and 20 AI reply
+  readings per case per day. Invites only reveal a geocoded street address. *Why:* the pilot link is
+  public, and storage and API spend are limited.
 
 ## 2026-10-18: Abate does the chasing
 

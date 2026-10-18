@@ -1,8 +1,8 @@
 "use client";
 
-import { CalendarCheck, CalendarClock, Check, ClipboardCopy, Hourglass, Landmark, Mail, PartyPopper, PenLine, Sparkles } from "lucide-react";
+import { BellRing, CalendarCheck, CalendarClock, Check, ClipboardCopy, Hourglass, Landmark, Mail, PartyPopper, PenLine, Sparkles } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
-import { fixedAction, notFixedAction, sendAction, trackAction, type CaseActionState } from "@/app/case/[token]/actions";
+import { contactAction, fixedAction, notFixedAction, sendAction, trackAction, type CaseActionState } from "@/app/case/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
@@ -18,7 +18,6 @@ export type LatestReply = {
   id: string;
   category: ReplyCategory | null;
   summary: string | null;
-  text: string | null;
 };
 
 export type NextStepProps = {
@@ -34,6 +33,11 @@ export type NextStepProps = {
   scheduledFor: string | null;
   latestReply: LatestReply | null;
   fixedSummary: string | null;
+  /** Whether teammates have a phone or email to send reminders to. */
+  hasContact: boolean;
+  /** The New York date the draft was built for, and the violation count it used, for fair edit tracking. */
+  draftedOn: string;
+  openViolations: number | null;
 };
 
 const STEP_TITLES: Record<StepId, string> = {
@@ -52,13 +56,25 @@ const shownDrafts = new Set<string>();
 
 export function NextStepCard(props: NextStepProps) {
   const { action, token } = props;
+  const stepKey = action.kind === "send" ? `send:${action.step}` : action.kind;
+  const lastKey = useRef(stepKey);
+
+  // After an action re-renders the card with a new step, move focus to its heading so screen
+  // readers announce what's next (the button that had focus is gone).
+  useEffect(() => {
+    if (lastKey.current === stepKey) return;
+    lastKey.current = stepKey;
+    document.getElementById("next-step-title")?.focus({ preventScroll: false });
+  }, [stepKey]);
+
+  const canMarkFixed = action.kind === "send" || action.kind === "team_review" || action.kind === "all_sent";
 
   return (
     <Card padded={false} className="relative overflow-hidden" aria-labelledby="next-step-title">
       <div className="h-1.5 bg-gradient-to-r from-ink via-[#3b3591] to-periwinkle" aria-hidden="true" />
       <div className="p-5">
         {props.latestReply && action.kind !== "done" ? <ReplyReading token={token} reply={props.latestReply} /> : null}
-        {action.kind === "send" ? <SendStep {...props} action={action} /> : null}
+        {action.kind === "send" ? <SendStep key={action.step} {...props} action={action} /> : null}
         {action.kind === "confirm_fixed" ? (
           <FixedQuestion token={token} title="They say it's fixed. Is it?" body="Check that the repair actually worked before you mark it done." defaultDate={null} />
         ) : null}
@@ -69,6 +85,7 @@ export function NextStepCard(props: NextStepProps) {
         {action.kind === "team_review" ? <TeamReview {...props} /> : null}
         {action.kind === "all_sent" ? <AllSent token={token} /> : null}
         {action.kind === "done" ? <Done summary={props.fixedSummary} /> : null}
+        {canMarkFixed ? <MarkFixed token={token} /> : null}
       </div>
     </Card>
   );
@@ -94,14 +111,18 @@ function SendStep(props: NextStepProps & { action: Extract<NextAction, { kind: "
     return (
       <div>
         {header}
-        <h2 id="next-step-title" className="mt-3 text-[22px] font-bold leading-tight tracking-tight">
+        <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
           Next up: {STEP_LABELS[action.step].toLowerCase()} on {dueLabel}
         </h2>
-        <p className="mt-2 leading-relaxed text-slate">{action.reason} Give them a little time to answer first. We&apos;ll text you when it&apos;s ready.</p>
+        <p className="mt-2 leading-relaxed text-slate">
+          {action.reason} Give them a little time to answer first.{" "}
+          {props.hasContact ? "We'll remind you when it's ready." : `Come back to this link on ${dueLabel}.`}
+        </p>
         <div className="mt-5 flex items-center gap-3 rounded-2xl bg-mist p-4 text-sm text-slate">
           <Hourglass className="size-5 shrink-0 text-ink" aria-hidden="true" />
           If management replies before then, paste it in and Abate will pick the right next step.
         </div>
+        {!props.hasContact ? <ContactForm token={token} /> : null}
         <div className="mt-5 grid gap-2.5">
           <ReplyButton token={token} variant="primary" />
           <Button type="button" variant="ghost" block onClick={() => setShowEarly(true)}>
@@ -115,7 +136,7 @@ function SendStep(props: NextStepProps & { action: Extract<NextAction, { kind: "
   return (
     <div>
       {header}
-      <h2 id="next-step-title" className="mt-3 text-[22px] font-bold leading-tight tracking-tight">
+      <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
         {STEP_TITLES[action.step]}
       </h2>
       <p className="mt-2 leading-relaxed text-slate">{action.reason}</p>
@@ -125,7 +146,7 @@ function SendStep(props: NextStepProps & { action: Extract<NextAction, { kind: "
   );
 }
 
-function Composer({ token, to, cc, step, draft }: NextStepProps & { step: StepId; draft: { subject: string; body: string } }) {
+function Composer({ token, to, cc, step, draft, draftedOn, openViolations }: NextStepProps & { step: StepId; draft: { subject: string; body: string } }) {
   const [subject, setSubject] = useState(draft.subject);
   const [body, setBody] = useState(draft.body);
   const [editing, setEditing] = useState(false);
@@ -184,7 +205,7 @@ function Composer({ token, to, cc, step, draft }: NextStepProps & { step: StepId
           <button
             type="button"
             onClick={() => setEditing((e) => !e)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold hover:bg-lavender"
+            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold hover:bg-lavender"
             aria-pressed={editing}
           >
             {editing ? <Check className="size-4" aria-hidden="true" /> : <PenLine className="size-4" aria-hidden="true" />}
@@ -241,6 +262,8 @@ function Composer({ token, to, cc, step, draft }: NextStepProps & { step: StepId
       ) : (
         <form action={formAction} className="mt-5 rounded-2xl bg-lavender/70 p-4">
           <input type="hidden" name="step" value={step} />
+          <input type="hidden" name="draftedOn" value={draftedOn} />
+          <input type="hidden" name="openViolations" value={openViolations ?? ""} />
           <input type="hidden" name="subject" value={subject} />
           <input type="hidden" name="body" value={body} />
           <p className="font-semibold">Did you send it?</p>
@@ -327,7 +350,7 @@ function ReplyReading({ token, reply }: { token: string; reply: LatestReply }) {
           <p className="font-semibold">{reply.category ? replyCategoryLabel(reply.category) : "Not sure yet"}</p>
           {reply.summary ? <p className="mt-1 text-sm leading-relaxed text-slate">{reply.summary}</p> : null}
           {!correcting ? (
-            <button type="button" onClick={() => setCorrecting(true)} className="mt-2 text-sm font-semibold underline decoration-periwinkle underline-offset-4">
+            <button type="button" onClick={() => setCorrecting(true)} className="-ml-1 mt-1 min-h-11 px-1 text-sm font-semibold underline decoration-periwinkle underline-offset-4">
               Not right? Tell us what they said
             </button>
           ) : null}
@@ -354,7 +377,7 @@ function FixedQuestion({ token, title, body, defaultDate }: { token: string; tit
   return (
     <div>
       <Eyebrow>Quick check</Eyebrow>
-      <h2 id="next-step-title" className="mt-3 text-[22px] font-bold leading-tight tracking-tight">
+      <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
         {title}
       </h2>
       <p className="mt-2 leading-relaxed text-slate">{body}</p>
@@ -384,7 +407,7 @@ function WaitingForRepair(props: NextStepProps) {
   return (
     <div>
       <Eyebrow>Repair scheduled</Eyebrow>
-      <h2 id="next-step-title" className="mt-3 text-[22px] font-bold leading-tight tracking-tight">
+      <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
         They&apos;re coming {props.scheduledLabel}
       </h2>
       <p className="mt-2 leading-relaxed text-slate">We&apos;ll check in the day after. If the date changes or they don&apos;t show, tell us and we&apos;ll draft the follow-up.</p>
@@ -415,10 +438,15 @@ function TeamReview(props: NextStepProps) {
   return (
     <div>
       <Eyebrow>We&apos;re on it</Eyebrow>
-      <h2 id="next-step-title" className="mt-3 text-[22px] font-bold leading-tight tracking-tight">
+      <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
         A teammate is reading this reply
       </h2>
-      <p className="mt-2 leading-relaxed text-slate">Their message wasn&apos;t clear enough to pick the next step automatically. We&apos;ll text you within a day. If you know what they meant, tell us above and we&apos;ll draft the next message now.</p>
+      <p className="mt-2 leading-relaxed text-slate">
+        Their message wasn&apos;t clear enough to pick the next step automatically.{" "}
+        {props.hasContact ? "We'll reach out within a day." : "Check back here tomorrow."} If you know what they meant, tell us above and we&apos;ll draft
+        the next message now.
+      </p>
+      {!props.hasContact ? <ContactForm token={props.token} /> : null}
       <div className="mt-5">
         <ReplyButton token={props.token} label="They sent another reply" />
       </div>
@@ -430,7 +458,7 @@ function AllSent({ token }: { token: string }) {
   return (
     <div>
       <Eyebrow>Every step sent</Eyebrow>
-      <h2 id="next-step-title" className="mt-3 text-[22px] font-bold leading-tight tracking-tight">
+      <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
         You&apos;ve done everything on the list
       </h2>
       <p className="mt-2 leading-relaxed text-slate">
@@ -449,10 +477,65 @@ function Done({ summary }: { summary: string | null }) {
       <span className="mx-auto grid size-14 place-items-center rounded-full bg-good-soft text-good">
         <PartyPopper className="size-7" aria-hidden="true" />
       </span>
-      <h2 id="next-step-title" className="mt-4 text-2xl font-bold tracking-tight">
+      <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-4 text-2xl font-bold tracking-tight">
         Fixed. Nice work.
       </h2>
       {summary ? <p className="mx-auto mt-2 max-w-xs leading-relaxed text-slate">{summary}</p> : null}
     </div>
+  );
+}
+
+/** "Already fixed?" for any open state: the super often just shows up without writing back. */
+function MarkFixed({ token }: { token: string }) {
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState<CaseActionState, FormData>(fixedAction.bind(null, token), {});
+  const today = useToday();
+
+  if (!open) {
+    return (
+      <div className="mt-5 border-t border-line/80 pt-3 text-center">
+        <button type="button" onClick={() => setOpen(true)} className="min-h-11 px-3 text-sm font-semibold text-slate underline decoration-periwinkle underline-offset-4">
+          Already fixed? Mark it done
+        </button>
+      </div>
+    );
+  }
+  return (
+    <form action={formAction} className="mt-5 space-y-3 border-t border-line/80 pt-4">
+      <p className="font-semibold">Mark the repair fixed</p>
+      <Field label="Date it was fixed" htmlFor="mark-fixed-on" error={state.errors?.fixedOn}>
+        <Input id="mark-fixed-on" name="fixedOn" type="date" key={today} defaultValue={today} max={today || undefined} required />
+      </Field>
+      {state.message ? <Notice tone="bad">{state.message}</Notice> : null}
+      <p className="text-sm text-slate">This closes your case and stops the follow-ups.</p>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+          Cancel
+        </Button>
+        <Button type="submit" loading={pending} icon={<Check className="size-4" aria-hidden="true" />}>
+          It&apos;s fixed
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** For tenants who skipped the reminder field: a phone or email so teammates can nudge them. */
+function ContactForm({ token }: { token: string }) {
+  const [state, formAction, pending] = useActionState<CaseActionState, FormData>(contactAction.bind(null, token), {});
+  if (state.ok) return null;
+  return (
+    <form action={formAction} className="mt-5 space-y-3 rounded-2xl bg-lavender/70 p-4">
+      <p className="flex items-center gap-2 font-semibold">
+        <BellRing className="size-4" aria-hidden="true" /> Want a reminder?
+      </p>
+      <Field label="Phone or email" htmlFor="reminder-contact" error={state.errors?.contact} hint="Our team will remind you when your next step is ready. We never share it.">
+        <Input id="reminder-contact" name="contact" autoComplete="tel" maxLength={120} required />
+      </Field>
+      {state.message ? <Notice tone="bad">{state.message}</Notice> : null}
+      <Button type="submit" variant="secondary" block loading={pending}>
+        Remind me
+      </Button>
+    </form>
   );
 }

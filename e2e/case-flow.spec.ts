@@ -61,7 +61,9 @@ test("a tenant starts a case, sends a notice, logs a reply and closes it out", a
 
   // Step 2: the problem
   await expect(page.getByRole("heading", { name: "What needs fixing?" })).toBeVisible();
-  await page.getByRole("radio", { name: /No heat or hot water/ }).click();
+  // Choices are native radios inside tappable cards; tap the card like a person would.
+  await page.locator("label").filter({ hasText: "No heat or hot water" }).filter({ visible: true }).click();
+  await expect(page.getByRole("radio", { name: /No heat or hot water/ })).toBeChecked();
   await page.getByLabel(/Describe it in a sentence/).fill("Radiators are cold and there is no hot water.");
   await page.getByLabel("When did it start?").fill(isoDaysAgo(14));
   await page.getByLabel("Choose photos").setInputFiles({ name: "radiator.jpg", mimeType: "image/jpeg", buffer: await fakePhoto(page) });
@@ -72,7 +74,8 @@ test("a tenant starts a case, sends a notice, logs a reply and closes it out", a
   // Step 3: who they told
   await expect(page.getByRole("heading", { name: "Who have you told?" })).toBeVisible();
   await page.getByLabel("When did you first tell management?").fill(isoDaysAgo(12));
-  await page.getByRole("radio", { name: "Text message" }).click();
+  await page.locator("label").filter({ hasText: "Text message" }).filter({ visible: true }).click();
+  await expect(page.getByRole("radio", { name: "Text message" })).toBeChecked();
   await page.getByRole("button", { name: "One more" }).click();
   await page.getByRole("button", { name: "One more" }).click();
   await page.getByLabel(/Management company or landlord/).fill("Example Property Management");
@@ -92,7 +95,7 @@ test("a tenant starts a case, sends a notice, logs a reply and closes it out", a
   await page.waitForURL(/\/case\/[A-Za-z0-9_-]{32}\?new=1/);
   await expect(page.getByText("Save your private link").filter({ visible: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Send your written notice" })).toBeVisible();
-  await expect(page.getByText(/You may be owed so far/).filter({ visible: true })).toBeVisible();
+  await expect(page.getByText(/may be owed so far/i).filter({ visible: true })).toBeVisible();
   await shot(page, "06-case-new");
 
   // Send the notice (copy path; mail apps don't exist in the test browser)
