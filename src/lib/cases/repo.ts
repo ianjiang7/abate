@@ -9,7 +9,7 @@ import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, mgmt_name, mgmt_email, status, repair_scheduled_for, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
 
 const MESSAGE_COLUMNS =
   "id, direction, created_at, step, subject, body, sent_at, received_at, logged_by, classification, ai_classification, classification_summary, classification_date, reply_reference, ai_source";
@@ -37,10 +37,12 @@ function toCase(r: Row): CaseRecord {
     priorFollowups: Number(r.prior_followups ?? 0),
     monthlyRent: Number(r.monthly_rent ?? 0),
     tenantName: r.tenant_name as string,
+    tenantContact: str(r.tenant_contact),
     mgmtName: str(r.mgmt_name),
     mgmtEmail: str(r.mgmt_email),
     status: r.status === "fixed" ? "fixed" : "open",
     repairScheduledFor: str(r.repair_scheduled_for),
+    repairScheduledAt: str(r.repair_scheduled_at),
     repairMissedAt: str(r.repair_missed_at),
     fixedOn: str(r.fixed_on),
     helpRequestedAt: str(r.help_requested_at),
@@ -173,11 +175,32 @@ export async function listMessages(caseId: string): Promise<MessageRecord[]> {
   return (check(res, "Loading messages") ?? []).map((m) => toMessage(m as Row));
 }
 
-/** For neighbor invites: the inviter's building, without their unit or anything private. */
-export async function findBuildingByCode(code: string): Promise<{ id: string; address: string; borough: string | null; bbl: string | null; bin: string | null } | null> {
-  const res = await db().from("cases").select("id, address, borough, bbl, bin").eq("code", code).maybeSingle();
+/**
+ * For neighbor invites: the inviter's building, never their unit or anything private. Only cases
+ * whose address came from the NYC geocoder qualify; a typed address could include the apartment.
+ */
+export async function findBuildingByCode(code: string): Promise<{ id: string; address: string; borough: string | null; bbl: string; bin: string | null } | null> {
+  const res = await db().from("cases").select("id, address, borough, bbl, bin").eq("code", code).not("bbl", "is", null).maybeSingle();
   const row = check(res, "Finding the invite");
-  return (row as { id: string; address: string; borough: string | null; bbl: string | null; bin: string | null } | null) ?? null;
+  return (row as { id: string; address: string; borough: string | null; bbl: string; bin: string | null } | null) ?? null;
+}
+
+/** Abuse guards: how many real cases were created, and replies read for one case, since a time. */
+export async function countCasesSince(sinceIso: string): Promise<number> {
+  const res = await db().from("cases").select("id", { count: "exact", head: true }).eq("is_test", false).gte("created_at", sinceIso);
+  if (res.error) throw new Error(`Counting cases failed: ${res.error.message}`);
+  return res.count ?? 0;
+}
+
+export async function countRepliesSince(caseId: string, sinceIso: string): Promise<number> {
+  const res = await db()
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("case_id", caseId)
+    .eq("direction", "incoming")
+    .gte("created_at", sinceIso);
+  if (res.error) throw new Error(`Counting replies failed: ${res.error.message}`);
+  return res.count ?? 0;
 }
 
 export async function insertMessage(caseId: string, fields: Record<string, unknown>): Promise<string> {

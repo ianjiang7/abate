@@ -29,6 +29,8 @@ export type TemplateContext = {
   /** From the case agent: one factual sentence about management's latest reply. */
   replyReference?: string | null;
   repairScheduledFor?: IsoDate | null;
+  /** Why a missed_repair message is being sent: management said it was fixed, or an appointment passed. */
+  missedBecause?: "says_fixed" | "appointment" | null;
 };
 
 export type DraftMessage = { subject: string; body: string };
@@ -36,8 +38,15 @@ export type DraftMessage = { subject: string; body: string };
 /** How many days management gets to reply to each message. */
 export const REPLY_WINDOW_DAYS = 3;
 
+/** "4B" from "Apt 4B", "apt. 4B", "Unit 4B" or "#4B", so letters never say "Apt Apt 4B". */
+export function bareUnit(unit: string | null | undefined): string | null {
+  const u = unit?.trim().replace(/^(apt|apartment|unit|ste|suite|#)\.?\s*#?\s*/i, "").trim();
+  return u ? u : null;
+}
+
 function place(ctx: TemplateContext): string {
-  return ctx.unit ? `${ctx.address}, Apt ${ctx.unit}` : ctx.address;
+  const unit = bareUnit(ctx.unit);
+  return unit ? `${ctx.address}, Apt ${unit}` : ctx.address;
 }
 
 function greeting(ctx: TemplateContext): string {
@@ -60,6 +69,13 @@ function replyBy(ctx: TemplateContext): string {
 
 function days(n: number): string {
   return n === 1 ? "1 day" : `${n} days`;
+}
+
+/** "It has been 12 days since I first reported it on October 6, 2026" (or a same-day version). */
+function sinceReport(ctx: TemplateContext, withDate: boolean): string {
+  if (ctx.daysSinceReport <= 0) return withDate ? `I reported it to you today` : `I reported it today`;
+  const on = withDate ? ` on ${formatFullDate(ctx.firstReportedOn)}` : "";
+  return `It has been ${days(ctx.daysSinceReport)} since I first reported it${on}`;
 }
 
 function followupsPhrase(n: number): string {
@@ -86,7 +102,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         body: [
           greeting(ctx),
           `I'm writing about a repair needed in my apartment at ${where}: ${problem(ctx)}.`,
-          `The problem started on ${started}. I first reported it to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. It has now been ${days(ctx.daysSinceReport)} since I first reported it, and it is still not fixed.`,
+          `The problem started on ${started}. I first reported it to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since I first reported it, and it` : "It"} is still not fixed.`,
           `Please reply by ${replyBy(ctx)} with the date the repair will be made.`,
           RECORD_LINE,
           signature(ctx),
@@ -100,7 +116,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         body: [
           greeting(ctx),
           `I'm following up on my ${noticeOn ? `message of ${formatFullDate(noticeOn)}` : "earlier message"} about ${problem(ctx)} at ${where}. I haven't received a repair date yet.`,
-          `${referenceLine(ctx)}The problem started on ${started}, and it has been ${days(ctx.daysSinceReport)} since I first reported it on ${firstReported}.`,
+          `${referenceLine(ctx)}The problem started on ${started}. ${sinceReport(ctx, true)}.`,
           `Please reply by ${replyBy(ctx)} with the date the repair will be made.`,
           signature(ctx),
         ].join("\n\n"),
@@ -114,7 +130,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       ];
       if (ctx.sentOn.notice) lines.push(`- ${formatFullDate(ctx.sentOn.notice)}: written notice sent`);
       if (ctx.sentOn.reminder) lines.push(`- ${formatFullDate(ctx.sentOn.reminder)}: written follow-up sent`);
-      lines.push(`- ${formatFullDate(ctx.today)}: still not repaired, ${days(ctx.daysSinceReport)} after my first report`);
+      lines.push(`- ${formatFullDate(ctx.today)}: still not repaired${ctx.daysSinceReport > 0 ? `, ${days(ctx.daysSinceReport)} after my first report` : ""}`);
 
       const violations =
         ctx.openViolations && ctx.openViolations > 0
@@ -122,9 +138,10 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
           : "";
 
       const est = ctx.estimate;
+      const range = est.low > 0 ? `between ${formatDollars(est.low)} and ${formatDollars(est.high)}` : `up to ${formatDollars(est.high)}`;
       const estimate =
         est.high > 0
-          ? ` Based on my rent and how long this has gone on, I estimate that reduction may be between ${formatDollars(est.low)} and ${formatDollars(est.high)} so far, and it grows each day the problem continues.`
+          ? ` Based on my rent and how long this has gone on, I estimate that reduction may be ${range} so far, and it grows each day the problem continues.`
           : "";
 
       return {
@@ -158,7 +175,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         body: [
           greeting(ctx),
           `Thank you for your reply about ${problem(ctx)} at ${where}.`,
-          `${referenceLine(ctx)}Could you please confirm the specific date the repair will be made? It has been ${days(ctx.daysSinceReport)} since I first reported it on ${firstReported}.`,
+          `${referenceLine(ctx)}Could you please confirm the specific date the repair will be made? ${sinceReport(ctx, true)}.`,
           `Please reply by ${replyBy(ctx)}.`,
           signature(ctx),
         ].join("\n\n"),
@@ -189,15 +206,19 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       };
 
     case "missed_repair": {
-      const opening = ctx.repairScheduledFor
-        ? `The repair of ${problem(ctx)} at ${where} that was scheduled for ${formatFullDate(ctx.repairScheduledFor)} did not happen, and the problem is still not fixed.`
-        : `I was told the repair of ${problem(ctx)} at ${where} was complete, but the problem is still not fixed.`;
+      const appointmentPassed =
+        ctx.missedBecause !== "says_fixed" && Boolean(ctx.repairScheduledFor) && ctx.repairScheduledFor! < ctx.today;
+      const opening = appointmentPassed
+        ? `The repair of ${problem(ctx)} at ${where} that was scheduled for ${formatFullDate(ctx.repairScheduledFor!)} did not happen or did not fix the problem. It is still not fixed.`
+        : ctx.missedBecause === "says_fixed"
+          ? `I was told the repair of ${problem(ctx)} at ${where} was complete, but the problem is still not fixed.`
+          : `The problem with ${problem(ctx)} at ${where} is still not fixed.`;
       return {
-        subject: ctx.repairScheduledFor ? `Repair did not happen: ${where}` : `Still not fixed: ${where}`,
+        subject: appointmentPassed ? `Repair did not fix the problem: ${where}` : `Still not fixed: ${where}`,
         body: [
           greeting(ctx),
           opening,
-          `It has been ${days(ctx.daysSinceReport)} since I first reported it on ${firstReported}. Please reply by ${replyBy(ctx)} with a new repair date.`,
+          `${sinceReport(ctx, true)}. Please reply by ${replyBy(ctx)} with a new repair date.`,
           RECORD_LINE,
           signature(ctx),
         ].join("\n\n"),

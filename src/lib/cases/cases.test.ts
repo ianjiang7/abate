@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isCaseCode, isCaseToken, newCaseCode, newCaseToken } from "./ids";
+import { draftWasEdited, firstReplyAfterNotice, receivedAtFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import { newCaseSchema, replySchema } from "./validation";
 import { buildTimeline, ladderInputs, ladderProgress, pendingReplyReference, sentOnByStep } from "./view";
@@ -22,10 +23,12 @@ const record: CaseRecord = {
   priorFollowups: 2,
   monthlyRent: 1500,
   tenantName: "Test Tenant",
+  tenantContact: null,
   mgmtName: null,
   mgmtEmail: null,
   status: "open",
   repairScheduledFor: null,
+  repairScheduledAt: null,
   repairMissedAt: null,
   fixedOn: null,
   helpRequestedAt: null,
@@ -139,6 +142,11 @@ describe("newCaseSchema", () => {
     expect(r.data.monthlyRent).toBe(1850);
   });
 
+  it("strips an autofilled Apt prefix from the unit", () => {
+    const r = newCaseSchema.safeParse({ ...valid, unit: "Apt 4B" });
+    expect(r.success && r.data.unit).toBe("4B");
+  });
+
   it("allows a free-text address with no building match", () => {
     expect(newCaseSchema.safeParse({ ...valid, bbl: "", bin: "", borough: "" }).success).toBe(true);
   });
@@ -161,5 +169,35 @@ describe("newCaseSchema", () => {
   it("requires reply text", () => {
     expect(replySchema.safeParse({ text: " ", receivedOn: "2026-10-18" }).success).toBe(false);
     expect(replySchema.safeParse({ text: "We'll come Tuesday.", receivedOn: "2026-10-18" }).success).toBe(true);
+  });
+});
+
+describe("rules", () => {
+  const sentAfternoon = msg({ step: "notice", sentAt: "2026-10-18T20:30:00Z" }); // 4:30pm New York
+  it("never sorts a past-dated reply before our message sent that same day", () => {
+    const at = receivedAtFor("2026-10-18", [sentAfternoon], new Date("2026-10-19T13:00:00Z"));
+    expect(at > "2026-10-18T20:30:00Z").toBe(true);
+    expect(at.startsWith("2026-10-18T20:30:01")).toBe(true);
+  });
+
+  it("uses noon New York time for an earlier day, and now for today", () => {
+    expect(receivedAtFor("2026-10-16", [sentAfternoon], new Date("2026-10-19T13:00:00Z"))).toBe("2026-10-16T16:00:00.000Z");
+    const now = new Date("2026-10-19T13:00:00Z");
+    expect(receivedAtFor("2026-10-19", [], now)).toBe(now.toISOString());
+  });
+
+  it("counts only replies after Abate's first notice for assumption 1", () => {
+    const early = msg({ direction: "incoming", receivedAt: "2026-10-15T16:00:00Z" });
+    const after = msg({ direction: "incoming", receivedAt: "2026-10-20T16:00:00Z" });
+    expect(firstReplyAfterNotice([early, sentAfternoon, after])).toBe("2026-10-20T16:00:00Z");
+    expect(firstReplyAfterNotice([early])).toBeNull();
+  });
+
+  it("doesn't count filling in a placeholder as editing the draft", () => {
+    const draft = { subject: "311 complaint filed", body: "My complaint number is [add your 311 number].\n\nThanks" };
+    expect(draftWasEdited(draft, { subject: "311 complaint filed", body: "My complaint number is 311-12345678.\n\nThanks" })).toBe(false);
+    expect(draftWasEdited(draft, { subject: "311 complaint filed", body: "My complaint number is 311-12345678. Fix it now!\n\nThanks" })).toBe(true);
+    expect(draftWasEdited(draft, { subject: "Changed", body: draft.body })).toBe(true);
+    expect(draftWasEdited({ subject: "a", body: "Hello" }, { subject: "a", body: "Hello " })).toBe(false);
   });
 });

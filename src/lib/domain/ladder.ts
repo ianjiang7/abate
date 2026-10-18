@@ -126,7 +126,10 @@ export function nextAction(c: LadderCase, messages: LadderMessage[], today: IsoD
     }
   }
 
-  if (c.repairScheduledFor) {
+  // An appointment only stands while the latest reply is the one that scheduled it. A later reply
+  // that says something else (a cancellation, a dispute) makes it moot.
+  const scheduleActive = Boolean(c.repairScheduledFor) && (!lastIn || lastIn.classification === "scheduled");
+  if (c.repairScheduledFor && scheduleActive) {
     if (today <= c.repairScheduledFor) {
       return { kind: "waiting_for_repair", scheduledFor: c.repairScheduledFor, reason: "The repair is scheduled." };
     }
@@ -162,6 +165,8 @@ export function dueSummary(action: NextAction, today: IsoDate): { nextStep: stri
     case "send":
       return { nextStep: action.step, nextDueOn: action.dueOn };
     case "checkin":
+    case "waiting_for_repair":
+      // Stored fields only change when the tenant acts, so schedule the day-after check-in now.
       return { nextStep: "checkin", nextDueOn: addDays(action.scheduledFor, 1) };
     case "confirm_fixed":
     case "team_review":

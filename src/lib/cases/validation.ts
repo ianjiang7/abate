@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isIsoDate } from "@/lib/domain/dates";
 import { isIssueTypeId, isReportChannelId } from "@/lib/domain/issues";
+import { bareUnit } from "@/lib/domain/templates";
 import { isReplyCategory } from "@/lib/domain/ladder";
 
 const isoDate = z.string().refine(isIsoDate, "Pick a date.");
@@ -17,7 +18,8 @@ const optionalText = (max: number) =>
 export const newCaseSchema = z
   .object({
     address: z.string().trim().min(5, "Enter your street address.").max(200),
-    unit: optionalText(20),
+    // Phones autofill "Apt 4B"; letters add "Apt" themselves.
+    unit: optionalText(20).transform((v) => (v ? bareUnit(v) : null)),
     borough: optionalText(40),
     bbl: z
       .string()

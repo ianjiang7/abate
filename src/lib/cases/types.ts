@@ -21,10 +21,12 @@ export type CaseRecord = {
   priorFollowups: number;
   monthlyRent: number;
   tenantName: string;
+  tenantContact: string | null;
   mgmtName: string | null;
   mgmtEmail: string | null;
   status: "open" | "fixed";
   repairScheduledFor: IsoDate | null;
+  repairScheduledAt: string | null;
   repairMissedAt: string | null;
   fixedOn: IsoDate | null;
   helpRequestedAt: string | null;

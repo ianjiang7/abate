@@ -38,6 +38,11 @@ export function sentOnByStep(messages: MessageRecord[]): Partial<Record<StepId, 
   return out;
 }
 
+export function latestIncoming(messages: MessageRecord[]): MessageRecord | null {
+  const incoming = messages.filter((m) => m.direction === "incoming").sort((a, b) => messageTime(a).localeCompare(messageTime(b)));
+  return incoming[incoming.length - 1] ?? null;
+}
+
 /** The agent's quotable sentence from the latest reply, if that reply is newer than our last message. */
 export function pendingReplyReference(messages: MessageRecord[]): string | null {
   const sorted = [...messages].sort((a, b) => messageTime(a).localeCompare(messageTime(b)));
@@ -72,6 +77,7 @@ export function templateContext(args: {
     openViolations,
     replyReference: pendingReplyReference(messages),
     repairScheduledFor: record.repairScheduledFor,
+    missedBecause: latestIncoming(messages)?.classification === "says_fixed" ? "says_fixed" : "appointment",
   };
 }
 

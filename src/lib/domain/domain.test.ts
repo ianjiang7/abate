@@ -3,7 +3,7 @@ import { addDays, daysBetween, isIsoDate, nyDate } from "./dates";
 import { estimateAbatement } from "./estimate";
 import { dueSummary, nextAction, type LadderMessage } from "./ladder";
 import { buildMailto, trackingAddress } from "./mailto";
-import { buildMessage, unfilledPlaceholders, type TemplateContext } from "./templates";
+import { bareUnit, buildMessage, unfilledPlaceholders, type TemplateContext } from "./templates";
 
 describe("dates", () => {
   it("uses New York's calendar date, not UTC's", () => {
@@ -118,6 +118,22 @@ describe("nextAction", () => {
     expect(nextAction(c, msgs, "2026-10-23")).toMatchObject({ step: "missed_repair", dueOn: "2026-10-23" });
   });
 
+  it("drops an appointment once a later reply says something else", () => {
+    const msgs: LadderMessage[] = [
+      sentNotice,
+      { direction: "incoming", classification: "scheduled", at: "2026-10-19T15:00:00Z" },
+      { direction: "outgoing", step: "confirm_schedule", at: "2026-10-19T16:00:00Z" },
+      { direction: "incoming", classification: "acknowledged_no_date", at: "2026-10-20T15:00:00Z" },
+      { direction: "outgoing", step: "ask_date", at: "2026-10-20T16:00:00Z" },
+    ];
+    const c = { status: "open" as const, repairScheduledFor: "2026-10-22" };
+    expect(nextAction(c, msgs, "2026-10-21")).toMatchObject({ kind: "send", step: "reminder" });
+  });
+
+  it("puts the day-after check-in on the team's list while waiting for a repair", () => {
+    expect(dueSummary({ kind: "waiting_for_repair", scheduledFor: "2026-10-22", reason: "" }, "2026-10-19")).toEqual({ nextStep: "checkin", nextDueOn: "2026-10-23" });
+  });
+
   it("is done once fixed", () => {
     expect(nextAction({ status: "fixed" }, [sentNotice], "2026-10-25").kind).toBe("done");
   });
@@ -176,6 +192,36 @@ describe("templates", () => {
   it("flags placeholders the tenant must fill in", () => {
     expect(unfilledPlaceholders(buildMessage("guide_311", ctx).body)).toEqual(["[add your 311 number]"]);
     expect(unfilledPlaceholders(buildMessage("notice", ctx).body)).toEqual([]);
+  });
+
+  it("reads naturally when management was told today", () => {
+    const m = buildMessage("notice", { ...ctx, daysSinceReport: 0 });
+    expect(m.body).toContain("since. It is still not fixed.");
+    expect(m.body).not.toContain("0 days");
+    expect(buildMessage("ask_date", { ...ctx, daysSinceReport: 0 }).body).toContain("I reported it to you today.");
+  });
+
+  it("never writes Apt twice", () => {
+    expect(buildMessage("notice", { ...ctx, unit: "Apt 4B" }).subject).toBe("Repair needed at 123 Example St, Bronx, NY 10452, Apt 4B");
+    expect(bareUnit("#12C")).toBe("12C");
+    expect(bareUnit("apt. 3")).toBe("3");
+  });
+
+  it("words a missed repair to match what happened", () => {
+    const saidFixed = buildMessage("missed_repair", { ...ctx, missedBecause: "says_fixed", repairScheduledFor: "2026-10-25" });
+    expect(saidFixed.body).toContain("I was told the repair");
+    expect(saidFixed.body).not.toContain("did not happen");
+    const passed = buildMessage("missed_repair", { ...ctx, missedBecause: "appointment", repairScheduledFor: "2026-10-16" });
+    expect(passed.body).toContain("scheduled for October 16, 2026 did not happen or did not fix the problem");
+    const future = buildMessage("missed_repair", { ...ctx, missedBecause: "appointment", repairScheduledFor: "2026-10-25" });
+    expect(future.body).not.toContain("scheduled for");
+  });
+
+  it("says 'up to' when an issue's low end is zero", () => {
+    const est = estimateAbatement({ monthlyRent: 2000, issueType: "other", noticeOn: "2026-09-18", endOn: "2026-10-18" });
+    const m = buildMessage("formal_notice", { ...ctx, issueType: "other", estimate: est });
+    expect(m.body).toMatch(/may be up to \$\d+/);
+    expect(m.body).not.toContain("between $0");
   });
 
   it("handles a missing unit, manager name and description", () => {

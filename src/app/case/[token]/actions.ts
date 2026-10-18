@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { isCaseToken } from "@/lib/cases/ids";
-import { confirmFixed, correctReply, logReply, recordClientEvent, recordSent, reportNotFixed, requestHelp } from "@/lib/cases/service";
+import { confirmFixed, correctReply, logReply, recordClientEvent, recordSent, reportNotFixed, requestHelp, saveContact } from "@/lib/cases/service";
 import { categorySchema, helpSchema, replySchema } from "@/lib/cases/validation";
 import { isIsoDate, nyDate } from "@/lib/domain/dates";
 import type { ReplyCategory, StepId } from "@/lib/domain/ladder";
@@ -30,8 +30,13 @@ export async function sendAction(token: string, _prev: CaseActionState, formData
   const subject = text(formData, "subject").trim().slice(0, 300);
   const body = text(formData, "body").trim().slice(0, 10_000);
   if (!isStep(step) || !subject || !body) return { ok: false, message: "The message is empty. Add some text and try again." };
+  const draftedOn = text(formData, "draftedOn");
+  const violations = text(formData, "openViolations");
+  const shown = isIsoDate(draftedOn)
+    ? { draftedOn, openViolations: /^\d{1,6}$/.test(violations) ? Number(violations) : null }
+    : null;
   try {
-    const result = await recordSent(token, step, subject, body);
+    const result = await recordSent(token, step, subject, body, shown);
     if (!result.ok) return { ok: false, message: result.message };
   } catch {
     return FAILED;
@@ -108,6 +113,20 @@ export async function helpAction(token: string, _prev: CaseActionState, formData
   if (!parsed.success) return { ok: false, errors: { contact: parsed.error.issues[0]?.message ?? "Add a phone number or email." } };
   try {
     const result = await requestHelp(token, parsed.data.contact);
+    if (!result.ok) return { ok: false, message: result.message };
+  } catch {
+    return FAILED;
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function contactAction(token: string, _prev: CaseActionState, formData: FormData): Promise<CaseActionState> {
+  if (!isCaseToken(token)) return NOT_FOUND;
+  const parsed = helpSchema.safeParse({ contact: text(formData, "contact") });
+  if (!parsed.success) return { ok: false, errors: { contact: parsed.error.issues[0]?.message ?? "Add a phone number or email." } };
+  try {
+    const result = await saveContact(token, parsed.data.contact);
     if (!result.ok) return { ok: false, message: result.message };
   } catch {
     return FAILED;
