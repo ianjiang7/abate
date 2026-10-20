@@ -62,7 +62,9 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
   const sorted = [...messages].sort((a, b) => messageTime(a).localeCompare(messageTime(b)));
   const last = sorted[sorted.length - 1];
   const latestReply: LatestReply | null =
-    last && last.direction === "incoming" ? { id: last.id, category: last.classification, summary: last.classificationSummary } : null;
+    last && last.direction === "incoming" && last.classification
+      ? { id: last.id, category: last.classification, summary: last.classificationSummary, classifiedBy: last.classifiedBy }
+      : null;
 
   const fixedSummary =
     record.status === "fixed" && record.fixedOn
@@ -113,6 +115,9 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         hasContact={Boolean(record.tenantContact)}
         draftedOn={today}
         openViolations={openViolations}
+        sendMode={record.sendMode}
+        tenantEmail={record.tenantEmail}
+        unreadReplyId={last && last.direction === "incoming" && !last.classification ? last.id : null}
       />
 
       <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} />

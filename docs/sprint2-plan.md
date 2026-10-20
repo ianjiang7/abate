@@ -1,95 +1,76 @@
 # Sprint 2 plan
 
-Updated Oct 18. Owners still need to be filled in.
+Updated Oct 20. Owners still need to be filled in.
 
 **What changed since the Oct 13 plan review:** we moved from a one-off letter to Abate doing the
-chasing. Sprint 1's top finding was that following up, not the first report, is the burden, and a
-single letter left that burden in place. One tenant's dollar figure for a typical issue is also
-small (about $120 to $310 for a broken sink for three weeks at $1,800 rent), so a single letter is
-easy to ignore. The full reasoning is in `docs/decisions.md`.
+chasing (Oct 18), and then to a **concierge pilot** (Oct 20): our team sends each follow-up on the
+tenant's behalf, with their approval, and reads every reply. Details are in `docs/decisions.md`.
 
-## 1. Our hypothesis and the two assumptions behind it
+## 1. Our hypothesis and the two we're testing
 
 > **Hypothesis:** when Abate does the chasing, with timed written follow-ups that build up to a
 > dollar figure, landlords fix repairs faster than when tenants chase on their own.
 
-The hypothesis holds only if both assumptions hold. The first asks whether chasing works on
-landlords. The second asks whether our technology can do the chasing.
+### Hypothesis 1: landlords respond faster to Abate's follow-ups
 
-### Assumption 1: landlords respond faster to Abate's follow-ups than to the tenant's own chasing
+- **Why it's risky:** the pain we heard most was follow-ups going unanswered, and only one
+  landlord told us pressure works. Letters now come from Abate, a third party, which could be
+  taken more seriously or ignored.
+- **How we test it:** when tenants start a case, they tell us when they first told management.
+  After our first follow-up goes out, the app timestamps management's first reply, the repair
+  date and the fix, and which step got the first response.
+- **Pass:** at least half of cases get a reply or a scheduled repair within 7 days of the first
+  follow-up.
+- **Caveat:** a handful of cases and no comparison group, so this is directional. First
+  follow-ups need to go out by Oct 22.
 
-- **Why it's risky:** the pain we heard most was follow-ups going unanswered. Only one landlord
-  told us that pressure speeds repairs. If landlords ignore Abate too, chasing on tenants' behalf
-  has no value.
-- **How we test it:** when tenants start a case, we ask how long they've been following up. After
-  Abate's first notice, we track the days until management replies, schedules the repair and
-  fixes it. We also record which step got the first response, which tells us whether the formal
-  notice with the dollar figure is what moved them.
-- **Pass:** at least half of cases get a reply or a scheduled repair within 7 days of Abate's
-  first notice, faster than the tenant's earlier wait.
-- **Caveat:** only a handful of cases and no comparison group, so this is directional evidence.
-  Most repairs won't be finished by Oct 29, so "repair scheduled" stands in for "fixed faster".
-  First notices need to go out by Oct 22 to get a full 7 days.
+### Hypothesis 2: tenants will let Abate contact their landlord for them
 
-### Assumption 2: the case agent can run the follow-ups
-
-This is the technical core of Sprint 2: an AI agent that reads management's replies, decides the
-next step and drafts the next follow-up for the tenant.
-
-- **Why it's risky:** landlord replies are messy ("we'll look into it", "the super will stop by",
-  silence and then a phone call). If the agent misreads them, it sends the wrong follow-up and
-  tenants stop trusting it. If tenants rewrite every draft, the app hasn't taken the chasing off
-  their plate.
-- **How we test it:** a teammate checks every classification against the real reply. Real replies
-  will be few, so we also run the agent on about 30 sample replies the team writes. The app
-  records whether each draft was sent as is or edited.
-- **Pass:** at least 90% of replies classified correctly, and at least 70% of drafts sent without
-  editing.
+- **Why it's risky:** Sprint 1 left this open ("Would they trust a third party with their
+  landlord?"), and fear of retaliation is real. If tenants won't hand it over, the product has to
+  stay a reminder tool.
+- **How we test it:** the start form asks who should send the follow-ups, with neither option
+  pre-selected. Tenants who pick Abate approve each draft; they can pause anytime (with a reason)
+  or switch to sending themselves. At the day-7 check-in we ask how comfortable they felt.
+- **Pass:** at least 8 of 10 choose Abate to send, at least 70% of drafts are approved within a
+  day of being ready, and at most 1 tester pauses or switches.
 
 ### What the results tell us
 
-| Assumption 1 | Assumption 2 | What it means |
+| Hypothesis 1 | Hypothesis 2 | What it means |
 | --- | --- | --- |
-| Pass | Pass | The hypothesis holds and the agent can run it. Next: let the agent send on the tenant's approval, and test the 25% fee. |
-| Pass | Fail | Chasing works, but our agent isn't good enough yet. Keep people in the loop and improve the agent before scaling. |
-| Fail | Either | Even persistent written follow-ups don't move these landlords. The value has to come from stronger steps: HPD complaints, small claims, building-wide pressure. |
+| Pass | Pass | Abate doing the chasing works and tenants want it. Next: automate sending and reading, and test the 25% fee. |
+| Pass | Fail | The chasing works, but tenants want to send it themselves. Build Abate as a reminder-and-drafting tool. |
+| Fail | Pass | Tenants trust us, but letters alone don't move landlords. Lean on stronger steps: HPD complaints, small claims, building-wide pressure. |
+| Fail | Fail | Rethink the product before building more. |
 
-**Side signals, not pass/fail:** neighbor invites (interest in building-wide cases) and "help me
-recover this" taps (willingness to pay 25%).
+**Side signals:** neighbor invites, "recover this for 25%" taps, and how often the AI (reading
+replies in the background) agreed with our team. The team page shows all of it live.
 
 ## 2. The smallest thing that tests them
 
-One flow on a phone-first web page.
+One flow on a phone-first web page, plus a team page that runs the concierge.
 
-1. **Start a case** in under 5 minutes: address, issue, dates, how long they've been following
-   up, rent, management contact, one photo.
-2. **See the building:** open HPD violations, this season's complaints, the registered managing
-   agent.
-3. **See the case:** a timeline that fills itself in, and a dollar estimate that grows each day.
-4. **Send each follow-up:** the agent drafts the next message on the escalation ladder (notice on
-   day 0, reminder on day 3, formal notice with the dollar figure on day 5, 311 guide on day 7).
-   The tenant sends it from their own email with our tracking address CC'd.
-5. **Log replies:** the tenant or a teammate pastes management's reply, and the agent reads it and
-   picks the next step.
-6. **Invite neighbors** with the same problem, and a **fake door** for the 25% recovery service.
+1. **Start a case** in about 5 minutes: address, issue, dates, rent, management contact, a
+   photo, and **who sends the follow-ups** (Abate's team, or the tenant).
+2. **See the building** (HPD violations, complaints, managing agent) and **the case** (timeline
+   and a growing estimate).
+3. **Each follow-up** on the ladder (notice day 0, reminder day 3, formal notice with the dollar
+   figure day 5, 311 guide day 7): the tenant approves the draft, and our team sends it from the
+   team Gmail with the tenant copied. Self-send tenants send it from their own email.
+4. **Replies:** we log replies that reach the team inbox; tenants paste ones they got directly.
+   Our team reads each one and the next draft follows.
+5. **Pause** anytime, invite neighbors, and the 25% fake door.
 
-**The tech pieces**
-- **The case agent (core):** Claude reads replies and fills in templates the team has reviewed.
-- **Building intelligence:** NYC Open Data (HPD violations, HPD complaints, 311, HPD
-  registrations), free and read-only.
-- **Stretch:** an evidence reader that turns screenshots of texts into timeline items, and
-  automatic reading of the CC inbox.
-
-**Build order:** templates and the ladder with no AI first, then the agent, then building
-intelligence. If the agent isn't ready when testing starts, teammates classify replies by hand
-while it's finished.
+**The team page** (`/team/<TEAM_KEY>`): the send queue, replies to read, a form for inbox
+replies, tenants to nudge, and live results for both hypotheses.
 
 ## 3. What we fake or skip
 
 **Done by hand**
-- Nudges: a teammate texts each tester when a step is due.
-- The first send: a teammate sits with each tester for the first notice.
-- Checking the agent: a teammate marks each classification and draft right or wrong.
+- Sending: a teammate sends each approved message from the team Gmail and marks it sent.
+- Reading replies: a teammate reads every reply and picks what it said on the team page.
+- Nudges: a teammate texts each tester when a step is ready to approve.
 - Building-wide cases: if neighbors join, we write a joint letter by hand.
 - Money recovery: we talk to whoever taps "help me".
 - Case review: the Supabase dashboard, not an admin screen.
@@ -125,21 +106,18 @@ since Sprint 1 skewed toward new renters.
 We'll recruit about 15 to end up with 10.
 
 **How we run each test**
-- **First session, in person:** they start the case on their own phone while we stay quiet (watch,
-  don't explain). We time them and note where they get stuck. Then we sit with them while they
-  send the first notice.
-- **Four questions afterwards,** writing down one quote each:
-  - What did you expect the number to be?
-  - Would you send this message as written?
-  - Would you let Abate send these for you?
-  - What almost stopped you?
-- **After that:** we text them when each step is due. They paste any reply into the app, or
-  forward it to us.
+- **First session, in person:** they start the case on their own phone while we stay quiet. We
+  time them and note where they hesitate, especially at "Who should send the follow-ups?". If
+  they pick Abate, they approve the first notice; we send it from the team Gmail that day.
+- **Questions afterwards,** one quote each: What did you expect the number to be? Why did you pick
+  who sends? What almost stopped you?
+- **Day 3 and day 7:** we text them when a step is ready to approve. At day 7 we ask: "How
+  comfortable were you with Abate contacting your landlord?"
 
 **Tracking sheet columns:** # · name · channel · issue · open now? · rent-stabilized? · test date ·
-minutes to start a case · days unanswered before Abate · steps sent · drafts sent unedited /
-drafts sent · step that got the first reply · days to reply · days to repair scheduled · days to
-fixed · neighbor invites · tapped help · would let Abate send? · best quote.
+minutes to start a case · who sends · comfort (day 7) · paused or switched (why) · best quote. The
+team page computes the timing and approval numbers, so the sheet only needs what the app can't
+see.
 
 ## 5. Our tools and our brief file
 
@@ -150,13 +128,12 @@ fixed · neighbor invites · tapped help · would let Abate send? · best quote.
   ground rules. Teammates on Codex or Cursor read the same `AGENTS.md`.
 - **Stack:** Next.js, TypeScript and Tailwind; Supabase for the database and photo storage;
   Vercel for a real link; Vitest and Playwright for tests.
-- **AI and data:** the Claude API for the case agent (billed separately from Claude Max, with a
-  spending cap), and NYC Open Data for building intelligence (free).
+- **AI and data:** the Claude API reads replies in the background only, so we can compare it
+  with our team after the pilot; NYC Open Data for building records (free).
 - **Process:** plan, cut, one feature per request, the agent clicks through at phone width,
   commit. A second agent reviews each change.
-- **Measurement:** events and messages in Supabase (including the agent's classifications and our
-  checks), a script that scores the agent on sample replies, a team Gmail as the CC tracking
-  address, and a Google Sheet for the tester log.
+- **Measurement:** the team page computes both hypotheses' numbers live from Supabase; a Google
+  Sheet holds what the app can't see (comfort quotes, why they picked who sends).
 - **Repo:** GitHub, with all four teammates added.
 
 ## Timeline
@@ -174,10 +151,12 @@ fixed · neighbor invites · tapped help · would let Abate send? · best quote.
 
 ## To do now
 
-- [ ] Get an Anthropic API key, set a spending cap, and put it in `.env.local`. Never paste it into
-      chat or the repo.
+- [ ] Add `TEAM_KEY` to Vercel (copy it from `.env.local`) and bookmark the team page.
+- [ ] Optional: an Anthropic API key with a spending cap, so the background AI comparison uses
+      Claude instead of the keyword stand-in.
 - [ ] Create Supabase and Vercel accounts (sign in with GitHub).
-- [ ] Set up the team Gmail used as the CC tracking address.
+- [ ] Set up the team Gmail we send from, and sign in to it on the laptops you send from.
+- [ ] Ask legal aid or a tenant attorney about the formal notice going out under Abate's name.
 - [ ] Write about 30 made-up landlord replies, each labeled with the right category.
 - [ ] Recruit: re-contact Sprint 1 interviewees whose issues are still open, post the screener, and
       pull this week's 311 heat complaints for flyering.
@@ -191,7 +170,8 @@ fixed · neighbor invites · tapped help · would let Abate send? · best quote.
 ## Questions for the Oct 23 advisor meeting
 
 1. Is comparing against each tenant's earlier wait convincing enough without a comparison group?
-2. Is the case agent a strong enough technical piece, or should building intelligence be the
-   headline?
-3. Who could review our message templates for legal-advice risk?
+2. Is a concierge pilot with a working app (intake, building records, ladder, team queue) enough
+   of a technical piece, or should we also demo the background AI comparison?
+3. Who could review our message templates, especially the formal notice we now send under
+   Abate's name, for legal-advice risk?
 4. Does the 25% fake door count as a test of willingness to pay?

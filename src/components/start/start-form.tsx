@@ -33,6 +33,9 @@ type Fields = {
   tenantName: string;
   monthlyRent: string;
   tenantContact: string;
+  sendMode: "abate" | "self" | "";
+  tenantEmail: string;
+  sendAuthorized: boolean;
   aiConsent: boolean;
   invite: string;
 };
@@ -54,6 +57,9 @@ const EMPTY: Fields = {
   tenantName: "",
   monthlyRent: "",
   tenantContact: "",
+  sendMode: "",
+  tenantEmail: "",
+  sendAuthorized: false,
   aiConsent: false,
   invite: "",
 };
@@ -64,6 +70,7 @@ const STEPS = [
   { title: "Where do you live?", subtitle: "We'll look up your building's record with the city.", fields: ["address", "unit"] },
   { title: "What needs fixing?", subtitle: "Pick the closest match. Add a photo so there's a record.", fields: ["issueType", "issueDescription", "startedOn", "photos"] },
   { title: "Who have you told?", subtitle: "The clock for what you may be owed starts when management was told.", fields: ["firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName", "mgmtEmail"] },
+  { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "tenantEmail", "sendAuthorized"] },
   { title: "Last few details", subtitle: "We use these to sign your messages and estimate what you may be owed.", fields: ["tenantName", "monthlyRent", "tenantContact", "aiConsent"] },
 ] as const;
 
@@ -91,6 +98,13 @@ function validateStep(step: number, f: Fields, photos: Photo[], today: string): 
     if (f.mgmtEmail.trim() && !EMAIL.test(f.mgmtEmail.trim())) e.mgmtEmail = "That email doesn't look right.";
   }
   if (step === 3) {
+    if (!f.sendMode) e.sendMode = "Choose who sends the follow-ups.";
+    if (f.sendMode === "abate") {
+      if (!EMAIL.test(f.tenantEmail.trim())) e.tenantEmail = "Add your email so we can copy you on every message.";
+      if (!f.sendAuthorized) e.sendAuthorized = "Please confirm we can email management for you.";
+    }
+  }
+  if (step === 4) {
     if (f.tenantName.trim().length < 2) e.tenantName = "Enter the name you sign messages with.";
     const rent = Number(f.monthlyRent.replace(/[$,\s]/g, ""));
     if (!rent || rent <= 0) e.monthlyRent = "Enter your monthly rent.";
@@ -209,8 +223,8 @@ export function StartForm() {
   const submit = () => {
     const fd = new FormData();
     for (const [key, value] of Object.entries(fields)) {
-      if (key === "aiConsent") {
-        if (value) fd.append("aiConsent", "on");
+      if (key === "aiConsent" || key === "sendAuthorized") {
+        if (value) fd.append(key, "on");
       } else if (key === "monthlyRent") {
         fd.append(key, String(value).replace(/[$,\s]/g, ""));
       } else {
@@ -407,6 +421,78 @@ export function StartForm() {
 
             {step === 3 ? (
               <>
+                <fieldset data-invalid={errors.sendMode ? "true" : undefined} aria-describedby={errors.sendMode ? "sendMode-error" : undefined} className="space-y-3">
+                  <legend className="sr-only">Who sends the follow-ups</legend>
+                  {(
+                    [
+                      {
+                        id: "abate",
+                        title: "Abate's team sends them for me",
+                        body: "You approve every message first. We email management from our team address, copy you on everything, and keep the record. You can pause anytime.",
+                      },
+                      {
+                        id: "self",
+                        title: "I'll send them myself",
+                        body: "We draft each message and tell you when it's time. You send it from your own email.",
+                      },
+                    ] as const
+                  ).map((o) => {
+                    const active = fields.sendMode === o.id;
+                    return (
+                      <label
+                        key={o.id}
+                        className={cn(
+                          "flex cursor-pointer gap-3 rounded-2xl bg-white p-4 ring-1 transition",
+                          "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
+                          active ? "ring-2 ring-ink shadow-[var(--shadow-card)]" : "ring-line hover:ring-periwinkle",
+                        )}
+                      >
+                        <input type="radio" name="sendMode" value={o.id} checked={active} onChange={() => set("sendMode", o.id)} className="mt-1 size-5 shrink-0 accent-[#08014E]" />
+                        <span>
+                          <span className="block font-semibold">{o.title}</span>
+                          <span className="mt-1 block text-[14px] leading-relaxed text-slate">{o.body}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                  {errors.sendMode ? (
+                    <p id="sendMode-error" role="alert" className="text-sm font-medium text-bad">
+                      {errors.sendMode}
+                    </p>
+                  ) : null}
+                </fieldset>
+
+                {fields.sendMode === "abate" ? (
+                  <>
+                    <Field label="Your email" htmlFor="tenantEmail" error={errors.tenantEmail} hint="We copy you on every message we send, so you see exactly what management gets.">
+                      <Input id="tenantEmail" type="email" inputMode="email" value={fields.tenantEmail} onChange={(e) => set("tenantEmail", e.target.value)} autoComplete="email" maxLength={200} aria-invalid={Boolean(errors.tenantEmail)} />
+                    </Field>
+                    <label className={cn("flex gap-3 rounded-2xl bg-white p-4 ring-1", errors.sendAuthorized ? "ring-bad" : "ring-line")}>
+                      <input
+                        type="checkbox"
+                        checked={fields.sendAuthorized}
+                        onChange={(e) => set("sendAuthorized", e.target.checked)}
+                        aria-invalid={Boolean(errors.sendAuthorized)}
+                        aria-describedby={errors.sendAuthorized ? "sendAuthorized-error" : undefined}
+                        className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
+                      />
+                      <span className="text-[14px] leading-relaxed text-slate">
+                        <span className="font-semibold text-ink">I authorize Abate</span> to email {fields.mgmtName.trim() || "my building's management"} about this repair on my behalf.
+                        I&apos;ll approve each message before it&apos;s sent.
+                      </span>
+                    </label>
+                    {errors.sendAuthorized ? (
+                      <p id="sendAuthorized-error" role="alert" className="-mt-3 text-sm font-medium text-bad">
+                        {errors.sendAuthorized}
+                      </p>
+                    ) : null}
+                  </>
+                ) : null}
+              </>
+            ) : null}
+
+            {step === 4 ? (
+              <>
                 <Field label="Your name" htmlFor="tenantName" error={errors.tenantName} hint="Messages are signed with it.">
                   <Input id="tenantName" value={fields.tenantName} onChange={(e) => set("tenantName", e.target.value)} autoComplete="name" maxLength={120} aria-invalid={Boolean(errors.tenantName)} />
                 </Field>
@@ -426,8 +512,8 @@ export function StartForm() {
                     className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
                   />
                   <span className="text-[14px] leading-relaxed text-slate">
-                    <span className="font-semibold text-ink">I agree.</span> Abate can use what I share to draft my messages, including an AI service that reads
-                    replies from management. Abate isn&apos;t a law firm, and estimates aren&apos;t legal advice.
+                    <span className="font-semibold text-ink">I agree.</span> Abate can use what I share to draft my messages. Our team reads replies from management,
+                    and we may test an AI tool on them. Abate isn&apos;t a law firm, and estimates aren&apos;t legal advice.
                   </span>
                 </label>
                 {errors.aiConsent ? (

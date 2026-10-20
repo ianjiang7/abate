@@ -3,6 +3,28 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-20: Concierge pilot: our team sends and reads
+
+- **We told our professor we'd run a concierge test,** so our team, not the AI, does the
+  follow-up work: we send each approved message from the team Gmail and read every reply.
+- **Hypothesis 2 changed** from "the AI agent can run the follow-ups" to "tenants will let Abate
+  contact their landlord for them". *Why:* with people doing the work, the open question is trust,
+  the one Sprint 1 left unanswered ("Would they trust a third party with their landlord?").
+- **"Who sends" is a choice, not a checkbox.** Tenants pick "Abate's team sends them for me" or
+  "I'll send them myself", with neither pre-selected. *Why:* the share who pick Abate measures
+  trust directly, and self-send keeps nervous tenants in the pilot.
+- **Tenants approve every message; they can pause anytime** (with a reason) or switch to sending
+  themselves. *Why:* retaliation fear, and pauses are the other half of the trust measure.
+- **Letters our team sends are in Abate's voice,** on the tenant's behalf, with the tenant copied.
+  *Why:* sending a first-person letter from our address would be misleading.
+- **The AI reads replies in the background only** and we compare it with our team at the end.
+  *Why:* keeps the agent work useful for after the pilot without letting it touch tenants.
+- **Built a team page** at a secret link (send queue, replies to read, nudges, live results).
+  *Why:* concierge sending needs accurate sent times for hypothesis 1, and a spreadsheet of
+  copy-paste would be error-prone. This relaxes the earlier "no admin UI" rule.
+- **Open legal question:** the formal notice (warranty of habitability, dollar estimate) now goes
+  out under Abate's name. Have legal aid or a tenant attorney look before the first one is sent.
+
 ## 2026-10-18: First build
 
 - **Look:** the Sprint 1 deck's palette (deep indigo, periwinkle, lavender) and Work Sans, phone

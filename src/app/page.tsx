@@ -26,8 +26,8 @@ export default function Home() {
               Repair still not fixed? <span className="text-slate">We&apos;ll do the chasing.</span>
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-slate text-pretty">
-              Abate writes and times every follow-up to your landlord, keeps a dated record of what they say, and shows the
-              rent you may be owed back while you wait.
+              Abate&apos;s team follows up with your landlord for you: timed, written messages you approve, a dated record of
+              everything they say, and an estimate of the rent you may be owed back.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
               <ButtonLink href="/start" size="lg" icon={null}>
@@ -48,13 +48,13 @@ export default function Home() {
                 The problem, when it started, when you told management, and a photo. We look up your building&apos;s record
                 with the city.
               </Step>
-              <Step n={2} icon={<Send className="size-5" />} title="We draft every follow-up">
-                A written notice, a reminder, a formal notice, and help filing with 311, each on schedule. You tap send from
-                your own email.
+              <Step n={2} icon={<Send className="size-5" />} title="We send every follow-up">
+                A written notice, a reminder, a formal notice, and help filing with 311, each on schedule. You approve each
+                one, and our team sends it and copies you. Rather send them yourself? You can.
               </Step>
-              <Step n={3} icon={<BellRing className="size-5" />} title="Paste their reply, we take it from there">
-                Abate reads what management says and drafts the right next step, while your estimate of what you may be owed
-                grows each day.
+              <Step n={3} icon={<BellRing className="size-5" />} title="We read their replies">
+                When management answers, our team reads it and sets up the right next step, while your estimate of what you
+                may be owed grows each day.
               </Step>
             </ol>
           </div>
@@ -70,7 +70,7 @@ export default function Home() {
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
             <Trust icon={<ShieldCheck className="size-5" />} title="You stay in control">
-              Nothing reaches your landlord unless you send it yourself.
+              Nothing reaches your landlord until you approve it, and you can pause anytime.
             </Trust>
             <Trust icon={<Lock className="size-5" />} title="Private by default">
               Your case lives at a private link. No account, no password.

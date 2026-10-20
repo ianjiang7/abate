@@ -24,7 +24,8 @@ Create `.env.local` in the project root (it is gitignored, never commit it) with
 | `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → secret key (or legacy `service_role`) |
 | `DATABASE_URL` | Supabase → Connect → Session pooler URI, with the database password filled in |
 | `ANTHROPIC_API_KEY` | console.anthropic.com. Optional: without it, replies are read by a built-in stand-in |
-| `CC_EMAIL` | The team inbox CC'd on every message, e.g. a Gmail address. Each case adds `+casecode` |
+| `CC_EMAIL` | The team inbox CC'd on messages tenants send themselves, e.g. a Gmail address. Each case adds `+casecode` |
+| `TEAM_KEY` | A long random secret (24+ characters). The team page lives at `/team/<TEAM_KEY>` |
 
 Set up the database tables once (and again after adding a migration):
 
@@ -52,18 +53,26 @@ npm run dev
 
 ## Running the pilot (team)
 
-Everything the team does by hand happens in the Supabase table editor:
+Open the team page at `/team/<TEAM_KEY>` (bookmark it; anyone with the link can use it). It has:
 
-- **`cases_due` view:** open cases with a step due today. Text the tenant their case link.
-- **`replies_to_check` view:** replies the agent has read. Open the row in `messages` and set
-  `team_verdict` to `correct` or `incorrect`. That is how we measure assumption 2.
-- **`cases` table:** `help_requested_at` and `help_contact` show who tapped "I'm interested".
-- **`events` table:** the funnel (case_created, draft_shown, send_confirmed, reply_logged, …).
+- **Live results** for both hypotheses, with pass marks, plus side signals.
+- **To send:** messages tenants approved. Tap "Open in Gmail" while signed in to the team Gmail
+  (it fills in To, Cc, subject and body), send it, then tap "Mark sent". Aim for the same day.
+- **Replies to read:** replies tenants pasted in. Pick what each one said; the tenant's next
+  draft appears on their page.
+- **Log a reply from the team inbox:** management usually replies to the team address. Paste the
+  reply, pick the case and what it said.
+- **Waiting on tenants:** who has a step to approve or a question to answer. Copy their case link
+  and text it to them.
 
-Rows with `is_test = true` come from automated tests and are left out of both views.
+Supabase still has the raw tables (`cases`, `messages`, `events`) and views (`cases_due`,
+`messages_to_send`). Add `?test=1` to the team page URL to include cases made by automated tests.
+
+At the day-7 check-in, ask each tester "How comfortable were you with Abate contacting your
+landlord?" and note the quote.
 
 ## Deploy
 
-Import the GitHub repo in Vercel, add the same environment variables (Production and Preview;
+Import the GitHub repo in Vercel, add the same environment variables, including `TEAM_KEY` (Production and Preview;
 `DATABASE_URL` is only needed locally for migrations), and deploy. Every push to `main` redeploys.
 Testers with an old tab open after a deploy may see an error; reloading the page fixes it.

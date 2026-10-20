@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 3100;
 
+/** The team page key used by the end-to-end test (the real one lives in .env.local and Vercel). */
+export const TEAM_KEY = "e2e-team-key-0123456789abcdefXYZ";
+
 // One end-to-end run of the tenant flow on a phone-sized screen, against a production build.
 // Needs Supabase credentials in .env.local. Cases it creates are marked is_test (npm run e2e:cleanup).
 export default defineConfig({
@@ -25,6 +28,6 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     timeout: 240_000,
     reuseExistingServer: !process.env.CI,
-    env: { E2E_TEST: "1", ABATE_AGENT: "standin" },
+    env: { E2E_TEST: "1", ABATE_AGENT: "standin", TEAM_KEY },
   },
 });

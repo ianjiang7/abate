@@ -7,15 +7,7 @@ import { Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Field, Input } from "@/components/ui/field";
 import { REPLY_CATEGORIES, type ReplyCategory } from "@/lib/domain/ladder";
-
-const PLAIN: Record<ReplyCategory, string> = {
-  acknowledged_no_date: "They answered but gave no repair date",
-  scheduled: "They gave a repair date",
-  needs_access: "They need to get into the apartment",
-  disputes_or_refuses: "They pushed back or refused",
-  says_fixed: "They say it's fixed",
-  unclear: "I'm not sure",
-};
+import { REPLY_PLAIN as PLAIN } from "./reply-labels";
 
 export function CorrectReply({ token, messageId, current, onDone }: { token: string; messageId: string; current: ReplyCategory | null; onDone?: () => void }) {
   const [state, formAction, pending] = useActionState<CaseActionState, FormData>(

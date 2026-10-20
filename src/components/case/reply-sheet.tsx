@@ -61,7 +61,7 @@ function ReplyForm({ token, onDone }: { token: string; onDone: () => void }) {
           <h2 id="reply-title" className="text-xl font-bold tracking-tight">
             What did management say?
           </h2>
-          <p className="mt-1 text-sm text-slate">Paste their text or email. Abate reads it and drafts your next step.</p>
+          <p className="mt-1 text-sm text-slate">Paste their text or email. Our team reads it and sets up your next step.</p>
         </div>
         <button type="button" onClick={onDone} aria-label="Close" className="-mr-2 grid size-11 shrink-0 place-items-center rounded-full hover:bg-lavender">
           <X className="size-5" />
@@ -76,9 +76,8 @@ function ReplyForm({ token, onDone }: { token: string; onDone: () => void }) {
         <Field label="When did you get it?" htmlFor="reply-date" error={state.errors?.receivedOn}>
           <Input id="reply-date" name="receivedOn" type="date" defaultValue={today} key={today} max={today || undefined} />
         </Field>
-        <p className="text-xs leading-relaxed text-slate">An AI service reads the reply to suggest your next step. You can correct it if it gets it wrong.</p>
         <Button type="submit" size="lg" block loading={pending}>
-          {pending ? "Reading their reply…" : "Read their reply"}
+          {pending ? "Sending it to our team…" : "Send it to our team"}
         </Button>
       </div>
     </form>

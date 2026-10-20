@@ -37,58 +37,58 @@ judgments we found range from about $1,700 to $4,700. HPD fines go to the city, 
 
 ## The hypothesis this MVP tests
 
+We test it as a **concierge pilot**: our team sends the follow-ups to landlords on the tenant's
+behalf (with the tenant's approval on each one) and reads every reply by hand.
+
 > **Hypothesis:** when Abate does the chasing, with timed written follow-ups that build up to a
 > dollar figure, landlords fix repairs faster than when tenants chase on their own.
 
-It holds only if both assumptions hold. Every feature must help test one of them.
-
 1. **Landlords respond faster to Abate's follow-ups than to the tenant's own chasing.** We
-   compare how long management takes to reply or schedule the repair after Abate's first notice
-   with how long the tenant's earlier messages went unanswered, and we record which step of the
-   escalation ladder got the first response. *Pass:* at least half of cases get a reply or a
-   scheduled repair within 7 days of Abate's first notice, faster than the tenant's earlier wait.
-2. **The case agent can run the follow-ups.** It reads management's replies correctly and drafts
-   follow-ups tenants will send as written. *Pass:* it classifies at least 90% of replies
-   correctly (the team checks every real reply plus a set of sample replies), and tenants send at
-   least 70% of its drafts without editing.
+   compare how long management takes to reply or schedule the repair after Abate's first
+   follow-up with how long the tenant had already waited, and record which step got the first
+   response. *Pass:* at least half of cases get a reply or a scheduled repair within 7 days of
+   the first follow-up.
+2. **Tenants will let Abate contact their landlord for them.** They choose "Abate's team sends
+   them for me", approve each draft promptly, and don't back out. *Pass:* at least 8 of 10
+   testers choose Abate to send, at least 70% of drafts are approved within a day of being ready,
+   and at most 1 tester pauses or switches to sending themselves. We also ask how comfortable they
+   felt at the day-7 check-in.
 
-Side signals, not pass/fail: neighbor invites sent (interest in building-wide cases) and "help me
-recover this" taps (willingness to pay the 25% fee). Not tested this sprint: whether tenants keep
-going without our help.
+Side signals, not pass/fail: neighbor invites, "recover this for 25%" taps, and how often the AI
+(reading replies in the background only) agreed with our team. The team page shows all of these
+live.
 
 ## What we are building: one flow, phone-first
 
-1. **Start a case** (under 5 minutes): address and unit, issue type, when it started, when
-   management was first told and how, how many times they've followed up since, monthly rent,
-   management name and email, at least one photo, and consent to AI processing of what they
-   share.
-2. **See the building:** the building's open HPD violations, recent heat and repair complaints,
-   and the registered managing agent (see Building intelligence).
-3. **See the case:** a timeline that fills itself in as messages go out and replies come in, the
-   days unresolved, and the estimated abatement so far, labeled as an estimate, not legal advice.
-4. **Send each follow-up:** the case agent drafts the next message from the escalation ladder.
-   The tenant sends it as is or edits it in the app, sends it from their own email (a `mailto:`
-   link that CCs the case's tracking address), then taps "I sent it".
-5. **Log replies:** the tenant taps "Management replied" and pastes the reply. Teammates paste
-   replies that arrive in the CC inbox. The agent classifies each reply and moves the case along
-   the ladder.
-6. **Invite neighbors:** "Know a neighbor with the same problem?" shares a link that starts a case
-   at the same building. We count invites and the cases they start.
-7. **Fake door:** "Want us to recover this for you? We take 25% only if you get paid." It captures
-   a phone number or email. Nothing is automated behind it.
+1. **Start a case** (about 5 minutes): address and unit, issue type, when it started, when
+   management was first told and how, follow-ups since, management name and email, a photo, **who
+   sends the follow-ups** (Abate's team, or the tenant), and for Abate: the tenant's email (copied
+   on everything) and their authorization. Neither choice is pre-selected; the choice measures
+   hypothesis 2. Then their name, rent, an optional phone for reminders, and consent.
+2. **See the building:** open HPD violations, recent complaints, the registered managing agent.
+3. **See the case:** a timeline that fills itself in, the days unresolved, and the estimated
+   abatement so far, labeled as an estimate, not legal advice.
+4. **Each follow-up:** the app drafts it from the reviewed templates.
+   - *Abate sends:* the tenant reviews (and can edit) the draft and taps **Approve and send**. It
+     waits in the team's send queue; a teammate sends it from the team Gmail with the tenant CC'd
+     and marks it sent. Letters are in Abate's voice ("We're writing on behalf of…").
+   - *Tenant sends:* the tenant sends it from their own email (`mailto:`) and taps "I sent it".
+     Letters are in the tenant's voice.
+5. **Replies:** management usually replies to the team inbox; a teammate logs it on the team page
+   with their reading. Tenants can paste replies they got directly; our team reads those too. The
+   reading moves the case along the ladder. Tenants can correct a reading.
+6. **Pause:** a tenant using Abate can pause anytime (with a reason) or switch to sending
+   themselves. Both count as backing out for hypothesis 2.
+7. **Invite neighbors** and the **fake door** ("we'll recover this for 25%") as before.
 8. **Private case link** (no login) to come back, follow along, or mark the repair fixed.
 
-Every step records an event: case started, case created, photo added, building viewed, draft
-shown, draft edited, send clicked, send confirmed, reply logged, neighbor invited, help requested,
-marked fixed.
+Data: `cases` (incl. `send_mode`, `send_authorized_at`, `tenant_email`, `paused_at`,
+`pause_reason`), `photos`, `messages` (outgoing: `ready_on`, `approved_at`, `sent_at`, `sent_by`;
+incoming: `classification`, `classified_by`, and the AI's shadow `ai_classification`), `events`.
 
-Data stays small: `cases`, `photos`, `messages` (every follow-up and reply, with the agent's
-classification and the team's check), `events`. Case links use a long random token. A case stores
-the dates management first replied, scheduled the repair and fixed it.
-
-**Build order:** (1) start a case, estimate, ladder and timeline with plain templates and no AI;
-deploy. (2) The case agent. (3) Building intelligence. (4) Stretch goals. If the agent isn't ready
-when testing starts, run the ladder with teammates classifying replies by hand.
+**The team page** lives at `/team/<TEAM_KEY>` (a secret link, like case links): the send queue
+with "Open in Gmail" and "Mark sent", replies to read, a form to log replies from the inbox,
+tenants to nudge, and the live hypothesis results. Add `?test=1` to include test cases.
 
 ## Escalation ladder
 
@@ -113,18 +113,15 @@ A reply changes the path:
 | Says it's fixed | Ask the tenant to confirm; if yes, mark fixed and show the fake door |
 | Unclear | Flag for a teammate |
 
-## The case agent
+## Reading replies (concierge)
 
-- Calls the Claude API through the official TypeScript SDK (`@anthropic-ai/sdk`), model
-  `claude-opus-5-5`, with structured outputs.
-- For each reply it returns a category from the table above, a one-line summary, any date
-  mentioned, and the suggested next step.
-- For each draft it picks the template for the next step and fills in facts only: dates, what
-  management said, the estimate. Legal wording comes only from templates the team has reviewed.
-- Every classification and draft is saved on its message so a teammate can mark it right or wrong.
-  That is how we measure assumption 2.
-- Keep about 30 sample replies the team writes (made up, no real data) with the correct
-  category, plus a script that runs the agent on them and reports accuracy.
+- Our team reads every reply and picks its category on the team page (or the tenant corrects it).
+  That reading drives the ladder.
+- The AI agent (`src/lib/agent`, Claude API with a keyword stand-in) reads each reply **in the
+  background only** and stores `ai_classification` for later comparison. It never shows the tenant
+  anything or changes a draft. `ABATE_REPLY_MODE=agent` switches back to the AI-driven flow for
+  after the pilot.
+- About 30 made-up sample replies plus `npm run score-agent` measure the agent on its own.
 
 ## Building intelligence
 
@@ -144,22 +141,23 @@ A reply changes the path:
 - **Inbox reading:** read the team's CC inbox automatically (Gmail API, one plus-address per case)
   instead of teammates pasting replies.
 
-## What the team does by hand
+## What the team does by hand (the concierge)
 
-- **Nudges:** a teammate texts the tenant when a step is due. A saved Supabase query lists cases
-  with a step due today.
-- **First send:** a teammate sits with each tester while they send the first notice.
-- **Checking the agent:** a teammate marks each classification and draft right or wrong in
-  Supabase.
+- **Send approved messages** from the team Gmail (tenant CC'd), then tap "Mark sent" on the team
+  page. Aim for the same day.
+- **Read replies** from the team inbox and from tenants, and pick what each said on the team page.
+- **Nudge tenants** listed under "Waiting on tenants" by texting them their case link.
+- **Day-7 check-in:** ask "How comfortable were you with Abate contacting your landlord?" and
+  keep the quote.
 - **Building-wide cases:** if several neighbors join, the team writes a joint letter by hand.
-- **Recovering money:** we talk to tenants who tap "help me". No negotiation, court or attorney
-  features.
-- **Reviewing cases:** the Supabase dashboard. No admin UI.
+- **Recovering money:** we talk to tenants who tap "I'm interested". No negotiation, court or
+  attorney features.
 
 ## Do not build
 
-Login, accounts or passwords; payments or fee collection; admin dashboards or settings pages;
-SMS, WhatsApp or push notifications; anything that sends a message to a landlord by itself;
+Login, accounts or passwords; payments or fee collection; admin dashboards or settings pages
+beyond the team page; SMS, WhatsApp or push notifications; anything that sends a message to a
+landlord automatically (a person sends every one, after the tenant approves it);
 access to tenants' own email inboxes; filing anything with 311, HPD or the courts; portfolio-wide
 landlord analytics; building-wide case features beyond the invite link; native apps; translations;
 AI-written legal wording. If a task seems to need one of these, stop and ask.
@@ -197,8 +195,11 @@ tenant attorney or legal aid before real testers see them.
   formal notice may mention the warranty of habitability. No other legal claims and no threats.
 - **The AI reads and fills in; it doesn't advise.** It classifies replies and fills facts into
   reviewed templates. It never writes legal wording, gives advice or predicts outcomes.
-- **The tenant presses send.** Fear of retaliation is real. Nothing reaches a landlord unless the
-  tenant sends it themselves.
+- **Nothing reaches a landlord without the tenant's say-so.** Fear of retaliation is real. In
+  Abate mode the tenant approves every message and can pause anytime; in self mode they send it.
+- **Abate never pretends to be the tenant.** Messages our team sends are in Abate's voice, on the
+  tenant's behalf, with the tenant copied. Before the formal notice (warranty of habitability and
+  a dollar estimate) goes out under Abate's name, legal aid or a tenant attorney should review it.
 - **Privacy.** Tenants share their address, rent, photos, messages and landlord. Collect only what
   the flow needs. Tell testers that what they share is processed by an AI service, and get their
   consent when they start a case. Keep the photo bucket private. Never log personal data. Never put
@@ -219,8 +220,8 @@ tenant attorney or legal aid before real testers see them.
 - **NYC GeoSearch and NYC Open Data** for building intelligence. No key needed at our volume.
 - **Vitest** for the estimate math and the ladder logic; **Playwright** for one phone-size test of
   the whole flow; a script that scores the agent on the sample replies.
-- **No email or SMS service.** The tenant's own email app sends each message (`mailto:`), and
-  teammates text testers from their own phones.
+- **No email or SMS service.** Our team sends from the team Gmail ("Open in Gmail" pre-fills it);
+  self-send tenants use their own email app (`mailto:`). Teammates text testers from their phones.
 
 ## How to run and test
 
@@ -237,8 +238,9 @@ Code map:
   view helpers for the case page. Server-only.
 - `src/lib/agent/`: the case agent (Claude reader, stand-in reader, guardrails).
 - `src/lib/building/`: NYC GeoSearch and Open Data, cached in `building_cache`.
-- `src/app/`: pages (`/`, `/start`, `/case/[token]`), server actions next to their pages, and
-  `api/address` and `api/invite` route handlers.
+- `src/app/`: pages (`/`, `/start`, `/case/[token]`, `/team/[key]`), server actions next to their
+  pages, and `api/address` and `api/invite` route handlers.
+- `src/lib/cases/metrics.ts`: the two hypotheses' numbers (pure, tested); the team page shows them.
 - `src/components/`: UI. Design tokens (Sprint 1 indigo palette, Work Sans) live in
   `src/app/globals.css`.
 
