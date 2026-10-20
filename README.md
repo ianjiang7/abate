@@ -57,7 +57,9 @@ npm run dev
 
 Open the team page at `/team/<TEAM_KEY>` (bookmark it; anyone with the link can use it). It has:
 
-- **Live results** for both hypotheses, with pass marks, plus side signals.
+- **Live results** for both hypotheses, with pass marks, plus side signals. Hypothesis 1 is split
+  into the sender (Abate's notice without $) and the dollar figure (first notices with $ vs
+  without), measured in the 3 days after the first notice. Each case shows its group.
 - **To send:** messages tenants approved. "Open in Gmail" (or "Copy") first re-checks the case, so a
   page left open can't send something the tenant has since paused, and tells you if a teammate
   already opened it. Gmail opens in the team inbox with To, Cc, subject and body filled in. Send it,

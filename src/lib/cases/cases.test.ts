@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isCaseCode, isCaseToken, newCaseCode, newCaseToken } from "./ids";
-import { draftWasEdited, firstReplyAfterNotice, readyOnFor, receivedAtFor } from "./rules";
+import { chooseDollarInNotice, draftWasEdited, firstReplyAfterNotice, readyOnFor, receivedAtFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import { newCaseSchema, replySchema } from "./validation";
 import { estimateAbatement } from "@/lib/domain/estimate";
@@ -33,6 +33,7 @@ const record: CaseRecord = {
   status: "open",
   sendMode: "self",
   sendModeChosen: false,
+  dollarInNotice: null,
   sendAuthorizedAt: null,
   tenantEmail: null,
   pausedAt: null,
@@ -338,5 +339,63 @@ describe("metrics", () => {
     };
     const m = computeMetrics([silentFix], now);
     expect(m.h1).toMatchObject({ judged: 1, responded: 1, medianDaysToReply: 4, fixed: 1 });
+  });
+});
+
+describe("hypothesis 1 split: sender vs dollar figure", () => {
+  it("assigns whichever first-notice version has fewer cases, and flips a coin on a tie", () => {
+    expect(chooseDollarInNotice({ with: 2, without: 3 }, 0.9)).toBe(true);
+    expect(chooseDollarInNotice({ with: 3, without: 2 }, 0.1)).toBe(false);
+    expect(chooseDollarInNotice({ with: 2, without: 2 }, 0.2)).toBe(true);
+    expect(chooseDollarInNotice({ with: 2, without: 2 }, 0.7)).toBe(false);
+  });
+
+  const est = estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-06", endOn: "2026-10-18" });
+  const ctxFor = (r: typeof record) => templateContext({ record: r, messages: [], today: "2026-10-18", estimate: est, openViolations: null });
+
+  it("puts the dollar estimate in the first notice only for the dollar group, in either voice", () => {
+    const abateWith = buildMessage("notice", ctxFor({ ...record, sendMode: "abate", dollarInNotice: true })).body;
+    expect(abateWith).toContain("warranty of habitability");
+    expect(abateWith).toContain("Based on Test's rent and how long this has gone on, we estimate that reduction may be between $120 and $300 so far");
+    const tenantWith = buildMessage("notice", ctxFor({ ...record, sendMode: "self", dollarInNotice: true })).body;
+    expect(tenantWith).toContain("Based on my rent and how long this has gone on, I estimate");
+    for (const dollar of [false, null]) {
+      const body = buildMessage("notice", ctxFor({ ...record, sendMode: "abate", dollarInNotice: dollar })).body;
+      expect(body).not.toMatch(/warranty|\$\d/);
+    }
+    // The reminder never carries it; the formal notice always does.
+    expect(buildMessage("reminder", ctxFor({ ...record, dollarInNotice: true })).body).not.toMatch(/warranty|\$\d/);
+    expect(buildMessage("formal_notice", ctxFor({ ...record, dollarInNotice: false })).body).toContain("may be between $120 and $300");
+  });
+
+  it("compares responses in the 3 days after the first notice, by sender and dollar group", () => {
+    const now = new Date("2026-10-25T16:00:00Z");
+    const notice = (sentAt: string, sentBy: "team" | "tenant") => msg({ step: "notice", sentAt, sentBy, approvedAt: sentBy === "team" ? sentAt : null });
+    const reply = (receivedAt: string) => msg({ direction: "incoming", receivedAt, classification: "acknowledged_no_date", classifiedBy: "team" });
+    const base = { ...record, sendModeChosen: true };
+    const rows = [
+      // Abate, with $: answered in 1 day.
+      { record: { ...base, id: "1", sendMode: "abate" as const, dollarInNotice: true }, messages: [notice("2026-10-15T16:00:00Z", "team"), reply("2026-10-16T16:00:00Z")] },
+      // Abate, without $: answered on day 5 (too late for the 3-day window).
+      { record: { ...base, id: "2", sendMode: "abate" as const, dollarInNotice: false }, messages: [notice("2026-10-15T16:00:00Z", "team"), reply("2026-10-20T16:00:00Z")] },
+      // Abate, without $: answered in 2 days.
+      { record: { ...base, id: "3", sendMode: "abate" as const, dollarInNotice: false }, messages: [notice("2026-10-15T16:00:00Z", "team"), reply("2026-10-17T16:00:00Z")] },
+      // Tenant-sent, with $: fixed on day 2 without a written reply.
+      { record: { ...base, id: "4", sendMode: "self" as const, dollarInNotice: true, status: "fixed" as const, fixedOn: "2026-10-17" }, messages: [notice("2026-10-15T16:00:00Z", "tenant")] },
+      // Tenant-sent, without $: sent yesterday, still in its window.
+      { record: { ...base, id: "5", sendMode: "self" as const, dollarInNotice: false }, messages: [notice("2026-10-24T16:00:00Z", "tenant")] },
+      // Before the split: not counted.
+      { record: { ...base, id: "6", sendMode: "self" as const, dollarInNotice: null }, messages: [notice("2026-10-15T16:00:00Z", "tenant"), reply("2026-10-16T16:00:00Z")] },
+    ];
+    const f = computeMetrics(rows, now).h1.firstNotice;
+    expect(f.abateWith).toMatchObject({ judged: 1, responded: 1, rate: 1 });
+    expect(f.abateWithout).toMatchObject({ judged: 2, responded: 1, rate: 0.5 });
+    expect(f.selfWith).toMatchObject({ judged: 1, responded: 1, rate: 1 });
+    expect(f.selfWithout).toMatchObject({ judged: 0, responded: 0, waiting: 1, rate: null });
+    expect(f.companyPass).toBe(true); // 50% of Abate notices without $ answered within 3 days
+    expect(f.allWith.rate).toBe(1);
+    expect(f.allWithout.rate).toBe(0.5);
+    expect(f.dollarLift).toBe(0.5);
+    expect(f.dollarPass).toBe(true);
   });
 });

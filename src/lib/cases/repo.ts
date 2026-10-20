@@ -9,7 +9,7 @@ import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
 
 const MESSAGE_COLUMNS =
   "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, claimed_at, withdrawn_at, edited, draft_body, received_at, logged_by, classification, ai_classification, classified_by, classified_at, classification_summary, classification_date, reply_reference, ai_source";
@@ -43,6 +43,7 @@ function toCase(r: Row): CaseRecord {
     status: r.status === "fixed" ? "fixed" : "open",
     sendMode: r.send_mode === "abate" ? "abate" : "self",
     sendModeChosen: Boolean(r.send_mode_chosen),
+    dollarInNotice: typeof r.dollar_in_notice === "boolean" ? r.dollar_in_notice : null,
     sendAuthorizedAt: str(r.send_authorized_at),
     tenantEmail: str(r.tenant_email),
     pausedAt: str(r.paused_at),
@@ -92,7 +93,7 @@ function check<T>(result: { data: T; error: { message: string; code?: string } |
 /** Inserts a case, retrying if the random token or code collides. */
 export async function insertCase(
   input: NewCaseInput,
-  extra: { isTest: boolean; invitedByCaseId: string | null; nextStep: string; nextDueOn: string },
+  extra: { isTest: boolean; invitedByCaseId: string | null; nextStep: string; nextDueOn: string; dollarInNotice: boolean },
 ): Promise<{ id: string; token: string; code: string }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const token = newCaseToken();
@@ -122,6 +123,7 @@ export async function insertCase(
         ai_consent: true,
         send_mode: input.sendMode,
         send_mode_chosen: true,
+        dollar_in_notice: extra.dollarInNotice,
         send_authorized_at: input.sendMode === "abate" ? new Date().toISOString() : null,
         tenant_email: input.sendMode === "abate" ? input.tenantEmail : null,
         invited_by_case_id: extra.invitedByCaseId,
@@ -255,6 +257,23 @@ export async function countEvents(name: string, scope: CaseScope): Promise<numbe
   const res = await q;
   if (res.error) throw new Error(`Counting events failed: ${res.error.message}`);
   return res.count ?? 0;
+}
+
+/** How many cases of this sender type already got each first-notice version (to keep the groups even). */
+export async function countDollarGroups(sendMode: "abate" | "self", isTest: boolean): Promise<{ with: number; without: number }> {
+  const count = async (value: boolean) => {
+    const res = await db()
+      .from("cases")
+      .select("id", { count: "exact", head: true })
+      .eq("is_test", isTest)
+      .eq("send_mode_chosen", true)
+      .eq("send_mode", sendMode)
+      .eq("dollar_in_notice", value);
+    if (res.error) throw new Error(`Counting groups failed: ${res.error.message}`);
+    return res.count ?? 0;
+  };
+  const [withCount, withoutCount] = await Promise.all([count(true), count(false)]);
+  return { with: withCount, without: withoutCount };
 }
 
 /** Abuse guards: how many real cases were created, and replies read for one case, since a time. */

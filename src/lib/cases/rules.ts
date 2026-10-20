@@ -76,3 +76,13 @@ export function readyOnFor(step: StepId, dueOn: IsoDate, record: CaseRecord, all
   else ready = dueOn;
   return ready > today ? today : ready;
 }
+
+/**
+ * Hypothesis 1 split: put the dollar estimate in this case's first notice or not. Assigns whichever
+ * version this sender type has fewer of, and a coin flip on a tie, so neither the team nor the
+ * tenant picks the group and the two stay even.
+ */
+export function chooseDollarInNotice(counts: { with: number; without: number }, coin: number): boolean {
+  if (counts.with !== counts.without) return counts.with < counts.without;
+  return coin < 0.5;
+}

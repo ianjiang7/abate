@@ -11,18 +11,31 @@ tenant's behalf, with their approval, and reads every reply. Details are in `doc
 > **Hypothesis:** when Abate does the chasing, with timed written follow-ups that build up to a
 > dollar figure, landlords fix repairs faster than when tenants chase on their own.
 
-### Hypothesis 1: landlords respond faster to Abate's follow-ups
+### Hypothesis 1: what makes landlords respond, the sender or the dollar figure?
 
 - **Why it's risky:** the pain we heard most was follow-ups going unanswered, and only one
-  landlord told us pressure works. Letters now come from Abate, a third party, which could be
-  taken more seriously or ignored.
-- **How we test it:** when tenants start a case, they tell us when they first told management.
-  After our first follow-up goes out, the app timestamps management's first reply, the repair
-  date and the fix, and which step got the first response.
-- **Pass:** at least half of cases get a reply or a scheduled repair within 7 days of the first
-  follow-up.
-- **Caveat:** a handful of cases and no comparison group, so this is directional. First
-  follow-ups need to go out by Oct 22.
+  landlord told us pressure works. If landlords respond, we need to know whether it was Abate
+  writing as a company or the money at stake, because they lead to different products.
+- **How we test it:** half the cases get the dollar estimate in the very first notice and half
+  don't. The app assigns the group when the case starts, balanced within each sender type, so we
+  never choose. Everyone still gets the figure in the day-5 formal notice. We compare responses (a
+  reply, a repair date or a fix) in the 3 days after the first notice, before any reminder:
+
+  | Comparison | Tells us |
+  | --- | --- |
+  | Abate notice with $ vs Abate notice without $ | **The dollar effect** (same sender, only the number differs) |
+  | Abate notice without $ vs the tenant's own chasing before Abate | **The sender effect** |
+  | Abate without $ vs tenant-sent without $ | A second read on the sender (tenants chose who sends, so a hint, not proof) |
+
+- **Pass:** (a) at least half of Abate notices without $ get a response within 3 days; (b)
+  responses are at least 25 points more common with $ than without.
+- **Also:** replies within 7 days of the first follow-up overall, and which step got the first
+  reply. The team page shows all of it live.
+- **Landlord letter test:** show Arshad and 5 to 10 property managers or supers the four versions
+  (Abate or tenant, with or without $) and ask which they'd act on first and why. More data points
+  and quotes for Oct 29.
+- **Caveat:** about 8 cases split 4 and 4 is a direction, not proof. First notices need to go out by
+  Oct 22.
 
 ### Hypothesis 2: tenants will let Abate contact their landlord for them
 
@@ -39,7 +52,7 @@ tenant's behalf, with their approval, and reads every reply. Details are in `doc
 
 | Hypothesis 1 | Hypothesis 2 | What it means |
 | --- | --- | --- |
-| Pass | Pass | Abate doing the chasing works and tenants want it. Next: automate sending and reading, and test the 25% fee. |
+| Pass | Pass | Abate doing the chasing works and tenants want it. Next: automate sending and reading, and test the 25% fee. Lead with whichever driver (sender or $) moved landlords. |
 | Pass | Fail | The chasing works, but tenants want to send it themselves. Build Abate as a reminder-and-drafting tool. |
 | Fail | Pass | Tenants trust us, but letters alone don't move landlords. Lean on stronger steps: HPD complaints, small claims, building-wide pressure. |
 | Fail | Fail | Rethink the product before building more. |

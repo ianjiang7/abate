@@ -8,9 +8,30 @@ import { ladderInputs, liveMessages } from "./view";
 
 export const PASS = {
   respondedWithin7: 0.5, // H1: at least half of cases
+  companyWithin3: 0.5, // H1a: at least half of Abate notices without $ get a response within 3 days
+  dollarLift: 0.25, // H1b: notices with $ get a response at least 25 points more often than without
   authorized: 0.8, // H2: at least 8 of 10 testers let Abate send
   approvedWithinDay: 0.7, // H2: at least 70% of drafts approved within 24 hours
   maxBackedOut: 1, // H2: at most 1 tester pauses or switches to sending themselves
+};
+
+/** Responses within 3 days of the first notice, before any follow-up, for one group. */
+export type NoticeCell = { judged: number; responded: number; waiting: number; rate: number | null };
+
+/** The first-notice split: who sent it (Abate's team or the tenant) and whether it had the dollar figure. */
+export type NoticeSplit = {
+  abateWith: NoticeCell;
+  abateWithout: NoticeCell;
+  selfWith: NoticeCell;
+  selfWithout: NoticeCell;
+  /** All notices with the dollar figure vs without (groups are balanced within each sender). */
+  allWith: NoticeCell;
+  allWithout: NoticeCell;
+  /** H1a: does a notice from Abate (without $) get answered? */
+  companyPass: boolean | null;
+  /** H1b: how much more often notices with $ got a response than without, in points (0 to 1). */
+  dollarLift: number | null;
+  dollarPass: boolean | null;
 };
 
 export type Metrics = {
@@ -30,6 +51,7 @@ export type Metrics = {
     /** Which follow-up was last sent before management's first reply. */
     firstReplyAfterStep: Partial<Record<StepId, number>>;
     fixed: number;
+    firstNotice: NoticeSplit;
   };
   h2: {
     /** Cases offered the who-sends choice (cases from before the concierge pilot weren't). */
@@ -80,6 +102,8 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
   const pauseReasons: Record<string, number> = {};
   let compared = 0;
   let agreed = 0;
+  const cell = (): NoticeCell => ({ judged: 0, responded: 0, waiting: 0, rate: null });
+  const split = { abateWith: cell(), abateWithout: cell(), selfWith: cell(), selfWithout: cell() };
 
   for (const { record, messages } of rows) {
     if (record.status === "fixed") fixed++;
@@ -103,6 +127,25 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       const fixedAt = record.fixedOn && record.fixedOn >= firstSentOn ? `${record.fixedOn}T23:59:59.000Z` : null;
       const candidates = [replies[0], record.repairScheduledAt, fixedAt].filter((t): t is string => Boolean(t) && t! >= firstSentAt).sort();
       const firstResponse = candidates[0];
+
+      // H1a/H1b: the 3 days after the first notice, before any follow-up, by sender and dollar group.
+      const notice = sent.find((m) => m.step === "notice");
+      if (notice && record.dollarInNotice !== null) {
+        const key = `${notice.sentBy === "team" ? "abate" : "self"}${record.dollarInNotice ? "With" : "Without"}` as keyof typeof split;
+        const c = split[key];
+        const noticeOn = nyDate(notice.sentAt!);
+        const afterNotice = candidates.filter((t) => t >= notice.sentAt!);
+        const responseOn = afterNotice[0] ? (afterNotice[0] === fixedAt ? record.fixedOn! : nyDate(afterNotice[0])) : null;
+        if (responseOn && daysBetween(noticeOn, responseOn) <= 3) {
+          c.judged++;
+          c.responded++;
+        } else if (daysBetween(noticeOn, today) > 3) {
+          c.judged++;
+        } else {
+          c.waiting++;
+        }
+      }
+
       if (firstResponse) {
         const d = daysBetween(firstSentOn, firstResponse === fixedAt ? record.fixedOn! : nyDate(firstResponse));
         toReply.push(d);
@@ -155,6 +198,24 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
     }
   }
 
+  for (const c of Object.values(split)) c.rate = ratio(c.responded, c.judged);
+  const pool = (a: NoticeCell, b: NoticeCell): NoticeCell => {
+    const p = { judged: a.judged + b.judged, responded: a.responded + b.responded, waiting: a.waiting + b.waiting, rate: null as number | null };
+    p.rate = ratio(p.responded, p.judged);
+    return p;
+  };
+  const allWith = pool(split.abateWith, split.selfWith);
+  const allWithout = pool(split.abateWithout, split.selfWithout);
+  const dollarLift = allWith.rate !== null && allWithout.rate !== null ? allWith.rate - allWithout.rate : null;
+  const firstNotice: NoticeSplit = {
+    ...split,
+    allWith,
+    allWithout,
+    companyPass: split.abateWithout.rate === null ? null : split.abateWithout.rate >= PASS.companyWithin3,
+    dollarLift,
+    dollarPass: dollarLift === null ? null : dollarLift >= PASS.dollarLift,
+  };
+
   const rate = ratio(responded, judged);
   const authRate = ratio(authorized, offered);
   const approvalRate = ratio(approvedWithinDay, approvals);
@@ -171,6 +232,7 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       medianDaysToReply: median(toReply),
       firstReplyAfterStep: afterStep,
       fixed,
+      firstNotice,
     },
     h2: {
       offered,

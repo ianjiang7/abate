@@ -43,11 +43,18 @@ behalf (with the tenant's approval on each one) and reads every reply by hand.
 > **Hypothesis:** when Abate does the chasing, with timed written follow-ups that build up to a
 > dollar figure, landlords fix repairs faster than when tenants chase on their own.
 
-1. **Landlords respond faster to Abate's follow-ups than to the tenant's own chasing.** We
-   compare how long management takes to reply or schedule the repair after Abate's first
-   follow-up with how long the tenant had already waited, and record which step got the first
-   response. *Pass:* at least half of cases get a reply or a scheduled repair within 7 days of
-   the first follow-up.
+1. **What makes landlords respond.** We test two drivers separately:
+   - *(a) The sender:* landlords respond to a follow-up from Abate, a company, when the tenant's own
+     chasing went unanswered. *Pass:* at least half of Abate's first notices **without** a dollar
+     figure get a reply, a repair date or a fix within 3 days.
+   - *(b) The dollar figure:* a first notice that includes the estimated rent abatement gets a
+     response more often than the same notice without it. Each case is assigned a group when it
+     starts (`cases.dollar_in_notice`), balanced within each sender type, so nobody picks who gets
+     it; everyone still gets the figure in the day-5 formal notice. *Pass:* responses within 3 days
+     are at least 25 points more common with the figure than without.
+   - Overall, we still track replies within 7 days of the first follow-up and which step got the
+     first reply. With a handful of cases these are directions, not proof. A landlord letter test
+     (property managers rank the four versions: Abate or tenant, with or without $) adds data.
 2. **Tenants will let Abate contact their landlord for them.** They choose "Abate's team sends
    them for me", approve each draft promptly, and don't back out. *Pass:* at least 8 of 10
    testers choose Abate to send, at least 70% of drafts are approved within a day of being ready,
@@ -109,7 +116,7 @@ for the sprint so most cases get through several steps before Oct 29.
 
 | Step | When, if there's no useful reply | What it says |
 | --- | --- | --- |
-| 1. Notice | Day 0 | The problem, when it started, when management was first told. Asks for a repair date. |
+| 1. Notice | Day 0 | The problem, when it started, when management was first told. Asks for a repair date. For the "$" group, also the estimated abatement so far. |
 | 2. Reminder | Day 3 | No response yet. Asks again for a date. |
 | 3. Formal notice | Day 5 | Restates the timeline, includes the estimated abatement so far and the building's open violation count, and may mention the warranty of habitability. |
 | 4. 311 guide | Day 7 | Shows the tenant how to file a 311 complaint themselves. We never file it. |
@@ -204,14 +211,16 @@ tenant attorney or legal aid before real testers see them.
 - **Not legal advice.** New York restricts non-lawyers from giving legal advice. Say "may be
   owed" and "estimate", never "you are owed" or "you will get". Show a short disclaimer on the
   estimate and every message. Messages state facts and ask for the repair by a date; only the
-  formal notice may mention the warranty of habitability. No other legal claims and no threats.
+  formal notice and the "$" group's first notice may mention the warranty of habitability and the
+  estimate. No other legal claims and no threats.
 - **The AI reads and fills in; it doesn't advise.** It classifies replies and fills facts into
   reviewed templates. It never writes legal wording, gives advice or predicts outcomes.
 - **Nothing reaches a landlord without the tenant's say-so.** Fear of retaliation is real. In
   Abate mode the tenant approves every message and can pause anytime; in self mode they send it.
 - **Abate never pretends to be the tenant.** Messages our team sends are in Abate's voice, on the
-  tenant's behalf, with the tenant copied. Before the formal notice (warranty of habitability and
-  a dollar estimate) goes out under Abate's name, legal aid or a tenant attorney should review it.
+  tenant's behalf, with the tenant copied. Before a letter with the warranty of habitability and a
+  dollar estimate (the formal notice, or the "$" first notice) goes out under Abate's name, legal
+  aid or a tenant attorney should review it.
 - **Privacy.** Tenants share their address, rent, photos, messages and landlord. Collect only what
   the flow needs. Tell testers that what they share is processed by an AI service, and get their
   consent when they start a case. Keep the photo bucket private. Never log personal data. Never put

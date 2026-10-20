@@ -34,6 +34,8 @@ export type TemplateContext = {
   missedBecause?: "says_fixed" | "appointment" | null;
   /** Who sends it: the tenant (first person) or the Abate team on their behalf. Defaults to the tenant. */
   voice?: "tenant" | "abate";
+  /** Hypothesis 1 split: include the dollar estimate in the first notice. */
+  estimateInNotice?: boolean;
 };
 
 export type DraftMessage = { subject: string; body: string };
@@ -110,6 +112,17 @@ function recordLine(ctx: TemplateContext): string {
     : "I'm keeping a dated record of this request and any replies.";
 }
 
+/** The warranty-of-habitability sentence with the dollar estimate (formal notice, and the "$" first notice). */
+function estimateParagraph(ctx: TemplateContext): string {
+  const est = ctx.estimate;
+  if (est.high <= 0) return "";
+  const range = est.low > 0 ? `between ${formatDollars(est.low)} and ${formatDollars(est.high)}` : `up to ${formatDollars(est.high)}`;
+  const basis = byAbate(ctx)
+    ? `Based on ${firstName(ctx)}'s rent and how long this has gone on, we estimate that reduction may be ${range} so far`
+    : `Based on my rent and how long this has gone on, I estimate that reduction may be ${range} so far`;
+  return `Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period a condition like this goes unrepaired. ${basis}, and it grows each day the problem continues.`;
+}
+
 function referenceLine(ctx: TemplateContext): string {
   const ref = ctx.replyReference?.trim();
   return ref ? `${ref}\n\n` : "";
@@ -130,6 +143,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
             ? `We're writing on behalf of ${ctx.tenantName}, your tenant at ${where}, about a repair that is needed: ${problem(ctx)}.`
             : `I'm writing about a repair needed in my apartment at ${where}: ${problem(ctx)}.`,
           `The problem started on ${started}. ${who(ctx)} first reported it to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since it was first reported, and it` : "It"} is still not fixed.`,
+          ...(ctx.estimateInNotice && estimateParagraph(ctx) ? [estimateParagraph(ctx)] : []),
           `Please reply by ${replyBy(ctx)} with the date the repair will be made.`,
           recordLine(ctx),
           signature(ctx),
@@ -166,14 +180,9 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
           ? `\n\nNYC HPD records currently list ${ctx.openViolations} open ${ctx.openViolations === 1 ? "violation" : "violations"} at this building.`
           : "";
 
-      const est = ctx.estimate;
-      const range = est.low > 0 ? `between ${formatDollars(est.low)} and ${formatDollars(est.high)}` : `up to ${formatDollars(est.high)}`;
-      const estimate =
-        est.high > 0
-          ? byAbate(ctx)
-            ? ` Based on ${firstName(ctx)}'s rent and how long this has gone on, we estimate that reduction may be ${range} so far, and it grows each day the problem continues.`
-            : ` Based on my rent and how long this has gone on, I estimate that reduction may be ${range} so far, and it grows each day the problem continues.`
-          : "";
+      const warranty =
+        estimateParagraph(ctx) ||
+        "Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period a condition like this goes unrepaired.";
 
       return {
         subject: `Formal notice: unresolved repair at ${where}`,
@@ -181,7 +190,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
           greeting(ctx),
           `This is a formal notice${byAbate(ctx) ? `, sent on behalf of ${ctx.tenantName},` : ""} about ${problem(ctx)} at ${where}, which remains unrepaired.`,
           `Timeline:\n${lines.join("\n")}`,
-          `${referenceLine(ctx)}Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period a condition like this goes unrepaired.${estimate}${violations}`,
+          `${referenceLine(ctx)}${warranty}${violations}`,
           `Please make the repair and confirm the repair date in writing by ${replyBy(ctx)}.`,
           recordLine(ctx),
           signature(ctx),

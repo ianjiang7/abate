@@ -10,6 +10,7 @@ import { buildMessage, unfilledPlaceholders, type DraftMessage } from "@/lib/dom
 import { isCaseCode } from "./ids";
 import { computeMetrics, type Metrics } from "./metrics";
 import {
+  countDollarGroups,
   countEvents,
   countRepliesSince,
   type CaseScope,
@@ -26,7 +27,7 @@ import {
   updateMessage,
   uploadCasePhotos,
 } from "./repo";
-import { draftWasEdited, firstReplyAfterNotice, readyOnFor, receivedAtFor } from "./rules";
+import { chooseDollarInNotice, draftWasEdited, firstReplyAfterNotice, readyOnFor, receivedAtFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import type { NewCaseInput } from "./validation";
 import { isPendingSend, ladderInputs, liveMessages, messageTime, templateContext } from "./view";
@@ -49,7 +50,8 @@ export async function createCase(input: NewCaseInput, photos: File[], opts: { is
   if (input.invite && isCaseCode(input.invite)) {
     invitedByCaseId = (await findBuildingByCode(input.invite))?.id ?? null;
   }
-  const created = await insertCase(input, { isTest: opts.isTest, invitedByCaseId, nextStep: "notice", nextDueOn: today });
+  const dollarInNotice = chooseDollarInNotice(await countDollarGroups(input.sendMode, opts.isTest), Math.random());
+  const created = await insertCase(input, { isTest: opts.isTest, invitedByCaseId, nextStep: "notice", nextDueOn: today, dollarInNotice });
   const uploaded = photos.length > 0 ? await uploadCasePhotos(created.id, photos) : 0;
   await logEvent(created.id, "case_created", {
     issueType: input.issueType,
@@ -58,6 +60,7 @@ export async function createCase(input: NewCaseInput, photos: File[], opts: { is
     priorFollowups: input.priorFollowups,
     hasMgmtEmail: Boolean(input.mgmtEmail),
     sendMode: input.sendMode,
+    dollarInNotice,
   });
   return { ...created, uploaded };
 }

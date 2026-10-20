@@ -29,6 +29,8 @@ export type CaseRecord = {
   sendMode: "abate" | "self";
   /** The tenant was offered the who-sends choice (cases created before the concierge pilot weren't). */
   sendModeChosen: boolean;
+  /** Hypothesis 1 split: whether the first notice includes the dollar estimate (null before the split). */
+  dollarInNotice: boolean | null;
   sendAuthorizedAt: string | null;
   tenantEmail: string | null;
   pausedAt: string | null;

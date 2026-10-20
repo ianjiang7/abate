@@ -3,6 +3,18 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-20: Split hypothesis 1 into the sender and the dollar figure
+
+- **Why:** in the original ladder the dollar figure only appeared in the day-5 formal notice, after
+  two Abate emails, so a reply couldn't be pinned on Abate writing as a company or on the money.
+- **Design:** each case is assigned, when it starts, to get the dollar estimate in its first notice
+  or not, balanced within each sender type (whichever group is smaller, a coin flip on a tie). We
+  compare responses in the 3 days after the first notice. Everyone still gets the figure at day 5.
+- **Pass marks:** (a) sender: at least half of Abate notices without $ get a response within 3
+  days; (b) dollar: at least 25 points more responses with $ than without.
+- **Trade-off:** the "$" first notice cites the warranty of habitability under Abate's name from
+  day 0, so it falls under the same legal check as the formal notice.
+
 ## 2026-10-20: Concierge safety and measurement fixes (from review)
 
 A four-part review of the concierge changes confirmed 32 findings; all were fixed.

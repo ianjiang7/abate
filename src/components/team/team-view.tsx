@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge, Card, CardHeader, Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { teamOverview, type TeamCase } from "@/lib/cases/service";
-import { PASS, type Metrics } from "@/lib/cases/metrics";
+import { PASS, type Metrics, type NoticeCell, type NoticeSplit } from "@/lib/cases/metrics";
 import { hasDatabase } from "@/lib/db/client";
 import { formatShortDate, nyDate } from "@/lib/domain/dates";
 import { getIssueType } from "@/lib/domain/issues";
@@ -50,7 +50,7 @@ export async function TeamView({ params, searchParams }: { params: Promise<{ key
                   edited={Boolean(message.edited)}
                   draftBody={message.draftBody}
                   replyAfterApproval={replyAfterApproval}
-                  needsLegalReview={message.step === "formal_notice" && !formalReviewed}
+                  needsLegalReview={!formalReviewed && (message.step === "formal_notice" || (message.step === "notice" && record.dollarInNotice === true))}
                 />
               </div>
             </li>
@@ -124,6 +124,9 @@ function CaseLine({ record, extra }: { record: TeamCase["record"]; extra?: strin
       <Badge tone={record.sendMode === "abate" ? "brand" : "neutral"} className="ml-1 align-middle">
         {record.sendMode === "abate" ? "Abate sends" : "Sends own"}
       </Badge>
+      {record.dollarInNotice !== null ? (
+        <Badge className="ml-1 align-middle">{record.dollarInNotice ? "$ in first notice" : "No $ in first notice"}</Badge>
+      ) : null}
       {record.pausedAt ? (
         <Badge tone="warn" className="ml-1 align-middle">
           Paused
@@ -186,6 +189,8 @@ function MetricsPanel({ m, invites, helpRequests }: { m: Metrics; invites: numbe
         <Tile label="Median days to first reply after Abate" value={m.h1.medianDaysToReply === null ? "–" : `${m.h1.medianDaysToReply}`} note={replySteps ? `First reply came after: ${replySteps}` : "No replies yet"} />
       </div>
 
+      <NoticeSplitPanel s={m.h1.firstNotice} baseline={m.h1.medianBaselineDays} />
+
       <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-slate">Hypothesis 2 · tenants let Abate contact their landlord</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Tile label="Chose Abate to send for them" value={`${m.h2.authorized} of ${m.h2.offered}`} note={`${pct(m.h2.rate)} · pass at ${pct(PASS.authorized)} · of tenants offered the choice`} pass={m.h2.authorizedPass} />
@@ -206,6 +211,59 @@ function MetricsPanel({ m, invites, helpRequests }: { m: Metrics; invites: numbe
         <Tile label="AI agreed with our team (shadow)" value={m.shadow.compared ? `${m.shadow.agreed} of ${m.shadow.compared}` : "–"} note={m.shadow.compared ? pct(m.shadow.rate) : "Compared once the team reads replies"} />
       </div>
     </Card>
+  );
+}
+
+const cellText = (c: NoticeCell) => `${c.responded} of ${c.judged}`;
+const cellNote = (c: NoticeCell) => `${pct(c.rate)}${c.waiting ? ` · ${c.waiting} still in their first 3 days` : ""}`;
+
+/** H1a and H1b: responses in the 3 days after the first notice, by sender and by dollar figure. */
+function NoticeSplitPanel({ s, baseline }: { s: NoticeSplit; baseline: number | null }) {
+  const lift = s.dollarLift === null ? "–" : `${s.dollarLift >= 0 ? "+" : ""}${Math.round(s.dollarLift * 100)} pts`;
+  return (
+    <>
+      <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-slate">Hypothesis 1 · what makes landlords respond (3 days after the first notice)</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Tile
+          label="H1a · The sender: Abate's notice without a dollar figure got a response"
+          value={cellText(s.abateWithout)}
+          note={`${cellNote(s.abateWithout)} · pass at ${pct(PASS.companyWithin3)}${baseline !== null ? ` · these tenants had waited a median ${baseline} days before Abate` : ""}`}
+          pass={s.companyPass}
+        />
+        <Tile
+          label="H1b · The dollar figure: response rate with $ minus without $"
+          value={lift}
+          note={`With $: ${cellText(s.allWith)} (${pct(s.allWith.rate)}) · without $: ${cellText(s.allWithout)} (${pct(s.allWithout.rate)}) · pass at +${Math.round(PASS.dollarLift * 100)} pts`}
+          pass={s.dollarPass}
+        />
+      </div>
+      <table className="mt-3 w-full text-left text-sm">
+        <caption className="sr-only">Responses within 3 days of the first notice</caption>
+        <thead className="text-slate">
+          <tr>
+            <th scope="col" className="py-1.5 font-semibold">First notice</th>
+            <th scope="col" className="py-1.5 font-semibold">With $</th>
+            <th scope="col" className="py-1.5 font-semibold">Without $</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line/70">
+          <tr>
+            <th scope="row" className="py-2 font-semibold">Sent by Abate</th>
+            <td className="py-2 tabular-nums">{cellText(s.abateWith)} <span className="text-slate">({pct(s.abateWith.rate)})</span></td>
+            <td className="py-2 tabular-nums">{cellText(s.abateWithout)} <span className="text-slate">({pct(s.abateWithout.rate)})</span></td>
+          </tr>
+          <tr>
+            <th scope="row" className="py-2 font-semibold">Sent by the tenant</th>
+            <td className="py-2 tabular-nums">{cellText(s.selfWith)} <span className="text-slate">({pct(s.selfWith.rate)})</span></td>
+            <td className="py-2 tabular-nums">{cellText(s.selfWithout)} <span className="text-slate">({pct(s.selfWithout.rate)})</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="mt-2 text-xs text-slate">
+        Each case is assigned a group when it starts (balanced within each sender), so we never pick who gets the dollar figure. With a handful of cases these are
+        directions, not proof; tenants chose who sends, so compare senders with care.
+      </p>
+    </>
   );
 }
 

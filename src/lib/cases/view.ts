@@ -92,6 +92,7 @@ export function templateContext(args: {
     repairScheduledFor: record.repairScheduledFor,
     missedBecause: latestIncoming(messages)?.classification === "says_fixed" ? "says_fixed" : "appointment",
     voice: record.sendMode === "abate" ? "abate" : "tenant",
+    estimateInNotice: record.dollarInNotice === true,
   };
 }
 
