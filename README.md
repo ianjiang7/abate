@@ -26,6 +26,8 @@ Create `.env.local` in the project root (it is gitignored, never commit it) with
 | `ANTHROPIC_API_KEY` | console.anthropic.com. Optional: without it, replies are read by a built-in stand-in |
 | `CC_EMAIL` | The team inbox CC'd on messages tenants send themselves, e.g. a Gmail address. Each case adds `+casecode` |
 | `TEAM_KEY` | A long random secret (24+ characters). The team page lives at `/team/<TEAM_KEY>` |
+| `TEAM_GMAIL` | The team Gmail address we send from. "Open in Gmail" opens that account even if a teammate is signed in to several (falls back to `CC_EMAIL`) |
+| `FORMAL_NOTICE_REVIEWED` | Set to `1` once legal aid or a tenant attorney has reviewed the formal notice; until then the send queue warns before each one |
 
 Set up the database tables once (and again after adding a migration):
 
@@ -56,8 +58,11 @@ npm run dev
 Open the team page at `/team/<TEAM_KEY>` (bookmark it; anyone with the link can use it). It has:
 
 - **Live results** for both hypotheses, with pass marks, plus side signals.
-- **To send:** messages tenants approved. Tap "Open in Gmail" while signed in to the team Gmail
-  (it fills in To, Cc, subject and body), send it, then tap "Mark sent". Aim for the same day.
+- **To send:** messages tenants approved. "Open in Gmail" (or "Copy") first re-checks the case, so a
+  page left open can't send something the tenant has since paused, and tells you if a teammate
+  already opened it. Gmail opens in the team inbox with To, Cc, subject and body filled in. Send it,
+  then tap "Mark sent". Aim for the same day. Watch the warnings: tenant edits, replies that came in
+  after approval, and the formal notice's legal check. Add a missing management email right there.
 - **Replies to read:** replies tenants pasted in. Pick what each one said; the tenant's next
   draft appears on their page.
 - **Log a reply from the team inbox:** management usually replies to the team address. Paste the
@@ -66,7 +71,8 @@ Open the team page at `/team/<TEAM_KEY>` (bookmark it; anyone with the link can 
   and text it to them.
 
 Supabase still has the raw tables (`cases`, `messages`, `events`) and views (`cases_due`,
-`messages_to_send`). Add `?test=1` to the team page URL to include cases made by automated tests.
+`messages_to_send`). Add `?test=1` to the team page URL to include cases made by automated tests,
+or `?test=only` to see only those.
 
 At the day-7 check-in, ask each tester "How comfortable were you with Abate contacting your
 landlord?" and note the quote.

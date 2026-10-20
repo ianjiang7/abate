@@ -3,6 +3,24 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-20: Concierge safety and measurement fixes (from review)
+
+A four-part review of the concierge changes confirmed 32 findings; all were fixed.
+
+- **Claim before sending:** "Open in Gmail" and "Copy" re-check the case and claim the message,
+  so a stale team page can't send a letter the tenant paused, and two teammates can't both send
+  it. Gmail opens in the team inbox (`TEAM_GMAIL`).
+- **Withdraw, don't send stale letters:** an unclaimed approval is withdrawn when the tenant
+  pauses, switches, or management replies; the tenant gets a fresh draft.
+- **Metrics now match the brief:** a step's ready date comes from what made it ready; drafts ready
+  over a day and never approved count against approval speed; a pause still counts after resuming;
+  "chose Abate" counts tenants who were offered the choice; a fix counts as a response.
+- **Team page warnings:** tenant edits (with the original draft to compare), replies that arrived
+  after approval, and the formal notice's legal check (`FORMAL_NOTICE_REVIEWED`).
+- **Smaller fixes:** unclear replies stay on the team's list; team readings can't overwrite a
+  tenant's; reply forms keep what was typed on errors; plain-language AI consent; e2e screenshots
+  only show test cases.
+
 ## 2026-10-20: Concierge pilot: our team sends and reads
 
 - **We told our professor we'd run a concierge test,** so our team, not the AI, does the

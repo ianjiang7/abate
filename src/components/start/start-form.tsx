@@ -223,6 +223,7 @@ export function StartForm() {
   const submit = () => {
     const fd = new FormData();
     for (const [key, value] of Object.entries(fields)) {
+      if ((key === "tenantEmail" || key === "sendAuthorized") && fields.sendMode !== "abate") continue;
       if (key === "aiConsent" || key === "sendAuthorized") {
         if (value) fd.append(key, "on");
       } else if (key === "monthlyRent") {
@@ -413,7 +414,7 @@ export function StartForm() {
                 <Field label="Management company or landlord" htmlFor="mgmtName" optional>
                   <Input id="mgmtName" value={fields.mgmtName} onChange={(e) => set("mgmtName", e.target.value)} placeholder="e.g. Acme Property Management" autoComplete="off" maxLength={120} />
                 </Field>
-                <Field label="Their email" htmlFor="mgmtEmail" optional error={errors.mgmtEmail} hint="We'll put it in the To: line of every message. If you don't have it, you can add it in your email app.">
+                <Field label="Their email" htmlFor="mgmtEmail" optional error={errors.mgmtEmail} hint="Every follow-up goes to this address. If you don't have it, leave it blank and we'll help you find it.">
                   <Input id="mgmtEmail" type="email" inputMode="email" value={fields.mgmtEmail} onChange={(e) => set("mgmtEmail", e.target.value)} placeholder="repairs@example.com" autoComplete="off" maxLength={200} aria-invalid={Boolean(errors.mgmtEmail)} />
                 </Field>
               </>
@@ -447,7 +448,17 @@ export function StartForm() {
                           active ? "ring-2 ring-ink shadow-[var(--shadow-card)]" : "ring-line hover:ring-periwinkle",
                         )}
                       >
-                        <input type="radio" name="sendMode" value={o.id} checked={active} onChange={() => set("sendMode", o.id)} className="mt-1 size-5 shrink-0 accent-[#08014E]" />
+                        <input
+                      type="radio"
+                      name="sendMode"
+                      value={o.id}
+                      checked={active}
+                      onChange={() =>
+                        // Switching to self-send drops the Abate-only answers, so they can't block submitting.
+                        o.id === "self" ? setFields((f) => ({ ...f, sendMode: "self", tenantEmail: "", sendAuthorized: false })) : set("sendMode", o.id)
+                      }
+                      className="mt-1 size-5 shrink-0 accent-[#08014E]"
+                    />
                         <span>
                           <span className="block font-semibold">{o.title}</span>
                           <span className="mt-1 block text-[14px] leading-relaxed text-slate">{o.body}</span>
@@ -512,8 +523,9 @@ export function StartForm() {
                     className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
                   />
                   <span className="text-[14px] leading-relaxed text-slate">
-                    <span className="font-semibold text-ink">I agree.</span> Abate can use what I share to draft my messages. Our team reads replies from management,
-                    and we may test an AI tool on them. Abate isn&apos;t a law firm, and estimates aren&apos;t legal advice.
+                    <span className="font-semibold text-ink">I agree.</span> Abate can use what I share to draft my messages. Our team reads every reply from
+                    management, and an outside AI service (Anthropic&apos;s Claude) also reads each reply so we can compare it with our team. Abate isn&apos;t a law
+                    firm, and estimates aren&apos;t legal advice.
                   </span>
                 </label>
                 {errors.aiConsent ? (

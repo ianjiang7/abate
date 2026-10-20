@@ -108,14 +108,15 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string)
   return { caseUrl, code };
 }
 
-const teamUrl = `/team/${TEAM_KEY}?test=1`;
+// Only automated test cases, so screenshots never capture real testers' details.
+const teamUrl = `/team/${TEAM_KEY}?test=only`;
 
 /** On the team page, act inside the list item for this case. */
 const teamItem = (page: Page, code: string) => page.locator("li").filter({ hasText: code }).filter({ visible: true }).first();
 
 test("concierge: the tenant approves, our team sends and reads replies, then the case closes", async ({ page }) => {
   const { caseUrl, code } = await startCase(page, "abate", "c");
-  await expect(page.getByRole("heading", { name: "Send your written notice" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Approve your written notice" })).toBeVisible();
   await expect(visibleText(page, "From:")).toBeVisible();
   await expect(visibleText(page, /may be owed so far/i)).toBeVisible();
   await shot(page, "c-05-case-new");
@@ -129,6 +130,9 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   // The team sends it from the team inbox and marks it sent.
   await page.goto(teamUrl);
   await expect(page.getByRole("heading", { name: /Live results/ })).toBeVisible();
+  // Copy claims the message (re-checking the case) before it can be sent.
+  await teamItem(page, code).getByRole("button", { name: "Copy" }).click();
+  await expect(teamItem(page, code).getByRole("button", { name: "Copied" })).toBeVisible();
   await teamItem(page, code).getByRole("button", { name: "Mark sent" }).click();
   await expect(teamItem(page, code).getByRole("button", { name: "Mark sent" })).toHaveCount(0);
   await shot(page, "c-07-team-sent");
@@ -155,7 +159,7 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   // The tenant sees the reading and the next draft.
   await page.goto(caseUrl);
   await expect(visibleText(page, "Our team read their latest reply as")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ask them for a repair date" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Approve: ask them for a repair date" })).toBeVisible();
   await shot(page, "c-09-next-draft");
 
   // Pausing and resuming.
@@ -164,7 +168,7 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Abate is paused" })).toBeVisible();
   await page.getByRole("button", { name: "Resume Abate" }).click();
-  await expect(page.getByRole("heading", { name: "Ask them for a repair date" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Approve: ask them for a repair date" })).toBeVisible();
 
   // Fixed.
   await page.getByRole("button", { name: "Already fixed? Mark it done" }).click();

@@ -7,7 +7,7 @@ import { isCaseToken } from "@/lib/cases/ids";
 import { getCaseBundle } from "@/lib/cases/repo";
 import { getBuildingSummary } from "@/lib/building";
 import { draftFor } from "@/lib/cases/service";
-import { buildTimeline, ladderInputs, ladderProgress, messageTime } from "@/lib/cases/view";
+import { buildTimeline, ladderInputs, ladderProgress, liveMessages, messageTime } from "@/lib/cases/view";
 import { hasDatabase } from "@/lib/db/client";
 import { formatLongDate, formatShortDate, nyDate } from "@/lib/domain/dates";
 import { estimateAbatement, formatDollars } from "@/lib/domain/estimate";
@@ -33,7 +33,9 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
   if (!bundle) notFound();
   const isNew = (await searchParams).new === "1";
 
-  const { record, messages, photos } = bundle;
+  const { record, photos } = bundle;
+  // Approvals withdrawn before sending (pause, switch, or a new reply) don't count as messages.
+  const messages = liveMessages(bundle.messages);
   const today = nyDate();
   const issue = getIssueType(record.issueType);
   const { ladderCase, ladderMessages } = ladderInputs(record, messages);
@@ -62,7 +64,7 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
   const sorted = [...messages].sort((a, b) => messageTime(a).localeCompare(messageTime(b)));
   const last = sorted[sorted.length - 1];
   const latestReply: LatestReply | null =
-    last && last.direction === "incoming" && last.classification
+    last && last.direction === "incoming" && last.classification && last.classification !== "unclear"
       ? { id: last.id, category: last.classification, summary: last.classificationSummary, classifiedBy: last.classifiedBy }
       : null;
 
@@ -112,12 +114,12 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         scheduledFor={record.repairScheduledFor}
         latestReply={latestReply}
         fixedSummary={fixedSummary}
-        hasContact={Boolean(record.tenantContact)}
+        hasContact={Boolean(record.tenantContact || record.tenantEmail)}
         draftedOn={today}
         openViolations={openViolations}
         sendMode={record.sendMode}
         tenantEmail={record.tenantEmail}
-        unreadReplyId={last && last.direction === "incoming" && !last.classification ? last.id : null}
+        unreadReplyId={last && last.direction === "incoming" && (!last.classification || last.classification === "unclear") ? last.id : null}
       />
 
       <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} />

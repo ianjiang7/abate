@@ -46,6 +46,18 @@ export type NextStepProps = {
   unreadReplyId: string | null;
 };
 
+/** In Abate mode the tenant approves, and our team sends. */
+const ABATE_STEP_TITLES: Record<StepId, string> = {
+  notice: "Approve your written notice",
+  reminder: "Approve a reminder",
+  formal_notice: "Approve the formal notice",
+  guide_311: "File with 311, then approve the update",
+  ask_date: "Approve: ask them for a repair date",
+  confirm_schedule: "Approve: confirm the repair date",
+  offer_access: "Approve: offer times they can come in",
+  missed_repair: "Approve: ask for a new repair date",
+};
+
 const STEP_TITLES: Record<StepId, string> = {
   notice: "Send your written notice",
   reminder: "Send a reminder",
@@ -73,7 +85,7 @@ export function NextStepCard(props: NextStepProps) {
     document.getElementById("next-step-title")?.focus({ preventScroll: false });
   }, [stepKey]);
 
-  const canMarkFixed = action.kind === "send" || action.kind === "team_review" || action.kind === "all_sent" || action.kind === "awaiting_send";
+  const canMarkFixed = action.kind === "send" || action.kind === "team_review" || action.kind === "all_sent" || action.kind === "awaiting_send" || action.kind === "paused";
   const canPause = props.sendMode === "abate" && action.kind !== "done" && action.kind !== "paused";
 
   return (
@@ -134,7 +146,7 @@ function SendStep(props: NextStepProps & { action: Extract<NextAction, { kind: "
         </p>
         <div className="mt-5 flex items-center gap-3 rounded-2xl bg-mist p-4 text-sm text-slate">
           <Hourglass className="size-5 shrink-0 text-ink" aria-hidden="true" />
-          If management replies before then, paste it in and Abate will pick the right next step.
+          If management replies before then, paste it in and our team will set up the next step.
         </div>
         {!props.hasContact ? <ContactForm token={token} /> : null}
         <div className="mt-5 grid gap-2.5">
@@ -151,7 +163,7 @@ function SendStep(props: NextStepProps & { action: Extract<NextAction, { kind: "
     <div>
       {header}
       <h2 id="next-step-title" tabIndex={-1} className="outline-none mt-3 text-[22px] font-bold leading-tight tracking-tight">
-        {STEP_TITLES[action.step]}
+        {(props.sendMode === "abate" ? ABATE_STEP_TITLES : STEP_TITLES)[action.step]}
       </h2>
       <p className="mt-2 leading-relaxed text-slate">{action.reason}</p>
       {action.step === "guide_311" ? <Guide311 byAbate={props.sendMode === "abate"} /> : null}
@@ -263,9 +275,11 @@ function Composer({ token, to, cc, step, draft, draftedOn, openViolations, sendM
       </div>
 
       {placeholders.length > 0 ? (
-        <Notice tone="warn" className="mt-3">
-          Fill in the highlighted part{placeholders.length > 1 ? "s" : ""} in brackets before you send. Tap <strong>Edit</strong>.
-        </Notice>
+        <div id={`placeholders-${step}`}>
+          <Notice tone="warn" className="mt-3">
+            Fill in the highlighted part{placeholders.length > 1 ? "s" : ""} in brackets before you {byAbate ? "approve" : "send"}. Tap <strong>Edit</strong>.
+          </Notice>
+        </div>
       ) : null}
 
       {state.message ? (
@@ -281,7 +295,23 @@ function Composer({ token, to, cc, step, draft, draftedOn, openViolations, sendM
           <input type="hidden" name="openViolations" value={openViolations ?? ""} />
           <input type="hidden" name="subject" value={subject} />
           <input type="hidden" name="body" value={body} />
-          <Button type="submit" size="lg" block loading={pending} disabled={placeholders.length > 0} icon={<Send className="size-5" aria-hidden="true" />}>
+          {/* Stays focusable (aria-disabled) so screen-reader users hear why it can't be used yet. */}
+          <Button
+            type="submit"
+            size="lg"
+            block
+            loading={pending}
+            aria-disabled={placeholders.length > 0 || undefined}
+            aria-describedby={placeholders.length > 0 ? `placeholders-${step}` : undefined}
+            className="aria-disabled:opacity-50"
+            onClick={(e) => {
+              if (placeholders.length > 0) {
+                e.preventDefault();
+                setEditing(true);
+              }
+            }}
+            icon={<Send className="size-5" aria-hidden="true" />}
+          >
             Approve and send
           </Button>
           <p className="text-center text-sm text-slate">Our team sends it within a day and copies you.</p>
@@ -322,7 +352,7 @@ function Composer({ token, to, cc, step, draft, draftedOn, openViolations, sendM
 
       <p className="mt-4 text-xs leading-relaxed text-slate">
         {byAbate
-          ? "Abate's team sends it from our email on your behalf, so you see exactly what management gets. "
+          ? "Our team sends it from Abate's email and copies you, so you see exactly what management gets. "
           : `It goes from your own email, so replies come straight to you${cc ? ". The Cc lets Abate keep a dated copy" : ""}. `}
         Messages stick to facts. Abate isn&apos;t a law firm, and nothing here is legal advice.
       </p>
@@ -557,7 +587,7 @@ function MarkFixed({ token }: { token: string }) {
     <form action={formAction} className="mt-3 w-full space-y-3">
       <p className="font-semibold">Mark the repair fixed</p>
       <Field label="Date it was fixed" htmlFor="mark-fixed-on" error={state.errors?.fixedOn}>
-        <Input id="mark-fixed-on" name="fixedOn" type="date" key={today} defaultValue={today} max={today || undefined} required />
+        <Input id="mark-fixed-on" name="fixedOn" type="date" key={today} defaultValue={today} max={today || undefined} required autoFocus />
       </Field>
       {state.message ? <Notice tone="bad">{state.message}</Notice> : null}
       <p className="text-sm text-slate">This closes your case and stops the follow-ups.</p>
@@ -634,6 +664,9 @@ function Paused({ token }: { token: string }) {
           Resume Abate
         </Button>
       </form>
+      <div className="mt-2.5">
+        <ReplyButton token={token} label="Management replied to me" />
+      </div>
     </div>
   );
 }
@@ -661,7 +694,7 @@ function PauseControl({ token }: { token: string }) {
         <legend className="mb-2 font-semibold">Why do you want to pause?</legend>
         {PAUSE_REASONS.map((r) => (
           <label key={r.id} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-mist px-4 py-2.5 text-[15px]">
-            <input type="radio" name="reason" value={r.id} required className="size-4 accent-[#08014E]" />
+            <input type="radio" name="reason" value={r.id} required autoFocus={r.id === PAUSE_REASONS[0].id} className="size-4 accent-[#08014E]" />
             {r.label}
           </label>
         ))}

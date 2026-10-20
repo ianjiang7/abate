@@ -88,7 +88,19 @@ incoming: `classification`, `classified_by`, and the AI's shadow `ai_classificat
 
 **The team page** lives at `/team/<TEAM_KEY>` (a secret link, like case links): the send queue
 with "Open in Gmail" and "Mark sent", replies to read, a form to log replies from the inbox,
-tenants to nudge, and the live hypothesis results. Add `?test=1` to include test cases.
+tenants to nudge, and the live hypothesis results. Add `?test=1` to include test cases, or
+`?test=only` for only them.
+
+Concierge safety rules (keep them when changing this flow):
+
+- A teammate **claims** a message (Open in Gmail / Copy) before sending; the claim re-checks that
+  the case isn't paused or fixed and the message wasn't withdrawn, and warns if another teammate
+  opened it in the last 30 minutes.
+- An approval the team hasn't claimed is **withdrawn** (kept for measurement, never sent) when the
+  tenant pauses, switches to sending themselves, or a new reply arrives; the tenant then gets a
+  fresh draft. At most one approved, unsent message per case (a database index enforces it).
+- Only the ladder's current step can be approved or sent, and never with "[add …]" blanks left.
+- Our team's reading never overwrites the tenant's own reading of a reply.
 
 ## Escalation ladder
 
