@@ -60,6 +60,8 @@ export type LadderMessage = {
   at: string;
   step?: StepId | null;
   classification?: ReplyCategory | null;
+  /** Outgoing only: approved by the tenant but not sent by the team yet. */
+  pending?: boolean;
 };
 
 export type LadderCase = {
@@ -67,10 +69,14 @@ export type LadderCase = {
   repairScheduledFor?: IsoDate | null;
   /** ISO timestamp when the tenant said a scheduled repair didn't happen. */
   repairMissedAt?: string | null;
+  /** The tenant paused Abate: nothing more goes to management until they resume. */
+  paused?: boolean;
 };
 
 export type NextAction =
   | { kind: "send"; step: StepId; dueOn: IsoDate; reason: string }
+  | { kind: "awaiting_send"; step: StepId; reason: string }
+  | { kind: "paused"; reason: string }
   | { kind: "confirm_fixed"; reason: string }
   | { kind: "checkin"; scheduledFor: IsoDate; reason: string }
   | { kind: "waiting_for_repair"; scheduledFor: IsoDate; reason: string }
@@ -82,8 +88,15 @@ const byTime = (a: LadderMessage, b: LadderMessage) => a.at.localeCompare(b.at);
 
 export function nextAction(c: LadderCase, messages: LadderMessage[], today: IsoDate): NextAction {
   if (c.status === "fixed") return { kind: "done", reason: "The repair is marked fixed." };
+  if (c.paused) return { kind: "paused", reason: "You paused Abate. Nothing goes to management until you resume." };
 
-  const outgoing = messages.filter((m) => m.direction === "outgoing").sort(byTime);
+  // A message the tenant approved that the team hasn't sent yet holds the ladder until it goes out.
+  const pending = messages.find((m) => m.direction === "outgoing" && m.pending);
+  if (pending?.step) {
+    return { kind: "awaiting_send", step: pending.step, reason: "Approved. Our team will send it and copy you." };
+  }
+
+  const outgoing = messages.filter((m) => m.direction === "outgoing" && !m.pending).sort(byTime);
   const incoming = messages.filter((m) => m.direction === "incoming").sort(byTime);
 
   if (outgoing.length === 0) {
@@ -122,7 +135,7 @@ export function nextAction(c: LadderCase, messages: LadderMessage[], today: IsoD
       case "says_fixed":
         return { kind: "confirm_fixed", reason: "Management says it's fixed. Is it?" };
       default:
-        return { kind: "team_review", reason: "A teammate is reading this reply and will help with the next step." };
+        return { kind: "team_review", reason: "Our team is reading this reply and will set up your next step." };
     }
   }
 
@@ -168,6 +181,8 @@ export function dueSummary(action: NextAction, today: IsoDate): { nextStep: stri
     case "waiting_for_repair":
       // Stored fields only change when the tenant acts, so schedule the day-after check-in now.
       return { nextStep: "checkin", nextDueOn: addDays(action.scheduledFor, 1) };
+    case "awaiting_send":
+      return { nextStep: "team_send", nextDueOn: today };
     case "confirm_fixed":
     case "team_review":
       return { nextStep: action.kind, nextDueOn: today };

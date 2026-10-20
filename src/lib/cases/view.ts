@@ -8,7 +8,12 @@ import type { TemplateContext } from "@/lib/domain/templates";
 import type { CaseRecord, MessageRecord } from "./types";
 
 export function messageTime(m: MessageRecord): string {
-  return (m.direction === "outgoing" ? m.sentAt : m.receivedAt) ?? m.createdAt;
+  return (m.direction === "outgoing" ? (m.sentAt ?? m.approvedAt) : m.receivedAt) ?? m.createdAt;
+}
+
+/** Approved by the tenant, waiting for the team to send it. */
+export function isPendingSend(m: MessageRecord): boolean {
+  return m.direction === "outgoing" && !m.sentAt && Boolean(m.approvedAt);
 }
 
 export function ladderInputs(record: CaseRecord, messages: MessageRecord[]): { ladderCase: LadderCase; ladderMessages: LadderMessage[] } {
@@ -17,12 +22,14 @@ export function ladderInputs(record: CaseRecord, messages: MessageRecord[]): { l
       status: record.status,
       repairScheduledFor: record.repairScheduledFor,
       repairMissedAt: record.repairMissedAt,
+      paused: Boolean(record.pausedAt),
     },
     ladderMessages: messages.map((m) => ({
       direction: m.direction,
       at: messageTime(m),
       step: m.step,
       classification: m.classification,
+      pending: isPendingSend(m),
     })),
   };
 }
@@ -31,8 +38,8 @@ export function ladderInputs(record: CaseRecord, messages: MessageRecord[]): { l
 export function sentOnByStep(messages: MessageRecord[]): Partial<Record<StepId, IsoDate>> {
   const out: Partial<Record<StepId, IsoDate>> = {};
   for (const m of messages) {
-    if (m.direction !== "outgoing" || !m.step) continue;
-    const on = nyDate(messageTime(m));
+    if (m.direction !== "outgoing" || !m.step || !m.sentAt) continue;
+    const on = nyDate(m.sentAt);
     if (!out[m.step]) out[m.step] = on;
   }
   return out;
@@ -78,6 +85,7 @@ export function templateContext(args: {
     replyReference: pendingReplyReference(messages),
     repairScheduledFor: record.repairScheduledFor,
     missedBecause: latestIncoming(messages)?.classification === "says_fixed" ? "says_fixed" : "appointment",
+    voice: record.sendMode === "abate" ? "abate" : "tenant",
   };
 }
 
@@ -112,25 +120,27 @@ export function buildTimeline(record: CaseRecord, messages: MessageRecord[]): Ti
   for (const m of messages) {
     const date = nyDate(messageTime(m));
     if (m.direction === "outgoing") {
+      const label = m.step ? STEP_LABELS[m.step] : "Message";
+      const pending = isPendingSend(m);
       items.push({
         id: m.id,
         date,
         kind: "sent",
-        title: `${m.step ? STEP_LABELS[m.step] : "Message"} sent`,
-        detail: m.subject ?? undefined,
-        tone: "brand",
+        title: pending ? `${label} approved` : m.sentBy === "team" ? `${label} sent by Abate` : `${label} sent`,
+        detail: pending ? "Our team will send it and copy you" : (m.subject ?? undefined),
+        tone: pending ? "neutral" : "brand",
       });
+    } else if (!m.classification) {
+      items.push({ id: m.id, date, kind: "reply", title: "Management replied", detail: "Our team is reading it", tone: "neutral" });
     } else {
-      // A tenant correction replaces the agent's reading, so its summary no longer applies.
-      const corrected = Boolean(m.classification && m.aiClassification && m.classification !== m.aiClassification);
+      // Who decided what the reply meant: the tenant (a correction), our team, or the agent (its summary).
+      const note = m.classifiedBy === "tenant" ? "corrected by you" : m.classifiedBy === "team" ? "read by our team" : m.classificationSummary;
       items.push({
         id: m.id,
         date,
         kind: "reply",
         title: "Management replied",
-        detail:
-          [m.classification ? replyCategoryLabel(m.classification) : null, corrected ? "corrected by you" : m.classificationSummary].filter(Boolean).join(" · ") ||
-          undefined,
+        detail: [m.classification ? replyCategoryLabel(m.classification) : null, note].filter(Boolean).join(" · ") || undefined,
         tone: m.classification === "disputes_or_refuses" ? "warn" : "good",
       });
     }

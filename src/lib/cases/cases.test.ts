@@ -3,7 +3,11 @@ import { isCaseCode, isCaseToken, newCaseCode, newCaseToken } from "./ids";
 import { draftWasEdited, firstReplyAfterNotice, receivedAtFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import { newCaseSchema, replySchema } from "./validation";
-import { buildTimeline, ladderInputs, ladderProgress, pendingReplyReference, sentOnByStep } from "./view";
+import { estimateAbatement } from "@/lib/domain/estimate";
+import { nextAction } from "@/lib/domain/ladder";
+import { buildMessage } from "@/lib/domain/templates";
+import { computeMetrics } from "./metrics";
+import { buildTimeline, ladderInputs, ladderProgress, pendingReplyReference, sentOnByStep, templateContext } from "./view";
 
 const record: CaseRecord = {
   id: "c1",
@@ -27,6 +31,11 @@ const record: CaseRecord = {
   mgmtName: null,
   mgmtEmail: null,
   status: "open",
+  sendMode: "self",
+  sendAuthorizedAt: null,
+  tenantEmail: null,
+  pausedAt: null,
+  pauseReason: null,
   repairScheduledFor: null,
   repairScheduledAt: null,
   repairMissedAt: null,
@@ -43,10 +52,14 @@ function msg(partial: Partial<MessageRecord>): MessageRecord {
     subject: null,
     body: null,
     sentAt: null,
+    approvedAt: null,
+    readyOn: null,
+    sentBy: null,
     receivedAt: null,
     loggedBy: null,
     classification: null,
     aiClassification: null,
+    classifiedBy: null,
     classificationSummary: null,
     classificationDate: null,
     replyReference: null,
@@ -84,7 +97,7 @@ describe("view helpers", () => {
   });
 
   it("labels a tenant-corrected reply instead of showing the agent's stale summary", () => {
-    const corrected = { ...reply, classification: "scheduled" as const, aiClassification: "acknowledged_no_date" as const };
+    const corrected = { ...reply, classification: "scheduled" as const, aiClassification: "acknowledged_no_date" as const, classifiedBy: "tenant" as const };
     expect(buildTimeline(record, [notice, corrected])[4].detail).toBe("Repair scheduled · corrected by you");
   });
 
@@ -128,6 +141,7 @@ describe("newCaseSchema", () => {
     tenantName: "Test Tenant",
     monthlyRent: "1850",
     tenantContact: "",
+    sendMode: "self",
     aiConsent: "on",
     invite: "",
   };
@@ -157,6 +171,14 @@ describe("newCaseSchema", () => {
     if (r.success) return;
     const fields = new Set(r.error.issues.map((i) => String(i.path[0])));
     expect(fields).toEqual(new Set(["issueType", "mgmtEmail", "aiConsent", "bbl"]));
+  });
+
+  it("requires an email and authorization when Abate sends", () => {
+    const r = newCaseSchema.safeParse({ ...valid, sendMode: "abate" });
+    expect(r.success).toBe(false);
+    if (r.success) return;
+    expect(new Set(r.error.issues.map((i) => String(i.path[0])))).toEqual(new Set(["tenantEmail", "sendAuthorized"]));
+    expect(newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on" }).success).toBe(true);
   });
 
   it("rejects a report date before the problem started", () => {
@@ -199,5 +221,86 @@ describe("rules", () => {
     expect(draftWasEdited(draft, { subject: "311 complaint filed", body: "My complaint number is 311-12345678. Fix it now!\n\nThanks" })).toBe(true);
     expect(draftWasEdited(draft, { subject: "Changed", body: draft.body })).toBe(true);
     expect(draftWasEdited({ subject: "a", body: "Hello" }, { subject: "a", body: "Hello " })).toBe(false);
+  });
+});
+
+describe("concierge", () => {
+  const abate = { ...record, sendMode: "abate" as const, sendAuthorizedAt: "2026-10-18T14:00:00Z", tenantEmail: "tenant@example.com" };
+
+  it("holds the ladder while an approved message waits for the team", () => {
+    const approved = msg({ step: "notice", approvedAt: "2026-10-18T15:00:00Z" });
+    const { ladderCase, ladderMessages } = ladderInputs(abate, [approved]);
+    expect(nextAction(ladderCase, ladderMessages, "2026-10-18")).toMatchObject({ kind: "awaiting_send", step: "notice" });
+    const sent = { ...approved, sentAt: "2026-10-18T18:00:00Z", sentBy: "team" as const };
+    const after = ladderInputs(abate, [sent]);
+    expect(nextAction(after.ladderCase, after.ladderMessages, "2026-10-19")).toMatchObject({ kind: "send", step: "reminder" });
+  });
+
+  it("stops everything while paused", () => {
+    const { ladderCase, ladderMessages } = ladderInputs({ ...abate, pausedAt: "2026-10-19T12:00:00Z" }, []);
+    expect(nextAction(ladderCase, ladderMessages, "2026-10-19").kind).toBe("paused");
+  });
+
+  it("labels the timeline by who sent what", () => {
+    const pending = msg({ step: "notice", approvedAt: "2026-10-18T15:00:00Z" });
+    const teamSent = msg({ step: "reminder", approvedAt: "2026-10-21T15:00:00Z", sentAt: "2026-10-21T16:00:00Z", sentBy: "team" });
+    const unread = msg({ direction: "incoming", receivedAt: "2026-10-22T16:00:00Z" });
+    const titles = buildTimeline(abate, [pending, teamSent, unread]).map((i) => i.title);
+    expect(titles).toContain("Written notice approved");
+    expect(titles).toContain("Reminder sent by Abate");
+    expect(buildTimeline(abate, [unread]).find((i) => i.kind === "reply")?.detail).toBe("Our team is reading it");
+  });
+
+  it("writes in Abate's voice when the team sends", () => {
+    const ctx = templateContext({
+      record: abate,
+      messages: [],
+      today: "2026-10-18",
+      estimate: estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-06", endOn: "2026-10-18" }),
+      openViolations: 3,
+    });
+    const notice = buildMessage("notice", ctx);
+    expect(notice.body).toContain("We're writing on behalf of Test Tenant, your tenant at");
+    expect(notice.body).toContain("Test first reported it to you on October 6, 2026");
+    expect(notice.body).toContain("Test is copied on this email.");
+    expect(notice.body).toContain("The Abate team, on behalf of Test Tenant");
+    expect(notice.body).not.toMatch(/\bmy apartment\b|\bI first\b/);
+    const formal = buildMessage("formal_notice", ctx);
+    expect(formal.body).toContain("sent on behalf of Test Tenant");
+    expect(formal.body).toContain("Based on Test's rent");
+  });
+});
+
+describe("metrics", () => {
+  const base = { ...record, sendMode: "abate" as const, sendAuthorizedAt: "2026-10-10T14:00:00Z" };
+  const now = new Date("2026-10-25T16:00:00Z");
+
+  it("scores hypothesis 1 only on cases old enough to judge", () => {
+    const quick = {
+      record: { ...base, id: "a", firstReportedOn: "2026-10-01" },
+      messages: [
+        msg({ step: "notice", approvedAt: "2026-10-10T15:00:00Z", sentAt: "2026-10-10T16:00:00Z", sentBy: "team", readyOn: "2026-10-10" }),
+        msg({ direction: "incoming", receivedAt: "2026-10-12T16:00:00Z", classification: "acknowledged_no_date", classifiedBy: "team", aiClassification: "acknowledged_no_date" }),
+      ],
+    };
+    const silent = { record: { ...base, id: "b", firstReportedOn: "2026-10-05" }, messages: [msg({ step: "notice", sentAt: "2026-10-12T16:00:00Z", approvedAt: "2026-10-12T15:00:00Z", readyOn: "2026-10-10" })] };
+    const fresh = { record: { ...base, id: "c" }, messages: [msg({ step: "notice", sentAt: "2026-10-23T16:00:00Z", approvedAt: "2026-10-23T15:00:00Z", readyOn: "2026-10-23" })] };
+    const m = computeMetrics([quick, silent, fresh], now);
+    expect(m.h1).toMatchObject({ started: 3, judged: 2, responded: 1, waiting: 1, rate: 0.5, pass: true, medianDaysToReply: 2 });
+    expect(m.h1.medianBaselineDays).toBe(9); // waits of 9, 7 and 17 days before the first notice
+    expect(m.h1.firstReplyAfterStep).toEqual({ notice: 1 });
+    expect(m.h2).toMatchObject({ authorized: 3, approvals: 3, approvedWithinDay: 2, backedOut: 0, backedOutPass: true });
+    expect(m.shadow).toEqual({ compared: 1, agreed: 1, rate: 1 });
+  });
+
+  it("counts pauses and switches to self-sending as backing out", () => {
+    const paused = { record: { ...base, id: "p", pausedAt: "2026-10-20T12:00:00Z", pauseReason: "worried" }, messages: [] };
+    const switched = { record: { ...base, id: "s", sendMode: "self" as const, pauseReason: "send_myself" }, messages: [] };
+    const self = { record: { ...record, id: "t" }, messages: [] };
+    const m = computeMetrics([paused, switched, self], now);
+    expect(m.h2.backedOut).toBe(2);
+    expect(m.h2.backedOutPass).toBe(false);
+    expect(m.h2.pauseReasons).toEqual({ worried: 1, send_myself: 1 });
+    expect(m.h2.authorized).toBe(1);
   });
 });

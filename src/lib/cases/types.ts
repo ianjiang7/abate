@@ -25,6 +25,12 @@ export type CaseRecord = {
   mgmtName: string | null;
   mgmtEmail: string | null;
   status: "open" | "fixed";
+  /** "abate": the team sends follow-ups on the tenant's behalf. "self": the tenant sends them. */
+  sendMode: "abate" | "self";
+  sendAuthorizedAt: string | null;
+  tenantEmail: string | null;
+  pausedAt: string | null;
+  pauseReason: string | null;
   repairScheduledFor: IsoDate | null;
   repairScheduledAt: string | null;
   repairMissedAt: string | null;
@@ -40,10 +46,16 @@ export type MessageRecord = {
   subject: string | null;
   body: string | null;
   sentAt: string | null;
+  /** Abate mode: when the tenant approved the team sending it. */
+  approvedAt: string | null;
+  /** The day this step became ready to send. */
+  readyOn: IsoDate | null;
+  sentBy: "team" | "tenant" | null;
   receivedAt: string | null;
   loggedBy: "tenant" | "team" | null;
   classification: ReplyCategory | null;
   aiClassification: ReplyCategory | null;
+  classifiedBy: "agent" | "team" | "tenant" | null;
   classificationSummary: string | null;
   classificationDate: IsoDate | null;
   replyReference: string | null;

@@ -9,10 +9,10 @@ import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
 
 const MESSAGE_COLUMNS =
-  "id, direction, created_at, step, subject, body, sent_at, received_at, logged_by, classification, ai_classification, classification_summary, classification_date, reply_reference, ai_source";
+  "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, received_at, logged_by, classification, ai_classification, classified_by, classification_summary, classification_date, reply_reference, ai_source";
 
 type Row = Record<string, unknown>;
 
@@ -41,6 +41,11 @@ function toCase(r: Row): CaseRecord {
     mgmtName: str(r.mgmt_name),
     mgmtEmail: str(r.mgmt_email),
     status: r.status === "fixed" ? "fixed" : "open",
+    sendMode: r.send_mode === "abate" ? "abate" : "self",
+    sendAuthorizedAt: str(r.send_authorized_at),
+    tenantEmail: str(r.tenant_email),
+    pausedAt: str(r.paused_at),
+    pauseReason: str(r.pause_reason),
     repairScheduledFor: str(r.repair_scheduled_for),
     repairScheduledAt: str(r.repair_scheduled_at),
     repairMissedAt: str(r.repair_missed_at),
@@ -58,10 +63,14 @@ function toMessage(r: Row): MessageRecord {
     subject: str(r.subject),
     body: str(r.body),
     sentAt: str(r.sent_at),
+    approvedAt: str(r.approved_at),
+    readyOn: str(r.ready_on),
+    sentBy: r.sent_by === "team" ? "team" : r.sent_by === "tenant" ? "tenant" : null,
     receivedAt: str(r.received_at),
     loggedBy: r.logged_by === "team" ? "team" : r.logged_by === "tenant" ? "tenant" : null,
     classification: (str(r.classification) as ReplyCategory | null) ?? null,
     aiClassification: (str(r.ai_classification) as ReplyCategory | null) ?? null,
+    classifiedBy: r.classified_by === "agent" || r.classified_by === "team" || r.classified_by === "tenant" ? r.classified_by : null,
     classificationSummary: str(r.classification_summary),
     classificationDate: str(r.classification_date),
     replyReference: str(r.reply_reference),
@@ -105,6 +114,9 @@ export async function insertCase(
         mgmt_name: input.mgmtName,
         mgmt_email: input.mgmtEmail,
         ai_consent: true,
+        send_mode: input.sendMode,
+        send_authorized_at: input.sendMode === "abate" ? new Date().toISOString() : null,
+        tenant_email: input.tenantEmail,
         invited_by_case_id: extra.invitedByCaseId,
         next_step: extra.nextStep,
         next_due_on: extra.nextDueOn,
@@ -185,6 +197,54 @@ export async function findBuildingByCode(code: string): Promise<{ id: string; ad
   return (row as { id: string; address: string; borough: string | null; bbl: string; bin: string | null } | null) ?? null;
 }
 
+/** Team page: every real case (or test cases, for the end-to-end test) with its messages. */
+export async function listCasesWithMessages(opts: { includeTest: boolean }): Promise<Array<{ record: CaseRecord; messages: MessageRecord[]; isTest: boolean }>> {
+  let q = db().from("cases").select(`${CASE_COLUMNS}, is_test`).order("created_at", { ascending: false }).limit(500);
+  if (!opts.includeTest) q = q.eq("is_test", false);
+  const casesRes = await q;
+  const rows = (check(casesRes, "Loading cases") ?? []) as Row[];
+  if (rows.length === 0) return [];
+  const msgRes = await db()
+    .from("messages")
+    .select(MESSAGE_COLUMNS)
+    .in(
+      "case_id",
+      rows.map((r) => r.id as string),
+    )
+    .order("created_at", { ascending: true });
+  const msgs = (check(msgRes, "Loading messages") ?? []) as Row[];
+  const byCase = new Map<string, MessageRecord[]>();
+  for (const m of msgs) {
+    const list = byCase.get(m.case_id as string) ?? [];
+    list.push(toMessage(m));
+    byCase.set(m.case_id as string, list);
+  }
+  return rows.map((r) => ({ record: toCase(r), messages: byCase.get(r.id as string) ?? [], isTest: Boolean(r.is_test) }));
+}
+
+export async function findMessageWithCase(messageId: string): Promise<{ message: MessageRecord; record: CaseRecord } | null> {
+  const res = await db().from("messages").select(MESSAGE_COLUMNS).eq("id", messageId).maybeSingle();
+  const row = check(res, "Finding the message") as Row | null;
+  if (!row) return null;
+  const caseRes = await db().from("cases").select(CASE_COLUMNS).eq("id", row.case_id as string).maybeSingle();
+  const caseRow = check(caseRes, "Finding the case") as Row | null;
+  return caseRow ? { message: toMessage(row), record: toCase(caseRow) } : null;
+}
+
+export async function findCaseByCode(code: string): Promise<CaseRecord | null> {
+  const res = await db().from("cases").select(CASE_COLUMNS).eq("code", code).maybeSingle();
+  const row = check(res, "Finding the case") as Row | null;
+  return row ? toCase(row) : null;
+}
+
+export async function countEvents(name: string, opts: { includeTest: boolean }): Promise<number> {
+  let q = db().from("events").select("id, cases!inner(is_test)", { count: "exact", head: true }).eq("name", name);
+  if (!opts.includeTest) q = q.eq("cases.is_test", false);
+  const res = await q;
+  if (res.error) throw new Error(`Counting events failed: ${res.error.message}`);
+  return res.count ?? 0;
+}
+
 /** Abuse guards: how many real cases were created, and replies read for one case, since a time. */
 export async function countCasesSince(sinceIso: string): Promise<number> {
   const res = await db().from("cases").select("id", { count: "exact", head: true }).eq("is_test", false).gte("created_at", sinceIso);
@@ -215,6 +275,11 @@ export async function insertMessage(caseId: string, fields: Record<string, unkno
 export async function updateMessage(caseId: string, messageId: string, patch: Record<string, unknown>): Promise<boolean> {
   const res = await db().from("messages").update(patch).eq("id", messageId).eq("case_id", caseId).select("id");
   return (check(res, "Updating the message") ?? []).length > 0;
+}
+
+export async function deleteMessage(caseId: string, messageId: string): Promise<void> {
+  const res = await db().from("messages").delete().eq("id", messageId).eq("case_id", caseId);
+  check(res, "Withdrawing the message");
 }
 
 export async function updateCase(caseId: string, patch: Record<string, unknown>): Promise<void> {

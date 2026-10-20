@@ -1,6 +1,7 @@
 // Message templates for each ladder step. Legal wording lives only here, reviewed by the team.
-// The case agent may supply `replyReference` (a factual sentence about management's last reply)
-// and dates it read from the reply; it never writes any other part of a message.
+// Two voices: "tenant" (the tenant sends it from their own email, first person) and "abate" (the
+// Abate team sends it on the tenant's behalf, with the tenant copied). A `replyReference` (one
+// factual sentence about management's last reply) may be inserted; nothing else is generated.
 
 import { addDays, formatFullDate, formatLongDate, type IsoDate } from "./dates";
 import { formatDollars, type Estimate } from "./estimate";
@@ -31,6 +32,8 @@ export type TemplateContext = {
   repairScheduledFor?: IsoDate | null;
   /** Why a missed_repair message is being sent: management said it was fixed, or an appointment passed. */
   missedBecause?: "says_fixed" | "appointment" | null;
+  /** Who sends it: the tenant (first person) or the Abate team on their behalf. Defaults to the tenant. */
+  voice?: "tenant" | "abate";
 };
 
 export type DraftMessage = { subject: string; body: string };
@@ -49,12 +52,30 @@ function place(ctx: TemplateContext): string {
   return unit ? `${ctx.address}, Apt ${unit}` : ctx.address;
 }
 
+const byAbate = (ctx: TemplateContext) => ctx.voice === "abate";
+
+function firstName(ctx: TemplateContext): string {
+  return ctx.tenantName.trim().split(/\s+/)[0] || ctx.tenantName;
+}
+
+/** Who reported the problem: "I", or the tenant's first name when Abate writes. */
+function who(ctx: TemplateContext): string {
+  return byAbate(ctx) ? firstName(ctx) : "I";
+}
+
+/** "me" or "us", for "let me know". */
+function us(ctx: TemplateContext): string {
+  return byAbate(ctx) ? "us" : "me";
+}
+
 function greeting(ctx: TemplateContext): string {
   return ctx.mgmtName ? `Hello ${ctx.mgmtName},` : "Hello,";
 }
 
 function signature(ctx: TemplateContext): string {
-  return `Thank you,\n${ctx.tenantName}\n${place(ctx)}`;
+  return byAbate(ctx)
+    ? `Thank you,\nThe Abate team, on behalf of ${ctx.tenantName}\n${place(ctx)}`
+    : `Thank you,\n${ctx.tenantName}\n${place(ctx)}`;
 }
 
 function problem(ctx: TemplateContext): string {
@@ -73,9 +94,9 @@ function days(n: number): string {
 
 /** "It has been 12 days since I first reported it on October 6, 2026" (or a same-day version). */
 function sinceReport(ctx: TemplateContext, withDate: boolean): string {
-  if (ctx.daysSinceReport <= 0) return withDate ? `I reported it to you today` : `I reported it today`;
+  if (ctx.daysSinceReport <= 0) return withDate ? `${who(ctx)} reported it to you today` : `${who(ctx)} reported it today`;
   const on = withDate ? ` on ${formatFullDate(ctx.firstReportedOn)}` : "";
-  return `It has been ${days(ctx.daysSinceReport)} since I first reported it${on}`;
+  return `It has been ${days(ctx.daysSinceReport)} since ${who(ctx)} first reported it${on}`;
 }
 
 function followupsPhrase(n: number): string {
@@ -83,7 +104,11 @@ function followupsPhrase(n: number): string {
   return n === 1 ? ", and followed up once since" : `, and followed up ${n} times since`;
 }
 
-const RECORD_LINE = "I'm keeping a dated record of this request and any replies.";
+function recordLine(ctx: TemplateContext): string {
+  return byAbate(ctx)
+    ? `We're keeping a dated record of this request and any replies. ${firstName(ctx)} is copied on this email.`
+    : "I'm keeping a dated record of this request and any replies.";
+}
 
 function referenceLine(ctx: TemplateContext): string {
   const ref = ctx.replyReference?.trim();
@@ -101,10 +126,12 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         subject: `Repair needed at ${where}`,
         body: [
           greeting(ctx),
-          `I'm writing about a repair needed in my apartment at ${where}: ${problem(ctx)}.`,
-          `The problem started on ${started}. I first reported it to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since I first reported it, and it` : "It"} is still not fixed.`,
+          byAbate(ctx)
+            ? `We're writing on behalf of ${ctx.tenantName}, your tenant at ${where}, about a repair that is needed: ${problem(ctx)}.`
+            : `I'm writing about a repair needed in my apartment at ${where}: ${problem(ctx)}.`,
+          `The problem started on ${started}. ${who(ctx)} first reported it to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since it was first reported, and it` : "It"} is still not fixed.`,
           `Please reply by ${replyBy(ctx)} with the date the repair will be made.`,
-          RECORD_LINE,
+          recordLine(ctx),
           signature(ctx),
         ].join("\n\n"),
       };
@@ -115,7 +142,9 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         subject: `Following up: repair at ${where}`,
         body: [
           greeting(ctx),
-          `I'm following up on my ${noticeOn ? `message of ${formatFullDate(noticeOn)}` : "earlier message"} about ${problem(ctx)} at ${where}. I haven't received a repair date yet.`,
+          byAbate(ctx)
+            ? `We're following up, on behalf of ${ctx.tenantName}, on our ${noticeOn ? `message of ${formatFullDate(noticeOn)}` : "earlier message"} about ${problem(ctx)} at ${where}. We haven't received a repair date yet.`
+            : `I'm following up on my ${noticeOn ? `message of ${formatFullDate(noticeOn)}` : "earlier message"} about ${problem(ctx)} at ${where}. I haven't received a repair date yet.`,
           `${referenceLine(ctx)}The problem started on ${started}. ${sinceReport(ctx, true)}.`,
           `Please reply by ${replyBy(ctx)} with the date the repair will be made.`,
           signature(ctx),
@@ -130,7 +159,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       ];
       if (ctx.sentOn.notice) lines.push(`- ${formatFullDate(ctx.sentOn.notice)}: written notice sent`);
       if (ctx.sentOn.reminder) lines.push(`- ${formatFullDate(ctx.sentOn.reminder)}: written follow-up sent`);
-      lines.push(`- ${formatFullDate(ctx.today)}: still not repaired${ctx.daysSinceReport > 0 ? `, ${days(ctx.daysSinceReport)} after my first report` : ""}`);
+      lines.push(`- ${formatFullDate(ctx.today)}: still not repaired${ctx.daysSinceReport > 0 ? `, ${days(ctx.daysSinceReport)} after it was first reported` : ""}`);
 
       const violations =
         ctx.openViolations && ctx.openViolations > 0
@@ -141,18 +170,20 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       const range = est.low > 0 ? `between ${formatDollars(est.low)} and ${formatDollars(est.high)}` : `up to ${formatDollars(est.high)}`;
       const estimate =
         est.high > 0
-          ? ` Based on my rent and how long this has gone on, I estimate that reduction may be ${range} so far, and it grows each day the problem continues.`
+          ? byAbate(ctx)
+            ? ` Based on ${firstName(ctx)}'s rent and how long this has gone on, we estimate that reduction may be ${range} so far, and it grows each day the problem continues.`
+            : ` Based on my rent and how long this has gone on, I estimate that reduction may be ${range} so far, and it grows each day the problem continues.`
           : "";
 
       return {
         subject: `Formal notice: unresolved repair at ${where}`,
         body: [
           greeting(ctx),
-          `This is a formal notice about ${problem(ctx)} at ${where}, which remains unrepaired.`,
+          `This is a formal notice${byAbate(ctx) ? `, sent on behalf of ${ctx.tenantName},` : ""} about ${problem(ctx)} at ${where}, which remains unrepaired.`,
           `Timeline:\n${lines.join("\n")}`,
           `${referenceLine(ctx)}Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period a condition like this goes unrepaired.${estimate}${violations}`,
           `Please make the repair and confirm the repair date in writing by ${replyBy(ctx)}.`,
-          RECORD_LINE,
+          recordLine(ctx),
           signature(ctx),
         ].join("\n\n"),
       };
@@ -163,8 +194,10 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         subject: `311 complaint filed: ${where}`,
         body: [
           greeting(ctx),
-          `Because ${problem(ctx)} at ${where} is still not repaired, I have filed a complaint with NYC 311. My complaint number is [add your 311 number].`,
-          `I first reported this problem to you on ${firstReported}. Please make the repair and let me know the repair date in writing.`,
+          byAbate(ctx)
+            ? `Because ${problem(ctx)} at ${where} is still not repaired, ${ctx.tenantName} has filed a complaint with NYC 311. The complaint number is [add your 311 number].`
+            : `Because ${problem(ctx)} at ${where} is still not repaired, I have filed a complaint with NYC 311. My complaint number is [add your 311 number].`,
+          `${who(ctx)} first reported this problem to you on ${firstReported}. Please make the repair and let ${us(ctx)} know the repair date in writing.`,
           signature(ctx),
         ].join("\n\n"),
       };
@@ -188,7 +221,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         body: [
           greeting(ctx),
           `Thank you for scheduling the repair of ${problem(ctx)} at ${where} for ${when}.`,
-          `Please let me know right away if that date changes.`,
+          `Please let ${us(ctx)} know right away if that date changes.`,
           signature(ctx),
         ].join("\n\n"),
       };
@@ -200,7 +233,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
         body: [
           greeting(ctx),
           `Thank you for your reply about ${problem(ctx)} at ${where}.`,
-          `${referenceLine(ctx)}I can provide access at these times: [add days and times that work for you]. Please confirm which works and the date the repair will be made.`,
+          `${referenceLine(ctx)}${who(ctx)} can provide access at these times: [add days and times that work for you]. Please confirm which works and the date the repair will be made.`,
           signature(ctx),
         ].join("\n\n"),
       };
@@ -211,7 +244,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       const opening = appointmentPassed
         ? `The repair of ${problem(ctx)} at ${where} that was scheduled for ${formatFullDate(ctx.repairScheduledFor!)} did not happen or did not fix the problem. It is still not fixed.`
         : ctx.missedBecause === "says_fixed"
-          ? `I was told the repair of ${problem(ctx)} at ${where} was complete, but the problem is still not fixed.`
+          ? `${byAbate(ctx) ? "We were" : "I was"} told the repair of ${problem(ctx)} at ${where} was complete, but the problem is still not fixed.`
           : `The problem with ${problem(ctx)} at ${where} is still not fixed.`;
       return {
         subject: appointmentPassed ? `Repair did not fix the problem: ${where}` : `Still not fixed: ${where}`,
@@ -219,7 +252,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
           greeting(ctx),
           opening,
           `${sinceReport(ctx, true)}. Please reply by ${replyBy(ctx)} with a new repair date.`,
-          RECORD_LINE,
+          recordLine(ctx),
           signature(ctx),
         ].join("\n\n"),
       };

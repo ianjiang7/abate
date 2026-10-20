@@ -2,8 +2,8 @@
 
 import { refresh } from "next/cache";
 import { isCaseToken } from "@/lib/cases/ids";
-import { confirmFixed, correctReply, logReply, recordClientEvent, recordSent, reportNotFixed, requestHelp, saveContact } from "@/lib/cases/service";
-import { categorySchema, helpSchema, replySchema } from "@/lib/cases/validation";
+import { confirmFixed, correctReply, logReply, pauseCase, recordClientEvent, recordStep, reportNotFixed, requestHelp, resumeCase, saveContact } from "@/lib/cases/service";
+import { categorySchema, helpSchema, pauseReasonSchema, replySchema } from "@/lib/cases/validation";
 import { isIsoDate, nyDate } from "@/lib/domain/dates";
 import type { ReplyCategory, StepId } from "@/lib/domain/ladder";
 import { STEP_LABELS } from "@/lib/domain/ladder";
@@ -12,7 +12,6 @@ export type CaseActionState = {
   ok?: boolean;
   message?: string;
   errors?: Record<string, string>;
-  reading?: { category: ReplyCategory; summary: string; mentionedDate: string | null; source: string };
 };
 
 const NOT_FOUND: CaseActionState = { ok: false, message: "We couldn't find this case. Check the link and try again." };
@@ -36,7 +35,7 @@ export async function sendAction(token: string, _prev: CaseActionState, formData
     ? { draftedOn, openViolations: /^\d{1,6}$/.test(violations) ? Number(violations) : null }
     : null;
   try {
-    const result = await recordSent(token, step, subject, body, shown);
+    const result = await recordStep(token, step, subject, body, shown);
     if (!result.ok) return { ok: false, message: result.message };
   } catch {
     return FAILED;
@@ -55,10 +54,10 @@ export async function replyAction(token: string, _prev: CaseActionState, formDat
   }
   if (parsed.data.receivedOn > nyDate()) return { ok: false, errors: { receivedOn: "That date is in the future." } };
   try {
-    const result = await logReply(token, parsed.data.text, parsed.data.receivedOn, "tenant");
+    const result = await logReply(token, parsed.data.text, parsed.data.receivedOn);
     if (!result.ok) return { ok: false, message: result.message };
     refresh();
-    return { ok: true, reading: result.reading };
+    return { ok: true };
   } catch {
     return FAILED;
   }
@@ -127,6 +126,32 @@ export async function contactAction(token: string, _prev: CaseActionState, formD
   if (!parsed.success) return { ok: false, errors: { contact: parsed.error.issues[0]?.message ?? "Add a phone number or email." } };
   try {
     const result = await saveContact(token, parsed.data.contact);
+    if (!result.ok) return { ok: false, message: result.message };
+  } catch {
+    return FAILED;
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function pauseAction(token: string, _prev: CaseActionState, formData: FormData): Promise<CaseActionState> {
+  if (!isCaseToken(token)) return NOT_FOUND;
+  const reason = pauseReasonSchema.safeParse(text(formData, "reason"));
+  if (!reason.success) return { ok: false, errors: { reason: "Choose a reason." } };
+  try {
+    const result = await pauseCase(token, reason.data);
+    if (!result.ok) return { ok: false, message: result.message };
+  } catch {
+    return FAILED;
+  }
+  refresh();
+  return { ok: true };
+}
+
+export async function resumeAction(token: string): Promise<CaseActionState> {
+  if (!isCaseToken(token)) return NOT_FOUND;
+  try {
+    const result = await resumeCase(token);
     if (!result.ok) return { ok: false, message: result.message };
   } catch {
     return FAILED;

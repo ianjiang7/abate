@@ -51,10 +51,23 @@ export const newCaseSchema = z
     tenantName: z.string().trim().min(2, "Enter the name you sign messages with.").max(120),
     monthlyRent: z.coerce.number({ message: "Enter your monthly rent." }).positive("Enter your monthly rent.").max(50_000),
     tenantContact: optionalText(120),
+    sendMode: z.enum(["abate", "self"], { message: "Choose who sends the follow-ups." }),
+    tenantEmail: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .transform((v) => (v ? v : null))
+      .refine((v) => v === null || z.email().safeParse(v).success, "That email doesn't look right."),
+    sendAuthorized: z.literal("on").optional(),
     aiConsent: z.literal("on", { message: "Please agree so we can set up your case." }),
     invite: optionalText(10),
   })
   .superRefine((v, ctx) => {
+    if (v.sendMode === "abate") {
+      if (!v.tenantEmail) ctx.addIssue({ code: "custom", path: ["tenantEmail"], message: "Add your email so we can copy you on every message." });
+      if (!v.sendAuthorized) ctx.addIssue({ code: "custom", path: ["sendAuthorized"], message: "Please confirm we can email management for you." });
+    }
     if (v.firstReportedOn < v.startedOn) {
       ctx.addIssue({ code: "custom", path: ["firstReportedOn"], message: "This is before the problem started." });
     }
@@ -68,6 +81,8 @@ export const replySchema = z.object({
 });
 
 export const categorySchema = z.string().refine(isReplyCategory);
+
+export const pauseReasonSchema = z.enum(["worried", "send_myself", "other"]);
 
 export const helpSchema = z.object({
   contact: z.string().trim().min(5, "Add a phone number or email.").max(120),
