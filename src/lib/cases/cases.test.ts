@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { isCaseCode, isCaseToken, newCaseCode, newCaseToken } from "./ids";
-import { draftWasEdited, firstReplyAfterNotice, receivedAtFor } from "./rules";
+import { draftWasEdited, firstReplyAfterNotice, readyOnFor, receivedAtFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import { newCaseSchema, replySchema } from "./validation";
 import { estimateAbatement } from "@/lib/domain/estimate";
@@ -32,6 +32,7 @@ const record: CaseRecord = {
   mgmtEmail: null,
   status: "open",
   sendMode: "self",
+  sendModeChosen: false,
   sendAuthorizedAt: null,
   tenantEmail: null,
   pausedAt: null,
@@ -55,11 +56,16 @@ function msg(partial: Partial<MessageRecord>): MessageRecord {
     approvedAt: null,
     readyOn: null,
     sentBy: null,
+    claimedAt: null,
+    withdrawnAt: null,
+    edited: null,
+    draftBody: null,
     receivedAt: null,
     loggedBy: null,
     classification: null,
     aiClassification: null,
     classifiedBy: null,
+    classifiedAt: null,
     classificationSummary: null,
     classificationDate: null,
     replyReference: null,
@@ -236,6 +242,23 @@ describe("concierge", () => {
     expect(nextAction(after.ladderCase, after.ladderMessages, "2026-10-19")).toMatchObject({ kind: "send", step: "reminder" });
   });
 
+  it("ignores approvals that were withdrawn before sending", () => {
+    const withdrawn = msg({ step: "notice", approvedAt: "2026-10-18T15:00:00Z", withdrawnAt: "2026-10-18T16:00:00Z" });
+    const { ladderCase, ladderMessages } = ladderInputs(abate, [withdrawn]);
+    expect(nextAction(ladderCase, ladderMessages, "2026-10-18")).toMatchObject({ kind: "send", step: "notice" });
+    expect(buildTimeline(abate, [withdrawn]).map((i) => i.kind)).not.toContain("sent");
+  });
+
+  it("dates readiness from what made the step ready", () => {
+    const created = { ...abate, createdAt: "2026-10-15T14:00:00Z" };
+    expect(readyOnFor("notice", "2026-10-18", created, [], "2026-10-18")).toBe("2026-10-15");
+    const notice = msg({ step: "notice", sentAt: "2026-10-15T16:00:00Z" });
+    const reply = msg({ direction: "incoming", receivedAt: "2026-10-16T16:00:00Z", classification: "acknowledged_no_date", classifiedAt: "2026-10-17T13:00:00Z" });
+    expect(readyOnFor("ask_date", "2026-10-18", created, [notice, reply], "2026-10-18")).toBe("2026-10-17");
+    expect(readyOnFor("reminder", "2026-10-18", created, [notice], "2026-10-20")).toBe("2026-10-18");
+    expect(readyOnFor("reminder", "2026-10-21", created, [notice], "2026-10-20")).toBe("2026-10-20"); // never in the future
+  });
+
   it("stops everything while paused", () => {
     const { ladderCase, ladderMessages } = ladderInputs({ ...abate, pausedAt: "2026-10-19T12:00:00Z" }, []);
     expect(nextAction(ladderCase, ladderMessages, "2026-10-19").kind).toBe("paused");
@@ -272,7 +295,7 @@ describe("concierge", () => {
 });
 
 describe("metrics", () => {
-  const base = { ...record, sendMode: "abate" as const, sendAuthorizedAt: "2026-10-10T14:00:00Z" };
+  const base = { ...record, sendMode: "abate" as const, sendModeChosen: true, sendAuthorizedAt: "2026-10-10T14:00:00Z" };
   const now = new Date("2026-10-25T16:00:00Z");
 
   it("scores hypothesis 1 only on cases old enough to judge", () => {
@@ -289,18 +312,31 @@ describe("metrics", () => {
     expect(m.h1).toMatchObject({ started: 3, judged: 2, responded: 1, waiting: 1, rate: 0.5, pass: true, medianDaysToReply: 2 });
     expect(m.h1.medianBaselineDays).toBe(9); // waits of 9, 7 and 17 days before the first notice
     expect(m.h1.firstReplyAfterStep).toEqual({ notice: 1 });
-    expect(m.h2).toMatchObject({ authorized: 3, approvals: 3, approvedWithinDay: 2, backedOut: 0, backedOutPass: true });
+    // Approvals: 3 approved (2 within a day of being ready) plus 2 drafts ready for over a day and
+    // still unapproved (case a's ask-for-a-date, case b's reminder).
+    expect(m.h2).toMatchObject({ offered: 3, authorized: 3, approvals: 5, approvedWithinDay: 2, overdue: 2, backedOut: 0, backedOutPass: true });
     expect(m.shadow).toEqual({ compared: 1, agreed: 1, rate: 1 });
   });
 
   it("counts pauses and switches to self-sending as backing out", () => {
     const paused = { record: { ...base, id: "p", pausedAt: "2026-10-20T12:00:00Z", pauseReason: "worried" }, messages: [] };
     const switched = { record: { ...base, id: "s", sendMode: "self" as const, pauseReason: "send_myself" }, messages: [] };
-    const self = { record: { ...record, id: "t" }, messages: [] };
-    const m = computeMetrics([paused, switched, self], now);
-    expect(m.h2.backedOut).toBe(2);
+    const resumed = { record: { ...base, id: "r", pausedAt: null, pauseReason: "other" }, messages: [] };
+    const preConcierge = { record: { ...record, id: "t" }, messages: [] };
+    const m = computeMetrics([paused, switched, resumed, preConcierge], now);
+    expect(m.h2.backedOut).toBe(3); // a pause still counts after resuming
     expect(m.h2.backedOutPass).toBe(false);
-    expect(m.h2.pauseReasons).toEqual({ worried: 1, send_myself: 1 });
-    expect(m.h2.authorized).toBe(1);
+    expect(m.h2.pauseReasons).toEqual({ worried: 1, send_myself: 1, other: 1 });
+    // Switching to self-send still counts as having chosen Abate; the pre-pilot case wasn't offered the choice.
+    expect(m.h2).toMatchObject({ offered: 3, authorized: 3 });
+  });
+
+  it("counts a fix as management responding, even with no written reply", () => {
+    const silentFix = {
+      record: { ...base, id: "f", status: "fixed" as const, fixedOn: "2026-10-14" },
+      messages: [msg({ step: "notice", approvedAt: "2026-10-10T15:00:00Z", sentAt: "2026-10-10T16:00:00Z", readyOn: "2026-10-10" })],
+    };
+    const m = computeMetrics([silentFix], now);
+    expect(m.h1).toMatchObject({ judged: 1, responded: 1, medianDaysToReply: 4, fixed: 1 });
   });
 });

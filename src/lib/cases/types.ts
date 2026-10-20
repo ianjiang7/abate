@@ -27,6 +27,8 @@ export type CaseRecord = {
   status: "open" | "fixed";
   /** "abate": the team sends follow-ups on the tenant's behalf. "self": the tenant sends them. */
   sendMode: "abate" | "self";
+  /** The tenant was offered the who-sends choice (cases created before the concierge pilot weren't). */
+  sendModeChosen: boolean;
   sendAuthorizedAt: string | null;
   tenantEmail: string | null;
   pausedAt: string | null;
@@ -51,11 +53,20 @@ export type MessageRecord = {
   /** The day this step became ready to send. */
   readyOn: IsoDate | null;
   sentBy: "team" | "tenant" | null;
+  /** A teammate opened it to send. */
+  claimedAt: string | null;
+  /** Approved but never sent (paused, switched, or a reply changed the plan). */
+  withdrawnAt: string | null;
+  /** Whether the tenant changed the template before approving or sending, and the template text. */
+  edited: boolean | null;
+  draftBody: string | null;
   receivedAt: string | null;
   loggedBy: "tenant" | "team" | null;
   classification: ReplyCategory | null;
   aiClassification: ReplyCategory | null;
   classifiedBy: "agent" | "team" | "tenant" | null;
+  /** When someone decided what this reply meant. */
+  classifiedAt: string | null;
   classificationSummary: string | null;
   classificationDate: IsoDate | null;
   replyReference: string | null;

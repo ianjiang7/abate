@@ -13,10 +13,16 @@ export function messageTime(m: MessageRecord): string {
 
 /** Approved by the tenant, waiting for the team to send it. */
 export function isPendingSend(m: MessageRecord): boolean {
-  return m.direction === "outgoing" && !m.sentAt && Boolean(m.approvedAt);
+  return m.direction === "outgoing" && !m.sentAt && Boolean(m.approvedAt) && !m.withdrawnAt;
 }
 
-export function ladderInputs(record: CaseRecord, messages: MessageRecord[]): { ladderCase: LadderCase; ladderMessages: LadderMessage[] } {
+/** Messages that count: withdrawn approvals (never sent) are kept only for measurement. */
+export function liveMessages(messages: MessageRecord[]): MessageRecord[] {
+  return messages.filter((m) => !m.withdrawnAt);
+}
+
+export function ladderInputs(record: CaseRecord, all: MessageRecord[]): { ladderCase: LadderCase; ladderMessages: LadderMessage[] } {
+  const messages = liveMessages(all);
   return {
     ladderCase: {
       status: record.status,
@@ -100,7 +106,8 @@ export type TimelineItem = {
   tone: TimelineTone;
 };
 
-export function buildTimeline(record: CaseRecord, messages: MessageRecord[]): TimelineItem[] {
+export function buildTimeline(record: CaseRecord, all: MessageRecord[]): TimelineItem[] {
+  const messages = liveMessages(all);
   const issue = getIssueType(record.issueType);
   const items: TimelineItem[] = [
     { id: "started", date: record.startedOn, kind: "started", title: "Problem started", detail: issue.label, tone: "neutral" },

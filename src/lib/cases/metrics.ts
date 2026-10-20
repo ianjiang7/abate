@@ -1,8 +1,10 @@
 // The two hypotheses' numbers, computed from cases and messages. Pure, so it can be unit tested.
 
 import { daysBetween, nyDate, type IsoDate } from "@/lib/domain/dates";
-import type { StepId } from "@/lib/domain/ladder";
+import { nextAction, type StepId } from "@/lib/domain/ladder";
+import { readyOnFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
+import { ladderInputs, liveMessages } from "./view";
 
 export const PASS = {
   respondedWithin7: 0.5, // H1: at least half of cases
@@ -30,11 +32,16 @@ export type Metrics = {
     fixed: number;
   };
   h2: {
+    /** Cases offered the who-sends choice (cases from before the concierge pilot weren't). */
+    offered: number;
     authorized: number;
     rate: number | null;
     authorizedPass: boolean | null;
+    /** Drafts that became ready: approved ones, plus ones still waiting more than a day. */
     approvals: number;
     approvedWithinDay: number;
+    /** Ready more than a day ago and still not approved (counted as not within a day). */
+    overdue: number;
     approvalRate: number | null;
     approvalPass: boolean | null;
     backedOut: number;
@@ -64,7 +71,9 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
   const toReply: number[] = [];
   const afterStep: Partial<Record<StepId, number>> = {};
 
+  let offered = 0;
   let authorized = 0;
+  let overdue = 0;
   let approvals = 0;
   let approvedWithinDay = 0;
   let backedOut = 0;
@@ -76,7 +85,8 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
     if (record.status === "fixed") fixed++;
 
     // Hypothesis 1: time from Abate's first follow-up to management's first reply or scheduling.
-    const sent = messages
+    const live = liveMessages(messages);
+    const sent = live
       .filter((m) => m.direction === "outgoing" && m.sentAt)
       .sort((a, b) => a.sentAt!.localeCompare(b.sentAt!));
     if (sent.length > 0) {
@@ -85,14 +95,16 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       const firstSentOn = nyDate(firstSentAt);
       baselines.push(Math.max(0, daysBetween(record.firstReportedOn, firstSentOn)));
 
-      const replies = messages
+      const replies = live
         .filter((m) => m.direction === "incoming" && (m.receivedAt ?? m.createdAt) >= firstSentAt)
         .map((m) => m.receivedAt ?? m.createdAt)
         .sort();
-      const candidates = [replies[0], record.repairScheduledAt].filter((t): t is string => Boolean(t) && t! >= firstSentAt).sort();
+      // A reply, a scheduled repair, or the repair itself (the super often fixes it without writing).
+      const fixedAt = record.fixedOn && record.fixedOn >= firstSentOn ? `${record.fixedOn}T23:59:59.000Z` : null;
+      const candidates = [replies[0], record.repairScheduledAt, fixedAt].filter((t): t is string => Boolean(t) && t! >= firstSentAt).sort();
       const firstResponse = candidates[0];
       if (firstResponse) {
-        const d = daysBetween(firstSentOn, nyDate(firstResponse));
+        const d = daysBetween(firstSentOn, firstResponse === fixedAt ? record.fixedOn! : nyDate(firstResponse));
         toReply.push(d);
         judged++;
         if (d <= 7) responded++;
@@ -106,17 +118,33 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
     }
 
     // Hypothesis 2: did tenants let Abate send, approve promptly, and stay in?
-    if (record.sendMode === "abate" && record.sendAuthorizedAt) authorized++;
+    // Choosing Abate counts even if they later switched (that's counted as backing out instead).
+    if (record.sendModeChosen) {
+      offered++;
+      if (record.sendAuthorizedAt) authorized++;
+    }
     for (const m of messages) {
       if (m.direction !== "outgoing" || !m.approvedAt) continue;
       approvals++;
       const ready = m.readyOn ?? nyDate(m.approvedAt);
       if (daysBetween(ready, nyDate(m.approvedAt)) <= 1) approvedWithinDay++;
     }
-    if (record.pausedAt || record.pauseReason === "send_myself") {
+    // A draft that's been ready for more than a day without approval counts as not approved in time.
+    if (record.sendMode === "abate" && record.status === "open" && !record.pausedAt) {
+      const { ladderCase, ladderMessages } = ladderInputs(record, messages);
+      const action = nextAction(ladderCase, ladderMessages, today);
+      if (action.kind === "send") {
+        const ready = readyOnFor(action.step, action.dueOn, record, messages, today);
+        if (daysBetween(ready, today) > 1) {
+          approvals++;
+          overdue++;
+        }
+      }
+    }
+    // pause_reason is never cleared, so a tenant who paused and resumed still counts.
+    if (record.pauseReason) {
       backedOut++;
-      const reason = record.pauseReason ?? "unknown";
-      pauseReasons[reason] = (pauseReasons[reason] ?? 0) + 1;
+      pauseReasons[record.pauseReason] = (pauseReasons[record.pauseReason] ?? 0) + 1;
     }
 
     // Shadow mode: how often the AI agreed with our team's reading.
@@ -128,7 +156,7 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
   }
 
   const rate = ratio(responded, judged);
-  const authRate = ratio(authorized, rows.length);
+  const authRate = ratio(authorized, offered);
   const approvalRate = ratio(approvedWithinDay, approvals);
   return {
     cases: rows.length,
@@ -145,11 +173,13 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       fixed,
     },
     h2: {
+      offered,
       authorized,
       rate: authRate,
       authorizedPass: authRate === null ? null : authRate >= PASS.authorized,
       approvals,
       approvedWithinDay,
+      overdue,
       approvalRate,
       approvalPass: approvalRate === null ? null : approvalRate >= PASS.approvedWithinDay,
       backedOut,

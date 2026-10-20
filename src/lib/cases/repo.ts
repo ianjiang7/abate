@@ -9,10 +9,10 @@ import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
 
 const MESSAGE_COLUMNS =
-  "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, received_at, logged_by, classification, ai_classification, classified_by, classification_summary, classification_date, reply_reference, ai_source";
+  "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, claimed_at, withdrawn_at, edited, draft_body, received_at, logged_by, classification, ai_classification, classified_by, classified_at, classification_summary, classification_date, reply_reference, ai_source";
 
 type Row = Record<string, unknown>;
 
@@ -42,6 +42,7 @@ function toCase(r: Row): CaseRecord {
     mgmtEmail: str(r.mgmt_email),
     status: r.status === "fixed" ? "fixed" : "open",
     sendMode: r.send_mode === "abate" ? "abate" : "self",
+    sendModeChosen: Boolean(r.send_mode_chosen),
     sendAuthorizedAt: str(r.send_authorized_at),
     tenantEmail: str(r.tenant_email),
     pausedAt: str(r.paused_at),
@@ -66,11 +67,16 @@ function toMessage(r: Row): MessageRecord {
     approvedAt: str(r.approved_at),
     readyOn: str(r.ready_on),
     sentBy: r.sent_by === "team" ? "team" : r.sent_by === "tenant" ? "tenant" : null,
+    claimedAt: str(r.claimed_at),
+    withdrawnAt: str(r.withdrawn_at),
+    edited: typeof r.edited === "boolean" ? r.edited : null,
+    draftBody: str(r.draft_body),
     receivedAt: str(r.received_at),
     loggedBy: r.logged_by === "team" ? "team" : r.logged_by === "tenant" ? "tenant" : null,
     classification: (str(r.classification) as ReplyCategory | null) ?? null,
     aiClassification: (str(r.ai_classification) as ReplyCategory | null) ?? null,
     classifiedBy: r.classified_by === "agent" || r.classified_by === "team" || r.classified_by === "tenant" ? r.classified_by : null,
+    classifiedAt: str(r.classified_at),
     classificationSummary: str(r.classification_summary),
     classificationDate: str(r.classification_date),
     replyReference: str(r.reply_reference),
@@ -115,8 +121,9 @@ export async function insertCase(
         mgmt_email: input.mgmtEmail,
         ai_consent: true,
         send_mode: input.sendMode,
+        send_mode_chosen: true,
         send_authorized_at: input.sendMode === "abate" ? new Date().toISOString() : null,
-        tenant_email: input.tenantEmail,
+        tenant_email: input.sendMode === "abate" ? input.tenantEmail : null,
         invited_by_case_id: extra.invitedByCaseId,
         next_step: extra.nextStep,
         next_due_on: extra.nextDueOn,
@@ -198,9 +205,13 @@ export async function findBuildingByCode(code: string): Promise<{ id: string; ad
 }
 
 /** Team page: every real case (or test cases, for the end-to-end test) with its messages. */
-export async function listCasesWithMessages(opts: { includeTest: boolean }): Promise<Array<{ record: CaseRecord; messages: MessageRecord[]; isTest: boolean }>> {
+/** "real": testers only. "all": testers and automated test cases. "test": automated test cases only. */
+export type CaseScope = "real" | "all" | "test";
+
+export async function listCasesWithMessages(scope: CaseScope): Promise<Array<{ record: CaseRecord; messages: MessageRecord[]; isTest: boolean }>> {
   let q = db().from("cases").select(`${CASE_COLUMNS}, is_test`).order("created_at", { ascending: false }).limit(500);
-  if (!opts.includeTest) q = q.eq("is_test", false);
+  if (scope === "real") q = q.eq("is_test", false);
+  if (scope === "test") q = q.eq("is_test", true);
   const casesRes = await q;
   const rows = (check(casesRes, "Loading cases") ?? []) as Row[];
   if (rows.length === 0) return [];
@@ -237,9 +248,10 @@ export async function findCaseByCode(code: string): Promise<CaseRecord | null> {
   return row ? toCase(row) : null;
 }
 
-export async function countEvents(name: string, opts: { includeTest: boolean }): Promise<number> {
+export async function countEvents(name: string, scope: CaseScope): Promise<number> {
   let q = db().from("events").select("id, cases!inner(is_test)", { count: "exact", head: true }).eq("name", name);
-  if (!opts.includeTest) q = q.eq("cases.is_test", false);
+  if (scope === "real") q = q.eq("cases.is_test", false);
+  if (scope === "test") q = q.eq("cases.is_test", true);
   const res = await q;
   if (res.error) throw new Error(`Counting events failed: ${res.error.message}`);
   return res.count ?? 0;

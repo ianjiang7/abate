@@ -1,8 +1,9 @@
 // Pure rules behind the case service, kept separate so they can be unit tested.
 
 import { nyDate, type IsoDate } from "@/lib/domain/dates";
-import type { MessageRecord } from "./types";
-import { messageTime } from "./view";
+import type { StepId } from "@/lib/domain/ladder";
+import type { CaseRecord, MessageRecord } from "./types";
+import { liveMessages, messageTime } from "./view";
 
 /**
  * When a logged reply "arrived". Today's replies get the current time. A past date gets noon New
@@ -51,4 +52,27 @@ export function draftWasEdited(draft: { subject: string; body: string }, sent: {
   if (parts.length === 1) return true;
   const pattern = new RegExp(`^${parts.map(escapeRegExp).join("(.+?)")}$`);
   return !pattern.test(sentBody);
+}
+
+/**
+ * The day a step became ready for the tenant, for hypothesis 2's "approved within a day": the
+ * notice when the case started, a reply-driven step when someone read the reply, a missed-repair
+ * message when the tenant reported the miss, and a timed step on its due date. Never later than today.
+ */
+export function readyOnFor(step: StepId, dueOn: IsoDate, record: CaseRecord, all: MessageRecord[], today: IsoDate): IsoDate {
+  const messages = liveMessages(all);
+  const sent = messages
+    .filter((m) => m.direction === "outgoing" && m.sentAt)
+    .map((m) => m.sentAt!)
+    .sort();
+  const lastSent = sent[sent.length - 1];
+  const replies = messages.filter((m) => m.direction === "incoming").sort((a, b) => messageTime(a).localeCompare(messageTime(b)));
+  const lastReply = replies[replies.length - 1];
+
+  let ready: IsoDate;
+  if (step === "notice") ready = nyDate(record.createdAt);
+  else if (step === "missed_repair" && record.repairMissedAt) ready = nyDate(record.repairMissedAt);
+  else if (lastReply?.classification && (!lastSent || messageTime(lastReply) > lastSent)) ready = nyDate(lastReply.classifiedAt ?? messageTime(lastReply));
+  else ready = dueOn;
+  return ready > today ? today : ready;
 }
