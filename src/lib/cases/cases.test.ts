@@ -184,8 +184,14 @@ describe("newCaseSchema", () => {
     const r = newCaseSchema.safeParse({ ...valid, sendMode: "abate" });
     expect(r.success).toBe(false);
     if (r.success) return;
-    expect(new Set(r.error.issues.map((i) => String(i.path[0])))).toEqual(new Set(["tenantEmail", "sendAuthorized"]));
-    expect(newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on" }).success).toBe(true);
+    expect(new Set(r.error.issues.map((i) => String(i.path[0])))).toEqual(new Set(["mgmtEmailForAbate", "tenantEmail", "sendAuthorized"]));
+    // Abate can't send without management's email.
+    const noMgmt = newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on" });
+    expect(noMgmt.success).toBe(false);
+    if (!noMgmt.success) expect(noMgmt.error.issues.map((i) => String(i.path[0]))).toEqual(["mgmtEmailForAbate"]);
+    expect(newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on", mgmtEmail: "repairs@example.com" }).success).toBe(true);
+    // Self-send tenants can leave it blank.
+    expect(newCaseSchema.safeParse({ ...valid, sendMode: "self" }).success).toBe(true);
   });
 
   it("rejects a report date before the problem started", () => {

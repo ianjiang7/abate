@@ -86,8 +86,16 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string)
   await expect(visibleText(page, "Choose who sends the follow-ups.")).toBeVisible();
   if (sendMode === "abate") {
     await page.locator("label").filter({ hasText: "Abate's team sends them for me" }).filter({ visible: true }).click();
+    // Management's email is required when Abate sends; it carries over from the previous step.
+    const mgmtEmail = page.getByLabel("Management's email");
+    await expect(mgmtEmail).toHaveValue("repairs@example.com");
     await page.getByLabel("Your email").fill("tenant@example.com");
     await page.getByRole("checkbox").filter({ visible: true }).check();
+    await mgmtEmail.fill("");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(visibleText(page, "Add management's email so we can send your follow-ups.")).toBeVisible();
+    await shot(page, `${prefix}-04-mgmt-email-required`);
+    await mgmtEmail.fill("repairs@example.com");
   } else {
     await page.locator("label").filter({ hasText: "I'll send them myself" }).filter({ visible: true }).click();
   }

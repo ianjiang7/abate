@@ -3,6 +3,16 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-22: Management's email is required when Abate sends
+
+- **What:** choosing "Abate's team sends them for me" shows a required "Management's email" field
+  on the same step, filled in from the step before. Tenants who send their own follow-ups can still
+  leave it blank.
+- **Why:** before, a tenant could pick Abate without giving the address, and our team had nothing
+  to send to.
+- **Cut:** an "I don't have it, help me find it" option, with a team-page list for looking up the
+  managing agent. Too much for now; a tenant without the address can send the follow-ups themselves.
+
 ## 2026-10-20: Split hypothesis 1 into the sender and the dollar figure
 
 - **Why:** in the original ladder the dollar figure only appeared in the day-5 formal notice, after

@@ -70,7 +70,7 @@ const STEPS = [
   { title: "Where do you live?", subtitle: "We'll look up your building's record with the city.", fields: ["address", "unit"] },
   { title: "What needs fixing?", subtitle: "Pick the closest match. Add a photo so there's a record.", fields: ["issueType", "issueDescription", "startedOn", "photos"] },
   { title: "Who have you told?", subtitle: "The clock for what you may be owed starts when management was told.", fields: ["firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName", "mgmtEmail"] },
-  { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "tenantEmail", "sendAuthorized"] },
+  { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmailForAbate", "tenantEmail", "sendAuthorized"] },
   { title: "Last few details", subtitle: "We use these to sign your messages and estimate what you may be owed.", fields: ["tenantName", "monthlyRent", "tenantContact", "aiConsent"] },
 ] as const;
 
@@ -100,6 +100,9 @@ function validateStep(step: number, f: Fields, photos: Photo[], today: string): 
   if (step === 3) {
     if (!f.sendMode) e.sendMode = "Choose who sends the follow-ups.";
     if (f.sendMode === "abate") {
+      // We can't send anything without management's address.
+      if (!f.mgmtEmail.trim()) e.mgmtEmailForAbate = "Add management's email so we can send your follow-ups.";
+      else if (!EMAIL.test(f.mgmtEmail.trim())) e.mgmtEmailForAbate = "That email doesn't look right.";
       if (!EMAIL.test(f.tenantEmail.trim())) e.tenantEmail = "Add your email so we can copy you on every message.";
       if (!f.sendAuthorized) e.sendAuthorized = "Please confirm we can email management for you.";
     }
@@ -414,7 +417,7 @@ export function StartForm() {
                 <Field label="Management company or landlord" htmlFor="mgmtName" optional>
                   <Input id="mgmtName" value={fields.mgmtName} onChange={(e) => set("mgmtName", e.target.value)} placeholder="e.g. Acme Property Management" autoComplete="off" maxLength={120} />
                 </Field>
-                <Field label="Their email" htmlFor="mgmtEmail" optional error={errors.mgmtEmail} hint="Every follow-up goes to this address. If you don't have it, leave it blank and we'll help you find it.">
+                <Field label="Their email" htmlFor="mgmtEmail" optional error={errors.mgmtEmail} hint="Every follow-up goes to this address. Check your lease, a rent receipt, or an email from management.">
                   <Input id="mgmtEmail" type="email" inputMode="email" value={fields.mgmtEmail} onChange={(e) => set("mgmtEmail", e.target.value)} placeholder="repairs@example.com" autoComplete="off" maxLength={200} aria-invalid={Boolean(errors.mgmtEmail)} />
                 </Field>
               </>
@@ -475,6 +478,27 @@ export function StartForm() {
 
                 {fields.sendMode === "abate" ? (
                   <>
+                    <Field
+                      label="Management's email"
+                      htmlFor="mgmtEmailForAbate"
+                      error={errors.mgmtEmailForAbate}
+                      hint="We send every follow-up here. Try your lease, a rent receipt, or an email from management. Can't find it? You can send them yourself instead."
+                    >
+                      <Input
+                        id="mgmtEmailForAbate"
+                        type="email"
+                        inputMode="email"
+                        value={fields.mgmtEmail}
+                        onChange={(e) => {
+                          set("mgmtEmail", e.target.value);
+                          setErrors((er) => ({ ...er, mgmtEmailForAbate: "" }));
+                        }}
+                        placeholder="repairs@example.com"
+                        autoComplete="off"
+                        maxLength={200}
+                        aria-invalid={Boolean(errors.mgmtEmailForAbate)}
+                      />
+                    </Field>
                     <Field label="Your email" htmlFor="tenantEmail" error={errors.tenantEmail} hint="We copy you on every message we send, so you see exactly what management gets.">
                       <Input id="tenantEmail" type="email" inputMode="email" value={fields.tenantEmail} onChange={(e) => set("tenantEmail", e.target.value)} autoComplete="email" maxLength={200} aria-invalid={Boolean(errors.tenantEmail)} />
                     </Field>

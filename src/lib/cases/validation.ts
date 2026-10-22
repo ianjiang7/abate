@@ -65,6 +65,10 @@ export const newCaseSchema = z
   .transform((v) => (v.sendMode === "self" ? { ...v, tenantEmail: null, sendAuthorized: undefined } : v))
   .superRefine((v, ctx) => {
     if (v.sendMode === "abate") {
+      // Abate can't send anything without management's address.
+      if (!v.mgmtEmail) {
+        ctx.addIssue({ code: "custom", path: ["mgmtEmailForAbate"], message: "Add management's email so we can send your follow-ups." });
+      }
       if (!v.tenantEmail) ctx.addIssue({ code: "custom", path: ["tenantEmail"], message: "Add your email so we can copy you on every message." });
       else if (!z.email().safeParse(v.tenantEmail).success) ctx.addIssue({ code: "custom", path: ["tenantEmail"], message: "That email doesn't look right." });
       if (!v.sendAuthorized) ctx.addIssue({ code: "custom", path: ["sendAuthorized"], message: "Please confirm we can email management for you." });
