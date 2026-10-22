@@ -80,7 +80,6 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string,
   await page.locator("label").filter({ hasText: "Text message" }).filter({ visible: true }).click();
   await page.getByRole("button", { name: "One more" }).click();
   await page.getByLabel(/Management company or landlord/).fill("Example Property Management");
-  await page.getByLabel(/Their email/).fill("repairs@example.com");
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Step 4: who sends
@@ -89,22 +88,27 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string,
   await expect(visibleText(page, "Choose who sends the follow-ups.")).toBeVisible();
   if (sendMode === "abate") {
     await page.locator("label").filter({ hasText: "Abate's team sends them for me" }).filter({ visible: true }).click();
-    // Management's email is required when Abate sends; it carries over from the previous step.
-    const mgmtEmail = page.getByLabel("Management's email");
-    await expect(mgmtEmail).toHaveValue("repairs@example.com");
+    // Management's email is asked for once, here, and is required when Abate sends.
     await page.getByLabel("Your email").fill("tenant@example.com");
     await page.getByRole("checkbox").filter({ visible: true }).check();
-    await mgmtEmail.fill("");
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(visibleText(page, "Add management's email so we can send your follow-ups.")).toBeVisible();
+    await expect(visibleText(page, /^Add management's email so we can send your follow-ups/)).toBeVisible();
     await shot(page, `${prefix}-04-mgmt-email-required`);
-    await mgmtEmail.fill("repairs@example.com");
+    await page.getByLabel("Management's email").fill("repairs@example.com");
   } else {
-    // A tenant who starts typing management's email for Abate, then switches to sending themselves,
-    // isn't sent back for a half-typed address they can no longer see.
+    // A tenant who tries Abate without management's email, then switches to sending themselves,
+    // doesn't keep the "required" error on a field that is now optional.
     await page.locator("label").filter({ hasText: "Abate's team sends them for me" }).filter({ visible: true }).click();
-    await page.getByLabel("Management's email").fill("repairs@exam");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(visibleText(page, /^Add management's email so we can send your follow-ups/)).toBeVisible();
     await page.locator("label").filter({ hasText: "I'll send them myself" }).filter({ visible: true }).click();
+    await expect(visibleText(page, /^Add management's email so we can send your follow-ups/)).toHaveCount(0);
+    await expect(visibleText(page, "We'll put it in the To line of each message for you.")).toBeVisible();
+    // Optional here, but still checked: a half-typed address is caught now, not on the server later.
+    await page.getByLabel("Management's email").fill("repairs@exam");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(visibleText(page, "That email doesn't look right.")).toBeVisible();
+    await page.getByLabel("Management's email").fill("repairs@example.com");
   }
   await shot(page, `${prefix}-04-who-sends`);
   await page.getByRole("button", { name: "Continue" }).click();
@@ -113,6 +117,8 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string,
   await expect(page.getByRole("heading", { name: "Last few details" })).toBeVisible();
   await page.getByLabel("Your name").fill("Test Tenant");
   await page.getByLabel("Monthly rent").fill("1,850");
+  // We already have an Abate tenant's email, so reminders only ask for a phone.
+  await expect(page.getByLabel(sendMode === "abate" ? "Phone for text reminders" : "Phone or email for reminders")).toBeVisible();
   await page.getByRole("checkbox").filter({ visible: true }).check();
   await page.getByRole("button", { name: "Create my case" }).click();
 

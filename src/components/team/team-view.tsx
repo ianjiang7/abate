@@ -87,7 +87,7 @@ export async function TeamView({ params, searchParams }: { params: Promise<{ key
       </Card>
 
       <Card>
-        <CardHeader icon={<Users className="size-5" />} title={`Waiting on tenants (${o.waitingOnTenant.length})`} subtitle="Text them their case link so they can act." />
+        <CardHeader icon={<Users className="size-5" />} title={`Waiting on tenants (${o.waitingOnTenant.length})`} subtitle="Text or email them their case link so they can act." />
         {o.waitingOnTenant.length === 0 ? <Empty>Nobody to nudge right now.</Empty> : null}
         <ul className="space-y-3">
           {o.waitingOnTenant.map((c) => (

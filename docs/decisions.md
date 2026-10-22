@@ -3,6 +3,15 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-22: Ask for each contact once
+
+- **What:** management's email moved off "Who have you told?" and is asked for once, on the
+  who-sends step: required if Abate sends, optional if the tenant sends (it fills the To line).
+  Tenants using Abate get "Phone for text reminders" instead of "Phone or email", since we
+  already have their email.
+- **Why:** the form asked for management's email twice and the tenant's email twice, which
+  was redundant.
+
 ## 2026-10-22: Photos are optional
 
 - **What:** tenants can start a case without a photo. The photo picker is marked optional, and the

@@ -67,11 +67,13 @@ live.
 
 ## What we are building: one flow, phone-first
 
-1. **Start a case** (about 5 minutes): address and unit, issue type, when it started, when
-   management was first told and how, follow-ups since, management name and email (required if Abate sends), a photo if they have one, **who
-   sends the follow-ups** (Abate's team, or the tenant), and for Abate: the tenant's email (copied
-   on everything) and their authorization. Neither choice is pre-selected; the choice measures
-   hypothesis 2. Then their name, rent, an optional phone for reminders, and consent.
+1. **Start a case** (about 5 minutes): address and unit, issue type, when it started, a photo if
+   they have one, when management was first told and how, follow-ups since, management's name,
+   then **who sends the follow-ups** (Abate's team, or the tenant). Neither choice is
+   pre-selected; the choice measures hypothesis 2. Then management's email (required if Abate
+   sends), and for Abate: the tenant's email (copied on everything) and their authorization. Then
+   their name, rent, an optional contact for reminders (a phone if Abate sends, since we have
+   their email), and consent. Each contact is asked for once.
 2. **See the building:** open HPD violations, recent complaints, the registered managing agent.
 3. **See the case:** a timeline that fills itself in, the days unresolved, and the estimated
    abatement so far, labeled as an estimate, not legal advice.
@@ -165,7 +167,7 @@ A reply changes the path:
 - **Send approved messages** from the team Gmail (tenant CC'd), then tap "Mark sent" on the team
   page. Aim for the same day.
 - **Read replies** from the team inbox and from tenants, and pick what each said on the team page.
-- **Nudge tenants** listed under "Waiting on tenants" by texting them their case link.
+- **Nudge tenants** listed under "Waiting on tenants" by texting (or emailing) them their case link.
 - **Day-7 check-in:** ask "How comfortable were you with Abate contacting your landlord?" and
   keep the quote.
 - **Building-wide cases:** if several neighbors join, the team writes a joint letter by hand.
