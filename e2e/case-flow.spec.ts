@@ -37,7 +37,7 @@ async function shot(page: Page, name: string) {
 const visibleText = (page: Page, text: string | RegExp) => page.getByText(text).filter({ visible: true });
 
 /** Fills the start form through the "who sends" step. Returns on the case page. */
-async function startCase(page: Page, sendMode: "abate" | "self", prefix: string) {
+async function startCase(page: Page, sendMode: "abate" | "self", prefix: string, { photo }: { photo: boolean }) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Repair still not fixed/ })).toBeVisible();
   await shot(page, `${prefix}-01-landing`);
@@ -67,8 +67,11 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string)
   await expect(page.getByRole("radio", { name: /No heat or hot water/ })).toBeChecked();
   await page.getByLabel(/Describe it in a sentence/).fill("Radiators are cold and there is no hot water.");
   await page.getByLabel("When did it start?").fill(isoDaysAgo(14));
-  await page.getByLabel("Choose photos").setInputFiles({ name: "radiator.jpg", mimeType: "image/jpeg", buffer: await fakePhoto(page) });
-  await expect(page.getByRole("img", { name: "Photo of the problem" })).toBeVisible();
+  // Photos are optional (nothing to photograph for no heat); one test adds one, the other skips it.
+  if (photo) {
+    await page.getByLabel("Choose photos").setInputFiles({ name: "radiator.jpg", mimeType: "image/jpeg", buffer: await fakePhoto(page) });
+    await expect(page.getByRole("img", { name: "Photo of the problem" })).toBeVisible();
+  }
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Step 3: who they told
@@ -97,6 +100,10 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string)
     await shot(page, `${prefix}-04-mgmt-email-required`);
     await mgmtEmail.fill("repairs@example.com");
   } else {
+    // A tenant who starts typing management's email for Abate, then switches to sending themselves,
+    // isn't sent back for a half-typed address they can no longer see.
+    await page.locator("label").filter({ hasText: "Abate's team sends them for me" }).filter({ visible: true }).click();
+    await page.getByLabel("Management's email").fill("repairs@exam");
     await page.locator("label").filter({ hasText: "I'll send them myself" }).filter({ visible: true }).click();
   }
   await shot(page, `${prefix}-04-who-sends`);
@@ -123,10 +130,11 @@ const teamUrl = `/team/${TEAM_KEY}?test=only`;
 const teamItem = (page: Page, code: string) => page.locator("li").filter({ hasText: code }).filter({ visible: true }).first();
 
 test("concierge: the tenant approves, our team sends and reads replies, then the case closes", async ({ page }) => {
-  const { caseUrl, code } = await startCase(page, "abate", "c");
+  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true });
   await expect(page.getByRole("heading", { name: "Approve your written notice" })).toBeVisible();
   await expect(visibleText(page, "From:")).toBeVisible();
   await expect(visibleText(page, /may be owed so far/i)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Photos", exact: true })).toBeVisible();
   await shot(page, "c-05-case-new");
 
   // The tenant approves; the case waits for the team.
@@ -191,8 +199,10 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
 });
 
 test("self-send: the tenant sends from their own email", async ({ page }) => {
-  const { caseUrl } = await startCase(page, "self", "s");
+  const { caseUrl } = await startCase(page, "self", "s", { photo: false });
   await expect(page.getByRole("heading", { name: "Send your written notice" })).toBeVisible();
+  // No photo was added, so the case page leaves out the Photos card.
+  await expect(page.getByRole("heading", { name: "Photos", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Copy the message instead" }).click();
   await page.getByRole("button", { name: "Yes, I sent it" }).click();
   await expect(page.getByRole("heading", { name: /Next up: reminder on/ })).toBeVisible();

@@ -45,7 +45,7 @@ export default function Home() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">How it works</h2>
             <ol className="mt-8 grid gap-4 md:grid-cols-3">
               <Step n={1} icon={<FileText className="size-5" />} title="Tell us what's broken">
-                The problem, when it started, when you told management, and a photo. We look up your building&apos;s record
+                The problem, when it started, when you told management, and a photo if you have one. We look up your building&apos;s record
                 with the city.
               </Step>
               <Step n={2} icon={<Send className="size-5" />} title="We send every follow-up">

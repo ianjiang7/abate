@@ -3,6 +3,15 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-22: Photos are optional
+
+- **What:** tenants can start a case without a photo. The photo picker is marked optional, and the
+  case page leaves out the Photos card when there are none.
+- **Why:** for no heat, no hot water or many plumbing problems, there's nothing useful to
+  photograph, and requiring one could stop a tester partway through.
+- **Kept:** if a tenant adds photos and none of them can be used, the form says so instead of
+  quietly starting the case without them.
+
 ## 2026-10-22: Management's email is required when Abate sends
 
 - **What:** choosing "Abate's team sends them for me" shows a required "Management's email" field

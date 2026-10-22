@@ -34,12 +34,12 @@ export async function createCaseAction(_prev: StartState, formData: FormData): P
     return { errors, message: "A few answers need another look." };
   }
 
-  const photos = formData
-    .getAll("photos")
-    .filter((p): p is File => p instanceof File && p.size > 0 && p.size <= MAX_PHOTO_BYTES && p.type.startsWith("image/"))
-    .slice(0, MAX_PHOTOS);
-  if (photos.length === 0) {
-    return { errors: { photos: "Add at least one photo of the problem." }, message: "A few answers need another look." };
+  // Photos are optional, but if the tenant added some and none can be used, say so instead of
+  // quietly starting the case without them.
+  const sent = formData.getAll("photos").filter((p): p is File => p instanceof File && p.size > 0);
+  const photos = sent.filter((p) => p.size <= MAX_PHOTO_BYTES && p.type.startsWith("image/")).slice(0, MAX_PHOTOS);
+  if (sent.length > 0 && photos.length === 0) {
+    return { errors: { photos: "We couldn't use that photo. Remove it and try a different one, or continue without it." }, message: "A few answers need another look." };
   }
 
   const isTest = process.env.E2E_TEST === "1";

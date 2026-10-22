@@ -65,7 +65,7 @@ replies in the background) agreed with our team. The team page shows all of it l
 One flow on a phone-first web page, plus a team page that runs the concierge.
 
 1. **Start a case** in about 5 minutes: address, issue, dates, rent, management contact, a
-   photo, and **who sends the follow-ups** (Abate's team, or the tenant).
+   photo if they have one, and **who sends the follow-ups** (Abate's team, or the tenant).
 2. **See the building** (HPD violations, complaints, managing agent) and **the case** (timeline
    and a growing estimate).
 3. **Each follow-up** on the ladder (notice day 0, reminder day 3, formal notice with the dollar

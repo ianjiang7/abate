@@ -68,7 +68,7 @@ type Photo = { id: string; file: File; url: string };
 
 const STEPS = [
   { title: "Where do you live?", subtitle: "We'll look up your building's record with the city.", fields: ["address", "unit"] },
-  { title: "What needs fixing?", subtitle: "Pick the closest match. Add a photo so there's a record.", fields: ["issueType", "issueDescription", "startedOn", "photos"] },
+  { title: "What needs fixing?", subtitle: "Pick the closest match. Add a photo if it shows the problem.", fields: ["issueType", "issueDescription", "startedOn", "photos"] },
   { title: "Who have you told?", subtitle: "The clock for what you may be owed starts when management was told.", fields: ["firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName", "mgmtEmail"] },
   { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmailForAbate", "tenantEmail", "sendAuthorized"] },
   { title: "Last few details", subtitle: "We use these to sign your messages and estimate what you may be owed.", fields: ["tenantName", "monthlyRent", "tenantContact", "aiConsent"] },
@@ -79,7 +79,7 @@ const MAX_PHOTOS = 4;
 const MAX_TOTAL_PHOTO_BYTES = 3_400_000;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function validateStep(step: number, f: Fields, photos: Photo[], today: string): Record<string, string> {
+function validateStep(step: number, f: Fields, today: string): Record<string, string> {
   const e: Record<string, string> = {};
   if (step === 0) {
     if (f.address.trim().length < 5) e.address = "Enter your street address.";
@@ -88,7 +88,6 @@ function validateStep(step: number, f: Fields, photos: Photo[], today: string): 
     if (!f.issueType) e.issueType = "Choose what needs fixing.";
     if (!f.startedOn) e.startedOn = "Pick the date it started (a guess is fine).";
     else if (today && f.startedOn > today) e.startedOn = "That date is in the future.";
-    if (photos.length === 0) e.photos = "Add at least one photo of the problem.";
   }
   if (step === 2) {
     if (!f.firstReportedOn) e.firstReportedOn = "Pick the date you first told them.";
@@ -208,7 +207,7 @@ export function StartForm() {
   };
 
   const next = () => {
-    const e = validateStep(step, fields, photos, today);
+    const e = validateStep(step, fields, today);
     setErrors(e);
     if (Object.keys(e).length > 0) {
       // Move focus to the first problem (on a phone it's often below the fold) so it's seen and read out.
@@ -457,8 +456,11 @@ export function StartForm() {
                       value={o.id}
                       checked={active}
                       onChange={() =>
-                        // Switching to self-send drops the Abate-only answers, so they can't block submitting.
-                        o.id === "self" ? setFields((f) => ({ ...f, sendMode: "self", tenantEmail: "", sendAuthorized: false })) : set("sendMode", o.id)
+                        // Switching to self-send drops the Abate-only answers, so they can't block submitting,
+                        // including a half-typed management email that would now be hidden.
+                        o.id === "self"
+                          ? setFields((f) => ({ ...f, sendMode: "self", tenantEmail: "", sendAuthorized: false, mgmtEmail: EMAIL.test(f.mgmtEmail.trim()) ? f.mgmtEmail : "" }))
+                          : set("sendMode", o.id)
                       }
                       className="mt-1 size-5 shrink-0 accent-[#08014E]"
                     />
@@ -777,16 +779,21 @@ function PhotoPicker({
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const remove = (id: string) =>
+  const remove = (id: string) => {
+    clearError();
     setPhotos((p) => {
       const gone = p.find((x) => x.id === id);
       if (gone) URL.revokeObjectURL(gone.url);
       return p.filter((x) => x.id !== id);
     });
+  };
 
   return (
     <div className="space-y-2" data-invalid={error ? "true" : undefined}>
-      <p className="text-[15px] font-semibold">Photos</p>
+      <p className="flex items-baseline justify-between gap-2 text-[15px] font-semibold">
+        <span>Photos</span>
+        <span className="text-xs font-medium text-slate">Optional</span>
+      </p>
       <div className="grid grid-cols-3 gap-2.5">
         {photos.map((p) => (
           <div key={p.id} className="relative aspect-square overflow-hidden rounded-2xl bg-lavender ring-1 ring-line">
@@ -820,7 +827,7 @@ function PhotoPicker({
         <p role="alert" className="text-sm font-medium text-bad">
           {error}
         </p>
-      ) : problem ? <p className="text-sm font-medium text-warn">{problem}</p> : <p className="text-sm text-slate">Up to {MAX_PHOTOS}. They stay private to your case.</p>}
+      ) : problem ? <p className="text-sm font-medium text-warn">{problem}</p> : <p className="text-sm text-slate">Helpful for things you can see, like a leak, mold or damage. Up to {MAX_PHOTOS}, private to your case.</p>}
     </div>
   );
 }

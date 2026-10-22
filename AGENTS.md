@@ -68,7 +68,7 @@ live.
 ## What we are building: one flow, phone-first
 
 1. **Start a case** (about 5 minutes): address and unit, issue type, when it started, when
-   management was first told and how, follow-ups since, management name and email (required if Abate sends), a photo, **who
+   management was first told and how, follow-ups since, management name and email (required if Abate sends), a photo if they have one, **who
    sends the follow-ups** (Abate's team, or the tenant), and for Abate: the tenant's email (copied
    on everything) and their authorization. Neither choice is pre-selected; the choice measures
    hypothesis 2. Then their name, rent, an optional phone for reminders, and consent.
