@@ -37,7 +37,7 @@ async function shot(page: Page, name: string) {
 const visibleText = (page: Page, text: string | RegExp) => page.getByText(text).filter({ visible: true });
 
 /** Fills the start form through the "who sends" step. Returns on the case page. */
-async function startCase(page: Page, sendMode: "abate" | "self", prefix: string, { photo }: { photo: boolean }) {
+async function startCase(page: Page, sendMode: "abate" | "self", prefix: string, { photo, alsoMold = false }: { photo: boolean; alsoMold?: boolean }) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Repair still not fixed/ })).toBeVisible();
   await shot(page, `${prefix}-01-landing`);
@@ -61,12 +61,19 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string,
   await page.getByLabel("Apartment").fill("4B");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 2: the problem. Choices are native radios inside tappable cards; tap the card.
+  // Step 2: the problems. Choices are native checkboxes inside tappable cards; tap the card.
   await expect(page.getByRole("heading", { name: "What needs fixing?" })).toBeVisible();
   await page.locator("label").filter({ hasText: "No heat or hot water" }).filter({ visible: true }).click();
-  await expect(page.getByRole("radio", { name: /No heat or hot water/ })).toBeChecked();
-  await page.getByLabel(/Describe it in a sentence/).fill("Radiators are cold and there is no hot water.");
-  await page.getByLabel("When did it start?").fill(isoDaysAgo(14));
+  await expect(page.getByRole("checkbox", { name: /No heat or hot water/ })).toBeChecked();
+  if (alsoMold) {
+    // Tenants can pick several problems.
+    await page.locator("label").filter({ hasText: "Mold" }).filter({ visible: true }).click();
+    await expect(page.getByRole("checkbox", { name: /Mold/ })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /No heat or hot water/ })).toBeChecked();
+    await shot(page, `${prefix}-02-problems`);
+  }
+  await page.getByLabel(/^Describe (it in a sentence|them in a sentence or two)/).fill("Radiators are cold and there is no hot water.");
+  await page.getByLabel(alsoMold ? "When did the first one start?" : "When did it start?").fill(isoDaysAgo(14));
   // Photos are optional (nothing to photograph for no heat); one test adds one, the other skips it.
   if (photo) {
     await page.getByLabel("Choose photos").setInputFiles({ name: "radiator.jpg", mimeType: "image/jpeg", buffer: await fakePhoto(page) });
@@ -136,11 +143,14 @@ const teamUrl = `/team/${TEAM_KEY}?test=only`;
 const teamItem = (page: Page, code: string) => page.locator("li").filter({ hasText: code }).filter({ visible: true }).first();
 
 test("concierge: the tenant approves, our team sends and reads replies, then the case closes", async ({ page }) => {
-  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true });
+  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true, alsoMold: true });
   await expect(page.getByRole("heading", { name: "Approve your written notice" })).toBeVisible();
   await expect(visibleText(page, "From:")).toBeVisible();
   await expect(visibleText(page, /may be owed so far/i)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Photos", exact: true })).toBeVisible();
+  // The most serious problem leads; the other is listed under it.
+  await expect(page.getByRole("heading", { level: 1, name: "No heat or hot water" })).toBeVisible();
+  await expect(visibleText(page, "Also:")).toBeVisible();
   await shot(page, "c-05-case-new");
 
   // The tenant approves; the case waits for the team.
@@ -152,6 +162,9 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   // The team sends it from the team inbox and marks it sent.
   await page.goto(teamUrl);
   await expect(page.getByRole("heading", { name: /Live results/ })).toBeVisible();
+  // The letter names both problems, in plural wording.
+  await expect(teamItem(page, code)).toContainText("about repairs that are needed: no heat or hot water and mold");
+  await expect(teamItem(page, code)).toContainText("No heat or hot water + Mold");
   // Copy claims the message (re-checking the case) before it can be sent.
   await teamItem(page, code).getByRole("button", { name: "Copy" }).click();
   await expect(teamItem(page, code).getByRole("button", { name: "Copied" })).toBeVisible();
@@ -192,8 +205,8 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   await page.getByRole("button", { name: "Resume Abate" }).click();
   await expect(page.getByRole("heading", { name: "Approve: ask them for a repair date" })).toBeVisible();
 
-  // Fixed.
-  await page.getByRole("button", { name: "Already fixed? Mark it done" }).click();
+  // Fixed. With several problems, "fixed" means all of them.
+  await page.getByRole("button", { name: "Everything fixed? Mark it done" }).click();
   await page.getByRole("button", { name: "It's fixed" }).click();
   await expect(page.getByRole("heading", { name: "Fixed. Nice work." })).toBeVisible();
   await shot(page, "c-10-fixed");

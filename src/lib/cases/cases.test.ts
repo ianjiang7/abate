@@ -19,7 +19,7 @@ const record: CaseRecord = {
   borough: "Bronx",
   bbl: "2012340001",
   bin: "2001234",
-  issueType: "heat",
+  issueTypes: ["heat"],
   issueDescription: null,
   startedOn: "2026-10-05",
   firstReportedOn: "2026-10-06",
@@ -137,7 +137,7 @@ describe("newCaseSchema", () => {
     borough: "Manhattan",
     bbl: "1003770001",
     bin: "1004567",
-    issueType: "heat",
+    issueTypes: ["heat"],
     issueDescription: "",
     startedOn: "2026-10-05",
     firstReportedOn: "2026-10-06",
@@ -172,12 +172,23 @@ describe("newCaseSchema", () => {
     expect(newCaseSchema.safeParse({ ...valid, bbl: "", bin: "", borough: "" }).success).toBe(true);
   });
 
+  it("accepts several problems, stored most serious first", () => {
+    const r = newCaseSchema.safeParse({ ...valid, issueTypes: ["mold", "heat", "mold"] });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.issueTypes).toEqual(["heat", "mold"]);
+    for (const issueTypes of [[], undefined]) {
+      const bad = newCaseSchema.safeParse({ ...valid, issueTypes });
+      expect(bad.success).toBe(false);
+      if (!bad.success) expect(bad.error.issues.map((i) => String(i.path[0]))).toEqual(["issueTypes"]);
+    }
+  });
+
   it("rejects bad input with field-specific messages", () => {
-    const r = newCaseSchema.safeParse({ ...valid, issueType: "lava", mgmtEmail: "nope", aiConsent: undefined, firstReportedOn: "2026-10-01", bbl: "12" });
+    const r = newCaseSchema.safeParse({ ...valid, issueTypes: ["lava"], mgmtEmail: "nope", aiConsent: undefined, firstReportedOn: "2026-10-01", bbl: "12" });
     expect(r.success).toBe(false);
     if (r.success) return;
     const fields = new Set(r.error.issues.map((i) => String(i.path[0])));
-    expect(fields).toEqual(new Set(["issueType", "mgmtEmail", "aiConsent", "bbl"]));
+    expect(fields).toEqual(new Set(["issueTypes", "mgmtEmail", "aiConsent", "bbl"]));
   });
 
   it("requires an email and authorization when Abate sends", () => {
@@ -286,7 +297,7 @@ describe("concierge", () => {
       record: abate,
       messages: [],
       today: "2026-10-18",
-      estimate: estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-06", endOn: "2026-10-18" }),
+      estimate: estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" }),
       openViolations: 3,
     });
     const notice = buildMessage("notice", ctx);
@@ -356,7 +367,7 @@ describe("hypothesis 1 split: sender vs dollar figure", () => {
     expect(chooseDollarInNotice({ with: 2, without: 2 }, 0.7)).toBe(false);
   });
 
-  const est = estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-06", endOn: "2026-10-18" });
+  const est = estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" });
   const ctxFor = (r: typeof record) => templateContext({ record: r, messages: [], today: "2026-10-18", estimate: est, openViolations: null });
 
   it("puts the dollar estimate in the first notice only for the dollar group, in either voice", () => {

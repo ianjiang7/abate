@@ -22,7 +22,8 @@ type Fields = {
   borough: string;
   bbl: string;
   bin: string;
-  issueType: IssueTypeId | "";
+  /** Every problem picked; tenants can choose several. */
+  issueTypes: IssueTypeId[];
   issueDescription: string;
   startedOn: string;
   firstReportedOn: string;
@@ -46,7 +47,7 @@ const EMPTY: Fields = {
   borough: "",
   bbl: "",
   bin: "",
-  issueType: "",
+  issueTypes: [],
   issueDescription: "",
   startedOn: "",
   firstReportedOn: "",
@@ -68,7 +69,7 @@ type Photo = { id: string; file: File; url: string };
 
 const STEPS = [
   { title: "Where do you live?", subtitle: "We'll look up your building's record with the city.", fields: ["address", "unit"] },
-  { title: "What needs fixing?", subtitle: "Pick the closest match. Add a photo if it shows the problem.", fields: ["issueType", "issueDescription", "startedOn", "photos"] },
+  { title: "What needs fixing?", subtitle: "Pick everything that applies. A photo helps if you have one.", fields: ["issueTypes", "issueDescription", "startedOn", "photos"] },
   { title: "Who have you told?", subtitle: "The clock for what you may be owed starts when management was told.", fields: ["firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName"] },
   { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized"] },
   { title: "Last few details", subtitle: "We use these to sign your messages and estimate what you may be owed.", fields: ["tenantName", "monthlyRent", "tenantContact", "aiConsent"] },
@@ -85,14 +86,14 @@ function validateStep(step: number, f: Fields, today: string): Record<string, st
     if (f.address.trim().length < 5) e.address = "Enter your street address.";
   }
   if (step === 1) {
-    if (!f.issueType) e.issueType = "Choose what needs fixing.";
-    if (!f.startedOn) e.startedOn = "Pick the date it started (a guess is fine).";
+    if (f.issueTypes.length === 0) e.issueTypes = "Choose what needs fixing.";
+    if (!f.startedOn) e.startedOn = f.issueTypes.length > 1 ? "Pick the date the first one started (a guess is fine)." : "Pick the date it started (a guess is fine).";
     else if (today && f.startedOn > today) e.startedOn = "That date is in the future.";
   }
   if (step === 2) {
     if (!f.firstReportedOn) e.firstReportedOn = "Pick the date you first told them.";
     else if (today && f.firstReportedOn > today) e.firstReportedOn = "That date is in the future.";
-    else if (f.startedOn && f.firstReportedOn < f.startedOn) e.firstReportedOn = "This is before the problem started.";
+    else if (f.startedOn && f.firstReportedOn < f.startedOn) e.firstReportedOn = f.issueTypes.length > 1 ? "This is before the first problem started." : "This is before the problem started.";
     if (!f.firstReportedVia) e.firstReportedVia = "Choose how you told them.";
   }
   if (step === 3) {
@@ -235,7 +236,9 @@ export function StartForm() {
     const fd = new FormData();
     for (const [key, value] of Object.entries(fields)) {
       if ((key === "tenantEmail" || key === "sendAuthorized") && fields.sendMode !== "abate") continue;
-      if (key === "aiConsent" || key === "sendAuthorized") {
+      if (Array.isArray(value)) {
+        for (const v of value) fd.append(key, v);
+      } else if (key === "aiConsent" || key === "sendAuthorized") {
         if (value) fd.append(key, "on");
       } else if (key === "monthlyRent") {
         fd.append(key, String(value).replace(/[$,\s]/g, ""));
@@ -313,11 +316,13 @@ export function StartForm() {
 
             {step === 1 ? (
               <>
-                <fieldset data-invalid={errors.issueType ? "true" : undefined} aria-describedby={errors.issueType ? "issueType-error" : undefined}>
-                  <legend className="text-[15px] font-semibold">What&apos;s wrong?</legend>
+                <fieldset data-invalid={errors.issueTypes ? "true" : undefined} aria-describedby={errors.issueTypes ? "issueTypes-error" : undefined}>
+                  <legend className="text-[15px] font-semibold">
+                    What&apos;s wrong? <span className="font-normal text-slate">Pick all that apply.</span>
+                  </legend>
                   <div className="mt-3 grid grid-cols-2 gap-2.5">
                     {ISSUE_TYPES.map((t) => {
-                      const active = fields.issueType === t.id;
+                      const active = fields.issueTypes.includes(t.id);
                       return (
                         <label
                           key={t.id}
@@ -327,23 +332,44 @@ export function StartForm() {
                             active ? "ring-2 ring-ink shadow-[var(--shadow-card)]" : "ring-line hover:ring-periwinkle",
                           )}
                         >
-                          <input type="radio" name="issueType" value={t.id} checked={active} onChange={() => set("issueType", t.id)} className="sr-only" />
-                          <span className={cn("grid size-9 place-items-center rounded-xl", active ? "bg-ink text-white" : "bg-lavender text-ink")}>
-                            <IssueIcon type={t.id} />
+                          <input
+                            type="checkbox"
+                            name="issueTypes"
+                            value={t.id}
+                            checked={active}
+                            onChange={() => set("issueTypes", active ? fields.issueTypes.filter((id) => id !== t.id) : [...fields.issueTypes, t.id])}
+                            className="sr-only"
+                          />
+                          <span className="flex w-full items-start justify-between gap-2">
+                            <span className={cn("grid size-9 place-items-center rounded-xl", active ? "bg-ink text-white" : "bg-lavender text-ink")}>
+                              <IssueIcon type={t.id} />
+                            </span>
+                            {/* A check mark shows several can be picked, unlike a single choice. */}
+                            <span
+                              aria-hidden="true"
+                              className={cn("grid size-6 place-items-center rounded-md ring-1", active ? "bg-ink text-white ring-ink" : "bg-white ring-line")}
+                            >
+                              {active ? <Check className="size-4" /> : null}
+                            </span>
                           </span>
                           {t.label}
                         </label>
                       );
                     })}
                   </div>
-                  {errors.issueType ? (
-                    <p id="issueType-error" role="alert" className="mt-2 text-sm font-medium text-bad">
-                      {errors.issueType}
+                  {errors.issueTypes ? (
+                    <p id="issueTypes-error" role="alert" className="mt-2 text-sm font-medium text-bad">
+                      {errors.issueTypes}
                     </p>
                   ) : null}
                 </fieldset>
 
-                <Field label="Describe it in a sentence" htmlFor="issueDescription" optional hint="This goes into your messages, so keep it factual.">
+                <Field
+                  label={fields.issueTypes.length > 1 ? "Describe them in a sentence or two" : "Describe it in a sentence"}
+                  htmlFor="issueDescription"
+                  optional
+                  hint="This goes into your messages, so keep it factual."
+                >
                   <Textarea
                     id="issueDescription"
                     value={fields.issueDescription}
@@ -354,7 +380,12 @@ export function StartForm() {
                   />
                 </Field>
 
-                <Field label="When did it start?" htmlFor="startedOn" error={errors.startedOn} hint="Your best guess is fine.">
+                <Field
+                  label={fields.issueTypes.length > 1 ? "When did the first one start?" : "When did it start?"}
+                  htmlFor="startedOn"
+                  error={errors.startedOn}
+                  hint={fields.issueTypes.length > 1 ? "The earliest of them. Your best guess is fine." : "Your best guess is fine."}
+                >
                   <Input id="startedOn" type="date" value={fields.startedOn} max={today || undefined} onChange={(e) => set("startedOn", e.target.value)} aria-invalid={Boolean(errors.startedOn)} />
                 </Field>
 

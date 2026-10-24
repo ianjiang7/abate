@@ -25,6 +25,39 @@ export function getIssueType(id: IssueTypeId): IssueType {
   return found;
 }
 
+/**
+ * The problems a tenant picked, most serious first (highest percentage range), without duplicates.
+ * Ties keep the order of ISSUE_TYPES. Never empty: falls back to "other".
+ */
+export function sortIssues(ids: readonly IssueTypeId[]): IssueTypeId[] {
+  const sorted = ISSUE_TYPES.filter((t) => ids.includes(t.id))
+    .sort((a, b) => b.high - a.high || b.low - a.low)
+    .map((t) => t.id);
+  return sorted.length > 0 ? sorted : ["other"];
+}
+
+/** The most serious problem picked. The estimate uses its percentages; they aren't added up. */
+export function mostSeriousIssue(ids: readonly IssueTypeId[]): IssueType {
+  return getIssueType(sortIssues(ids)[0]);
+}
+
+/**
+ * "a, b and c", or "a; b; and c" when an item has its own commas ("a broken window, door or lock").
+ * With two items, the one with commas goes last: "a plumbing problem and a broken window, door or lock".
+ */
+function listPhrase(parts: string[]): string {
+  if (parts.length === 2 && parts[0].includes(",") && !parts[1].includes(",")) return `${parts[1]} and ${parts[0]}`;
+  if (parts.length <= 2) return parts.join(" and ");
+  if (parts.some((p) => p.includes(","))) return `${parts.slice(0, -1).join("; ")}; and ${parts[parts.length - 1]}`;
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** The problems as they read in a letter: "no heat or hot water and mold". */
+export function issuesPhrase(ids: readonly IssueTypeId[]): string {
+  const sorted = sortIssues(ids);
+  return listPhrase(sorted.map((id) => (id === "other" && sorted.length > 1 ? "another repair problem" : getIssueType(id).short)));
+}
+
 export const REPORT_CHANNELS = [
   { id: "text", label: "Text message" },
   { id: "email", label: "Email" },

@@ -18,11 +18,13 @@ export async function createCaseAction(_prev: StartState, formData: FormData): P
     return { message: "Abate isn't connected to its database yet. Please try again soon." };
   }
 
-  const fields: Record<string, FormDataEntryValue> = {};
+  const fields: Record<string, unknown> = {};
   for (const [key, value] of formData.entries()) {
-    if (key.startsWith("$ACTION_") || key === "photos") continue;
+    if (key.startsWith("$ACTION_") || key === "photos" || key === "issueTypes") continue;
     fields[key] = value;
   }
+  // Tenants can pick several problems; each arrives as its own "issueTypes" entry.
+  fields.issueTypes = formData.getAll("issueTypes");
 
   const parsed = newCaseSchema.safeParse(fields);
   if (!parsed.success) {

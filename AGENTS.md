@@ -67,7 +67,7 @@ live.
 
 ## What we are building: one flow, phone-first
 
-1. **Start a case** (about 5 minutes): address and unit, issue type, when it started, a photo if
+1. **Start a case** (about 5 minutes): address and unit, the problems (one or more), when it started, a photo if
    they have one, when management was first told and how, follow-ups since, management's name,
    then **who sends the follow-ups** (Abate's team, or the tenant). Neither choice is
    pre-selected; the choice measures hypothesis 2. Then management's email (required if Abate
@@ -91,7 +91,7 @@ live.
 7. **Invite neighbors** and the **fake door** ("we'll recover this for 25%") as before.
 8. **Private case link** (no login) to come back, follow along, or mark the repair fixed.
 
-Data: `cases` (incl. `send_mode`, `send_authorized_at`, `tenant_email`, `paused_at`,
+Data: `cases` (incl. `issue_types`, most serious first, with `issue_type` as the most serious; `send_mode`, `send_authorized_at`, `tenant_email`, `paused_at`,
 `pause_reason`), `photos`, `messages` (outgoing: `ready_on`, `approved_at`, `sent_at`, `sent_by`;
 incoming: `classification`, `classified_by`, and the AI's shadow `ai_classification`), `events`.
 
@@ -192,6 +192,8 @@ unit tests. It feeds the case page and the formal notice.
 - Days = from the date management was first told (notice) until the fix date, or today if still
   unfixed.
 - Range = daily rent × days × low % to daily rent × days × high %, rounded to the nearest $10.
+- Several problems: use the most serious one's percentages (the highest range). Don't add them up;
+  the percentage describes how unlivable the apartment is overall.
 - While unfixed, also show roughly how much the range grows per day.
 
 Starting percentages. **These are team placeholders, not legal standards.** Confirm them with a

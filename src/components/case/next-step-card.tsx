@@ -44,6 +44,8 @@ export type NextStepProps = {
   tenantEmail: string | null;
   /** The latest reply no one has read yet, if any. */
   unreadReplyId: string | null;
+  /** The tenant listed several problems, so "fixed" means all of them. */
+  severalProblems: boolean;
 };
 
 /** In Abate mode the tenant approves, and our team sends. */
@@ -95,10 +97,26 @@ export function NextStepCard(props: NextStepProps) {
         {props.latestReply && action.kind !== "done" ? <ReplyReading token={token} reply={props.latestReply} /> : null}
         {action.kind === "send" ? <SendStep key={action.step} {...props} action={action} /> : null}
         {action.kind === "confirm_fixed" ? (
-          <FixedQuestion token={token} title="They say it's fixed. Is it?" body="Check that the repair actually worked before you mark it done." defaultDate={null} />
+          <FixedQuestion
+            token={token}
+            several={props.severalProblems}
+            title={props.severalProblems ? "They say it's fixed. Is everything fixed?" : "They say it's fixed. Is it?"}
+            body={
+              props.severalProblems
+                ? "Check every problem you reported. If something is still broken, we'll ask them again and you can say what."
+                : "Check that the repair actually worked before you mark it done."
+            }
+            defaultDate={null}
+          />
         ) : null}
         {action.kind === "checkin" ? (
-          <FixedQuestion token={token} title={`Was it fixed on ${props.scheduledLabel ?? "the scheduled day"}?`} body="Let us know so we can close the case or ask for a new date." defaultDate={props.scheduledFor} />
+          <FixedQuestion
+            token={token}
+            several={props.severalProblems}
+            title={`Was ${props.severalProblems ? "everything" : "it"} fixed on ${props.scheduledLabel ?? "the scheduled day"}?`}
+            body="Let us know so we can close the case or ask for a new date."
+            defaultDate={props.scheduledFor}
+          />
         ) : null}
         {action.kind === "waiting_for_repair" ? <WaitingForRepair {...props} /> : null}
         {action.kind === "team_review" ? <TeamReview {...props} /> : null}
@@ -108,7 +126,7 @@ export function NextStepCard(props: NextStepProps) {
         {action.kind === "done" ? <Done summary={props.fixedSummary} /> : null}
         {canMarkFixed || canPause ? (
           <div className="mt-5 flex flex-wrap justify-center gap-x-4 border-t border-line/80 pt-2">
-            {canMarkFixed ? <MarkFixed token={token} /> : null}
+            {canMarkFixed ? <MarkFixed token={token} several={props.severalProblems} /> : null}
             {canPause ? <PauseControl token={token} /> : null}
           </div>
         ) : null}
@@ -440,7 +458,7 @@ function ReplyReading({ token, reply }: { token: string; reply: LatestReply }) {
   );
 }
 
-function FixedQuestion({ token, title, body, defaultDate }: { token: string; title: string; body: string; defaultDate: string | null }) {
+function FixedQuestion({ token, title, body, defaultDate, several }: { token: string; title: string; body: string; defaultDate: string | null; several: boolean }) {
   const [fixedState, fixedFormAction, fixedPending] = useActionState<CaseActionState, FormData>(fixedAction.bind(null, token), {});
   const [notState, notFormAction, notPending] = useActionState<CaseActionState, FormData>(notFixedAction.bind(null, token), {});
   const today = useToday();
@@ -463,12 +481,12 @@ function FixedQuestion({ token, title, body, defaultDate }: { token: string; tit
           <Input id="fixedOn" name="fixedOn" type="date" key={`${defaultDate}-${today}`} defaultValue={defaultDate && today && defaultDate <= today ? defaultDate : today} max={today || undefined} />
         </Field>
         <Button type="submit" size="lg" block loading={fixedPending} icon={<CalendarCheck className="size-5" aria-hidden="true" />}>
-          Yes, it&apos;s fixed
+          {several ? "Yes, everything's fixed" : "Yes, it's fixed"}
         </Button>
       </form>
       <form action={notFormAction} className="mt-2.5">
         <Button type="submit" variant="secondary" block loading={notPending}>
-          No, it&apos;s still broken
+          {several ? "No, something's still broken" : "No, it's still broken"}
         </Button>
       </form>
     </div>
@@ -571,7 +589,7 @@ function Done({ summary }: { summary: string | null }) {
 }
 
 /** "Already fixed?" for any open state: the super often just shows up without writing back. */
-function MarkFixed({ token }: { token: string }) {
+function MarkFixed({ token, several }: { token: string; several: boolean }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<CaseActionState, FormData>(fixedAction.bind(null, token), {});
   const today = useToday();
@@ -579,18 +597,20 @@ function MarkFixed({ token }: { token: string }) {
   if (!open) {
     return (
       <button type="button" onClick={() => setOpen(true)} className="min-h-11 px-2 text-sm font-semibold text-slate underline decoration-periwinkle underline-offset-4">
-        Already fixed? Mark it done
+        {several ? "Everything fixed? Mark it done" : "Already fixed? Mark it done"}
       </button>
     );
   }
   return (
     <form action={formAction} className="mt-3 w-full space-y-3">
-      <p className="font-semibold">Mark the repair fixed</p>
+      <p className="font-semibold">{several ? "Mark everything fixed" : "Mark the repair fixed"}</p>
       <Field label="Date it was fixed" htmlFor="mark-fixed-on" error={state.errors?.fixedOn}>
         <Input id="mark-fixed-on" name="fixedOn" type="date" key={today} defaultValue={today} max={today || undefined} required autoFocus />
       </Field>
       {state.message ? <Notice tone="bad">{state.message}</Notice> : null}
-      <p className="text-sm text-slate">This closes your case and stops the follow-ups.</p>
+      <p className="text-sm text-slate">
+        {several ? "This closes your case and stops the follow-ups for every problem you listed." : "This closes your case and stops the follow-ups."}
+      </p>
       <div className="grid grid-cols-2 gap-2.5">
         <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
           Cancel

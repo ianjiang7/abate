@@ -2,7 +2,22 @@ import { HandCoins, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatDollars, type Estimate } from "@/lib/domain/estimate";
 
-export function EstimateCard({ estimate, fixed, issueLabel, lowPct, highPct }: { estimate: Estimate; fixed: boolean; issueLabel: string; lowPct: number; highPct: number }) {
+export function EstimateCard({
+  estimate,
+  fixed,
+  issueLabel,
+  lowPct,
+  highPct,
+  ofSeveral = false,
+}: {
+  estimate: Estimate;
+  fixed: boolean;
+  issueLabel: string;
+  lowPct: number;
+  highPct: number;
+  /** The tenant listed several problems; the estimate uses the most serious one. */
+  ofSeveral?: boolean;
+}) {
   const hasRange = estimate.high > 0;
   const perDayLow = Math.round(estimate.perDayLow);
   const perDayHigh = Math.max(1, Math.round(estimate.perDayHigh));
@@ -46,7 +61,8 @@ export function EstimateCard({ estimate, fixed, issueLabel, lowPct, highPct }: {
         </summary>
         <p className="mt-3 leading-relaxed">
           New York&apos;s warranty of habitability lets tenants ask for part of their rent back while a serious problem goes unfixed. We multiply your daily rent by the days
-          since management was told, then by {Math.round(lowPct * 100)}–{Math.round(highPct * 100)}% for {issueLabel.toLowerCase()}. These percentages are our own rough
+          since management was told, then by {Math.round(lowPct * 100)}–{Math.round(highPct * 100)}% for {issueLabel.toLowerCase()}
+          {ofSeveral ? ", the most serious problem you listed. Several problems don't add up to a bigger percentage" : ""}. These percentages are our own rough
           guide, not a legal standard. It&apos;s an estimate, not legal advice.
         </p>
       </details>

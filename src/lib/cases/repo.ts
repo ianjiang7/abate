@@ -2,14 +2,14 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { cache } from "react";
 import { db, PHOTO_BUCKET } from "@/lib/db/client";
-import type { IssueTypeId, ReportChannelId } from "@/lib/domain/issues";
+import { isIssueTypeId, sortIssues, type ReportChannelId } from "@/lib/domain/issues";
 import type { ReplyCategory, StepId } from "@/lib/domain/ladder";
 import { newCaseCode, newCaseToken } from "./ids";
 import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types";
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_types, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
 
 const MESSAGE_COLUMNS =
   "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, claimed_at, withdrawn_at, edited, draft_body, received_at, logged_by, classification, ai_classification, classified_by, classified_at, classification_summary, classification_date, reply_reference, ai_source";
@@ -29,7 +29,8 @@ function toCase(r: Row): CaseRecord {
     borough: str(r.borough),
     bbl: str(r.bbl),
     bin: str(r.bin),
-    issueType: r.issue_type as IssueTypeId,
+    // Cases from before multiple problems only have issue_type.
+    issueTypes: sortIssues((Array.isArray(r.issue_types) && r.issue_types.length > 0 ? r.issue_types : [r.issue_type]).filter(isIssueTypeId)),
     issueDescription: str(r.issue_description),
     startedOn: r.started_on as string,
     firstReportedOn: r.first_reported_on as string,
@@ -109,7 +110,8 @@ export async function insertCase(
         borough: input.borough,
         bbl: input.bbl,
         bin: input.bin,
-        issue_type: input.issueType,
+        issue_type: input.issueTypes[0],
+        issue_types: input.issueTypes,
         issue_description: input.issueDescription,
         started_on: input.startedOn,
         first_reported_on: input.firstReportedOn,

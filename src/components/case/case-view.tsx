@@ -11,7 +11,7 @@ import { buildTimeline, ladderInputs, ladderProgress, liveMessages, messageTime 
 import { hasDatabase } from "@/lib/db/client";
 import { formatLongDate, formatShortDate, nyDate } from "@/lib/domain/dates";
 import { estimateAbatement, formatDollars } from "@/lib/domain/estimate";
-import { getIssueType } from "@/lib/domain/issues";
+import { getIssueType, mostSeriousIssue } from "@/lib/domain/issues";
 import { nextAction, TIMED_STEPS } from "@/lib/domain/ladder";
 import { trackingAddress } from "@/lib/domain/mailto";
 import { BuildingCard } from "./building-card";
@@ -37,12 +37,14 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
   // Approvals withdrawn before sending (pause, switch, or a new reply) don't count as messages.
   const messages = liveMessages(bundle.messages);
   const today = nyDate();
-  const issue = getIssueType(record.issueType);
+  // The most serious problem leads the page and sets the estimate; any others are listed under it.
+  const issue = mostSeriousIssue(record.issueTypes);
+  const otherIssues = record.issueTypes.filter((id) => id !== issue.id).map((id) => getIssueType(id).label);
   const { ladderCase, ladderMessages } = ladderInputs(record, messages);
   const action = nextAction(ladderCase, ladderMessages, today);
   const estimate = estimateAbatement({
     monthlyRent: record.monthlyRent,
-    issueType: record.issueType,
+    issueTypes: record.issueTypes,
     noticeOn: record.firstReportedOn,
     endOn: record.fixedOn ?? today,
   });
@@ -85,10 +87,18 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         </div>
         <h1 className="mt-3 flex items-center gap-3 text-[28px] font-bold leading-tight tracking-tight">
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-white text-ink shadow-[var(--shadow-card)] ring-1 ring-line">
-            <IssueIcon type={record.issueType} className="size-6" />
+            <IssueIcon type={issue.id} className="size-6" />
           </span>
           {issue.label}
         </h1>
+        {otherIssues.length > 0 ? (
+          <p className="mt-2 flex flex-wrap items-center gap-1.5 text-sm font-medium text-slate">
+            <span>Also:</span>
+            {otherIssues.map((label) => (
+              <Badge key={label}>{label}</Badge>
+            ))}
+          </p>
+        ) : null}
         <p className="mt-3 flex items-start gap-1.5 text-[15px] text-slate">
           <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
@@ -119,10 +129,11 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         openViolations={openViolations}
         sendMode={record.sendMode}
         tenantEmail={record.tenantEmail}
+        severalProblems={record.issueTypes.length > 1}
         unreadReplyId={last && last.direction === "incoming" && (!last.classification || last.classification === "unclear") ? last.id : null}
       />
 
-      <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} />
+      <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} ofSeveral={otherIssues.length > 0} />
 
       {record.status === "fixed" || action.kind === "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize /> : null}
 

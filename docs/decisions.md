@@ -3,6 +3,27 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-24: Tenants can pick several problems
+
+- **What:** the "What needs fixing?" cards are multi-select. Cases store every problem picked
+  (`issue_types`, most serious first); letters list them all with plural wording ("repairs that
+  are needed: no heat or hot water and mold"); the case page leads with the most serious one and
+  lists the rest.
+- **Estimate:** uses the most serious problem's percentage range; problems are not added up.
+  *Why:* the percentage reflects how unlivable the apartment is overall, and summing ranges (heat
+  20–50% plus mold 10–30% …) would overstate what tenants may be owed in letters sent to
+  landlords. Still team placeholders until legal aid reviews them.
+- **Kept:** one start date and one "first told management" date per case, even with several
+  problems. *Why:* a second set of dates per problem would lengthen the form for a rare case.
+- **Why:** tenants often live with more than one problem at once, and forcing a single pick hid
+  part of their situation from management.
+- **Known gap: partial fixes.** A case is still fixed as a whole. When there are several problems,
+  "fixed" questions ask whether *everything* is fixed, and the letters for a partial fix or a
+  scheduled visit don't claim anything about all the problems: the tenant fills in which ones are
+  still broken before they can approve. Later letters still list every problem and the estimate
+  still uses the most serious one, so a tenant whose worst problem was fixed should edit those
+  drafts. Tracking which problem was fixed when is a possible next step.
+
 ## 2026-10-22: Ask for each contact once
 
 - **What:** management's email moved off "Who have you told?" and is asked for once, on the

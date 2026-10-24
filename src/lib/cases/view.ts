@@ -78,7 +78,7 @@ export function templateContext(args: {
     address: record.address,
     unit: record.unit,
     mgmtName: record.mgmtName,
-    issueType: record.issueType,
+    issueTypes: record.issueTypes,
     issueDescription: record.issueDescription,
     startedOn: record.startedOn,
     firstReportedOn: record.firstReportedOn,
@@ -109,9 +109,15 @@ export type TimelineItem = {
 
 export function buildTimeline(record: CaseRecord, all: MessageRecord[]): TimelineItem[] {
   const messages = liveMessages(all);
-  const issue = getIssueType(record.issueType);
   const items: TimelineItem[] = [
-    { id: "started", date: record.startedOn, kind: "started", title: "Problem started", detail: issue.label, tone: "neutral" },
+    {
+      id: "started",
+      date: record.startedOn,
+      kind: "started",
+      title: record.issueTypes.length > 1 ? "Problems started" : "Problem started",
+      detail: record.issueTypes.map((id) => getIssueType(id).label).join(" + "),
+      tone: "neutral",
+    },
     {
       id: "reported",
       date: record.firstReportedOn,

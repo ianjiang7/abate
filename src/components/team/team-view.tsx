@@ -120,7 +120,7 @@ export async function TeamView({ params, searchParams }: { params: Promise<{ key
 function CaseLine({ record, extra }: { record: TeamCase["record"]; extra?: string }) {
   return (
     <p className="text-[15px]">
-      <span className="font-bold">{record.code}</span> · {record.tenantName} · <span className="text-slate">{getIssueType(record.issueType).label}</span>{" "}
+      <span className="font-bold">{record.code}</span> · {record.tenantName} · <span className="text-slate">{record.issueTypes.map((id) => getIssueType(id).label).join(" + ")}</span>{" "}
       <Badge tone={record.sendMode === "abate" ? "brand" : "neutral"} className="ml-1 align-middle">
         {record.sendMode === "abate" ? "Abate sends" : "Sends own"}
       </Badge>

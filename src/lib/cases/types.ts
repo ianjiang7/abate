@@ -13,7 +13,8 @@ export type CaseRecord = {
   borough: string | null;
   bbl: string | null;
   bin: string | null;
-  issueType: IssueTypeId;
+  /** Every problem the tenant picked, most serious first. Never empty. */
+  issueTypes: IssueTypeId[];
   issueDescription: string | null;
   startedOn: IsoDate;
   firstReportedOn: IsoDate;

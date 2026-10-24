@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { isIsoDate } from "@/lib/domain/dates";
-import { isIssueTypeId, isReportChannelId } from "@/lib/domain/issues";
+import { ISSUE_TYPES, isIssueTypeId, isReportChannelId, sortIssues, type IssueTypeId } from "@/lib/domain/issues";
 import { bareUnit } from "@/lib/domain/templates";
 import { isReplyCategory } from "@/lib/domain/ladder";
 
@@ -35,7 +35,12 @@ export const newCaseSchema = z
       .optional()
       .or(z.literal("").transform(() => null))
       .transform((v) => v ?? null),
-    issueType: z.string().refine(isIssueTypeId, "Choose what needs fixing."),
+    // Tenants can pick several problems; stored most serious first.
+    issueTypes: z
+      .array(z.string().refine(isIssueTypeId, "Choose what needs fixing."), { message: "Choose what needs fixing." })
+      .min(1, "Choose what needs fixing.")
+      .max(ISSUE_TYPES.length, "Choose what needs fixing.")
+      .transform((ids) => sortIssues(ids as IssueTypeId[])),
     issueDescription: optionalText(500),
     startedOn: isoDate,
     firstReportedOn: isoDate,

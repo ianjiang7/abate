@@ -4,7 +4,7 @@ import { readReply } from "@/lib/agent";
 import { getBuildingSummary } from "@/lib/building";
 import { daysBetween, nyDate, type IsoDate } from "@/lib/domain/dates";
 import { estimateAbatement } from "@/lib/domain/estimate";
-import { getIssueType } from "@/lib/domain/issues";
+import { issuesPhrase } from "@/lib/domain/issues";
 import { dueSummary, nextAction, type ReplyCategory, type StepId } from "@/lib/domain/ladder";
 import { buildMessage, unfilledPlaceholders, type DraftMessage } from "@/lib/domain/templates";
 import { isCaseCode } from "./ids";
@@ -54,7 +54,7 @@ export async function createCase(input: NewCaseInput, photos: File[], opts: { is
   const created = await insertCase(input, { isTest: opts.isTest, invitedByCaseId, nextStep: "notice", nextDueOn: today, dollarInNotice });
   const uploaded = photos.length > 0 ? await uploadCasePhotos(created.id, photos) : 0;
   await logEvent(created.id, "case_created", {
-    issueType: input.issueType,
+    issueTypes: input.issueTypes,
     photos: uploaded,
     invited: Boolean(invitedByCaseId),
     priorFollowups: input.priorFollowups,
@@ -94,7 +94,7 @@ export async function draftFor(
 ): Promise<DraftMessage> {
   const estimate = estimateAbatement({
     monthlyRent: record.monthlyRent,
-    issueType: record.issueType,
+    issueTypes: record.issueTypes,
     noticeOn: record.firstReportedOn,
     endOn: record.fixedOn ?? today,
   });
@@ -205,7 +205,7 @@ async function saveReply(
     .sort((a, b) => messageTime(a).localeCompare(messageTime(b)))
     .pop();
   const receivedAt = receivedAtFor(receivedOn, liveMessages(messages));
-  const readerInput = { replyText: text, receivedOn, issue: getIssueType(record.issueType).short, lastStepSent: lastSent?.step ?? null };
+  const readerInput = { replyText: text, receivedOn, issue: issuesPhrase(record.issueTypes), lastStepSent: lastSent?.step ?? null };
 
   let category: ReplyCategory | null = team?.category ?? null;
   let date: IsoDate | null = team?.category === "scheduled" ? team.scheduledFor : null;
@@ -347,7 +347,7 @@ export async function confirmFixed(token: string, fixedOn: IsoDate): Promise<Act
   const record = await findCaseByToken(token);
   if (!record) return NOT_FOUND;
   await updateCase(record.id, { status: "fixed", fixed_on: fixedOn, next_step: null, next_due_on: null });
-  await logEvent(record.id, "marked_fixed", { fixedOn, days: estimateAbatement({ monthlyRent: record.monthlyRent, issueType: record.issueType, noticeOn: record.firstReportedOn, endOn: fixedOn }).days });
+  await logEvent(record.id, "marked_fixed", { fixedOn, days: estimateAbatement({ monthlyRent: record.monthlyRent, issueTypes: record.issueTypes, noticeOn: record.firstReportedOn, endOn: fixedOn }).days });
   return { ok: true };
 }
 

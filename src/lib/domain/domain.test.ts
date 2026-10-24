@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays, daysBetween, isIsoDate, nyDate } from "./dates";
 import { estimateAbatement } from "./estimate";
+import { issuesPhrase, mostSeriousIssue, sortIssues } from "./issues";
 import { dueSummary, nextAction, type LadderMessage } from "./ladder";
 import { buildMailto, trackingAddress } from "./mailto";
 import { bareUnit, buildMessage, unfilledPlaceholders, type TemplateContext } from "./templates";
@@ -27,14 +28,14 @@ describe("dates", () => {
 
 describe("estimateAbatement", () => {
   it("matches the worked example: a sink broken 3 weeks at $1,800 rent", () => {
-    const e = estimateAbatement({ monthlyRent: 1800, issueType: "plumbing", noticeOn: "2026-09-27", endOn: "2026-10-18" });
+    const e = estimateAbatement({ monthlyRent: 1800, issueTypes: ["plumbing"], noticeOn: "2026-09-27", endOn: "2026-10-18" });
     expect(e.days).toBe(21);
     expect(e.low).toBe(120);
     expect(e.high).toBe(310);
   });
 
   it("uses the higher range for no heat", () => {
-    const e = estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-04", endOn: "2026-10-18" });
+    const e = estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-04", endOn: "2026-10-18" });
     expect(e.days).toBe(14);
     expect(e.low).toBe(140); // 1500*12/365*14*0.2 = 138.08
     expect(e.high).toBe(350); // ... *0.5 = 345.2
@@ -42,8 +43,32 @@ describe("estimateAbatement", () => {
   });
 
   it("never goes negative and handles bad rent", () => {
-    expect(estimateAbatement({ monthlyRent: 2000, issueType: "mold", noticeOn: "2026-10-20", endOn: "2026-10-18" }).high).toBe(0);
-    expect(estimateAbatement({ monthlyRent: Number.NaN, issueType: "mold", noticeOn: "2026-10-01", endOn: "2026-10-18" }).high).toBe(0);
+    expect(estimateAbatement({ monthlyRent: 2000, issueTypes: ["mold"], noticeOn: "2026-10-20", endOn: "2026-10-18" }).high).toBe(0);
+    expect(estimateAbatement({ monthlyRent: Number.NaN, issueTypes: ["mold"], noticeOn: "2026-10-01", endOn: "2026-10-18" }).high).toBe(0);
+  });
+
+  it("uses the most serious problem when there are several, without adding them up", () => {
+    const heatOnly = estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-04", endOn: "2026-10-18" });
+    const several = estimateAbatement({ monthlyRent: 1500, issueTypes: ["mold", "pests", "heat"], noticeOn: "2026-10-04", endOn: "2026-10-18" });
+    expect(several).toEqual(heatOnly);
+  });
+});
+
+describe("several problems", () => {
+  it("sorts them most serious first, without duplicates", () => {
+    expect(sortIssues(["mold", "heat", "mold", "other"])).toEqual(["heat", "mold", "other"]);
+    expect(sortIssues([])).toEqual(["other"]);
+    expect(mostSeriousIssue(["electrical", "leak"]).id).toBe("leak");
+  });
+
+  it("lists them the way a letter reads", () => {
+    expect(issuesPhrase(["heat"])).toBe("no heat or hot water");
+    expect(issuesPhrase(["mold", "heat"])).toBe("no heat or hot water and mold");
+    expect(issuesPhrase(["pests", "mold", "heat"])).toBe("no heat or hot water, mold and pests");
+    // An item with its own commas switches the list to semicolons so it stays readable.
+    expect(issuesPhrase(["window_door", "mold", "heat"])).toBe("no heat or hot water; mold; and a broken window, door or lock");
+    expect(issuesPhrase(["other", "mold"])).toBe("mold and another repair problem");
+    expect(issuesPhrase(["window_door", "plumbing"])).toBe("a plumbing problem and a broken window, door or lock");
   });
 });
 
@@ -152,17 +177,50 @@ describe("templates", () => {
     address: "123 Example St, Bronx, NY 10452",
     unit: "4B",
     mgmtName: "Acme Management",
-    issueType: "heat",
+    issueTypes: ["heat"],
     issueDescription: "Radiators cold since Oct 5.",
     startedOn: "2026-10-05",
     firstReportedOn: "2026-10-06",
     firstReportedVia: "text",
     priorFollowups: 3,
     daysSinceReport: 12,
-    estimate: estimateAbatement({ monthlyRent: 1500, issueType: "heat", noticeOn: "2026-10-06", endOn: "2026-10-18" }),
+    estimate: estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" }),
     sentOn: { notice: "2026-10-12", reminder: "2026-10-15" },
     openViolations: 14,
   };
+
+  it("switches to plural wording when the tenant listed several problems", () => {
+    const many = { ...ctx, issueTypes: ["mold", "heat"] as const };
+    const notice = buildMessage("notice", many);
+    expect(notice.subject).toBe("Repairs needed at 123 Example St, Bronx, NY 10452, Apt 4B");
+    expect(notice.body).toContain("I'm writing about repairs needed in my apartment at 123 Example St, Bronx, NY 10452, Apt 4B: no heat or hot water and mold (Radiators cold since Oct 5).");
+    expect(notice.body).toContain("The problems started on October 5, 2026. I first reported them to you on");
+    expect(notice.body).toContain("since they were first reported, and they are still not fixed.");
+    expect(buildMessage("notice", { ...many, voice: "abate" }).body).toContain("about repairs that are needed: no heat or hot water and mold");
+    // Only some problems may be fixed or scheduled: never claim all of them were, and make the
+    // tenant say which are still broken (approval is blocked until the blank is filled).
+    const missed = buildMessage("missed_repair", { ...many, missedBecause: "says_fixed" }).body;
+    expect(missed).toContain("I was told repairs at 123 Example St, Bronx, NY 10452, Apt 4B were complete, but not everything I reported (no heat or hot water and mold");
+    expect(unfilledPlaceholders(missed)).toEqual(["[add which problems are still not fixed]"]);
+    expect(missed).not.toMatch(/but the problems are still not fixed/);
+    const passed = buildMessage("missed_repair", { ...many, repairScheduledFor: "2026-10-16", missedBecause: "appointment" }).body;
+    expect(passed).toContain("did not happen or did not fix everything I reported");
+    expect(unfilledPlaceholders(passed)).toHaveLength(1);
+    const scheduled = buildMessage("confirm_schedule", { ...many, repairScheduledFor: "2026-10-20" }).body;
+    expect(scheduled).toContain("Thank you for scheduling repairs at 123 Example St, Bronx, NY 10452, Apt 4B for");
+    expect(scheduled).toContain("If this visit won't cover everything I reported (no heat or hot water and mold");
+    // Single-problem letters keep their wording.
+    expect(buildMessage("missed_repair", { ...ctx, missedBecause: "says_fixed" }).body).toContain("I was told the repair of no heat or hot water (Radiators cold since Oct 5) at");
+
+    // No singular leftovers anywhere on the ladder.
+    for (const step of ["notice", "reminder", "formal_notice", "guide_311", "ask_date", "confirm_schedule", "offer_access", "missed_repair"] as const) {
+      for (const voice of ["tenant", "abate"] as const) {
+        const { subject, body } = buildMessage(step, { ...many, voice, repairScheduledFor: "2026-10-16" });
+        const text = `${subject}\n${body}`;
+        expect(text, `${step} (${voice})`).not.toMatch(/\bthe problem\b(?!s)|\bthis problem\b|\ba repair\b(?! date)|\bit is still\b|\bit was first\b|\breported it\b|\bremains unrepaired\b/i);
+      }
+    }
+  });
 
   it("writes a factual first notice with a reply-by date", () => {
     const m = buildMessage("notice", ctx);
@@ -218,8 +276,8 @@ describe("templates", () => {
   });
 
   it("says 'up to' when an issue's low end is zero", () => {
-    const est = estimateAbatement({ monthlyRent: 2000, issueType: "other", noticeOn: "2026-09-18", endOn: "2026-10-18" });
-    const m = buildMessage("formal_notice", { ...ctx, issueType: "other", estimate: est });
+    const est = estimateAbatement({ monthlyRent: 2000, issueTypes: ["other"], noticeOn: "2026-09-18", endOn: "2026-10-18" });
+    const m = buildMessage("formal_notice", { ...ctx, issueTypes: ["other"], estimate: est });
     expect(m.body).toMatch(/may be up to \$\d+/);
     expect(m.body).not.toContain("between $0");
   });
