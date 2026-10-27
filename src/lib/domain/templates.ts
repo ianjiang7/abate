@@ -30,8 +30,6 @@ export type TemplateContext = {
   estimate: Estimate;
   /** Dates we sent earlier steps, if any. */
   sentOn: Partial<Record<StepId, IsoDate>>;
-  /** Open HPD violations at the building, when building data is available. */
-  openViolations?: number | null;
   /** From the case agent: one factual sentence about management's latest reply. */
   replyReference?: string | null;
   repairScheduledFor?: IsoDate | null;
@@ -215,11 +213,6 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
       if (ctx.sentOn.reminder) lines.push(`- ${formatFullDate(ctx.sentOn.reminder)}: written follow-up sent`);
       lines.push(`- ${formatFullDate(ctx.today)}: still not repaired${ctx.daysSinceReport > 0 ? `, ${days(ctx.daysSinceReport)} after ${w.itWas} first reported` : ""}`);
 
-      const violations =
-        ctx.openViolations && ctx.openViolations > 0
-          ? `\n\nNYC HPD records currently list ${ctx.openViolations} open ${ctx.openViolations === 1 ? "violation" : "violations"} at this building.`
-          : "";
-
       const warranty =
         estimateParagraph(ctx) ||
         `Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period ${w.aCondition} unrepaired.`;
@@ -230,7 +223,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
           greeting(ctx),
           `This is a formal notice${byAbate(ctx) ? `, sent on behalf of ${ctx.tenantName},` : ""} about ${problem(ctx)} at ${where}, which ${w.remains} unrepaired.`,
           `Timeline:\n${lines.join("\n")}`,
-          `${referenceLine(ctx)}${warranty}${violations}`,
+          `${referenceLine(ctx)}${warranty}`,
           `Please make the ${w.repair} and confirm the repair date in writing by ${replyBy(ctx)}.`,
           recordLine(ctx),
           signature(ctx),

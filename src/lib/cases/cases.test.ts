@@ -113,13 +113,13 @@ describe("view helpers", () => {
 
     // The notice is the first report only if management hadn't already written back.
     const ctxFor = (messages: MessageRecord[]) =>
-      templateContext({ record: notTold, messages, today: "2026-10-18", estimate: caseEstimate(notTold, messages, "2026-10-18"), openViolations: null });
+      templateContext({ record: notTold, messages, today: "2026-10-18", estimate: caseEstimate(notTold, messages, "2026-10-18") });
     expect(ctxFor([draftOnly]).noticeIsFirstReport).toBe(true);
     const earlyReply = msg({ direction: "incoming", receivedAt: "2026-10-17T18:00:00Z", classification: "scheduled", classifiedBy: "team" });
     expect(ctxFor([{ ...draftOnly, withdrawnAt: "2026-10-17T18:00:00Z" }, earlyReply]).noticeIsFirstReport).toBe(false);
     const laterReply = msg({ direction: "incoming", receivedAt: "2026-10-19T18:00:00Z", classification: "acknowledged_no_date", classifiedBy: "team" });
     expect(ctxFor([sent, laterReply]).noticeIsFirstReport).toBe(true);
-    expect(templateContext({ record, messages: [], today: "2026-10-18", estimate: caseEstimate(record, [], "2026-10-18"), openViolations: null }).noticeIsFirstReport).toBe(false);
+    expect(templateContext({ record, messages: [], today: "2026-10-18", estimate: caseEstimate(record, [], "2026-10-18") }).noticeIsFirstReport).toBe(false);
   });
 
   it("orders the timeline by date, with started and reported first", () => {
@@ -337,7 +337,6 @@ describe("concierge", () => {
       messages: [],
       today: "2026-10-18",
       estimate: estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" }),
-      openViolations: 3,
     });
     const notice = buildMessage("notice", ctx);
     expect(notice.body).toContain("We're writing on behalf of Test Tenant, your tenant at");
@@ -410,7 +409,7 @@ describe("hypothesis 1 split: sender vs dollar figure", () => {
   });
 
   const est = estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" });
-  const ctxFor = (r: typeof record) => templateContext({ record: r, messages: [], today: "2026-10-18", estimate: est, openViolations: null });
+  const ctxFor = (r: typeof record) => templateContext({ record: r, messages: [], today: "2026-10-18", estimate: est });
 
   it("puts the dollar estimate in the first notice only for the dollar group, in either voice", () => {
     const abateWith = buildMessage("notice", ctxFor({ ...record, sendMode: "abate", dollarInNotice: true })).body;

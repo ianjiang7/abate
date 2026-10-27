@@ -13,6 +13,17 @@ portfolio and the Nov 5 memo.
   Testers are asked for their address and rent, so a plain privacy page should help signups and
   get mods to approve posts.
 
+## 2026-10-27: Removed the HPD building lookup
+
+- **What:** the case page no longer shows "Your building's record" (open HPD violations, heat and
+  repair complaints, the registered managing agent), and the formal notice no longer cites the
+  building's open violation count. The Open Data fetching and its cache code are gone.
+- **Why:** to make the MVP simpler. Neither hypothesis depends on it, and it was the slowest, most
+  failure-prone part of the case page.
+- **Kept:** the GeoSearch address autocomplete (neighbor invites need its building ID) and the
+  team's `npm run heat-buildings` flyering script. The `building_cache` table is left in Supabase,
+  unused; it can be dropped after the sprint.
+
 ## 2026-10-27: Ask whether they've reached out to management yet
 
 - **What:** from tester feedback, the "Who have you told?" step now opens with a checkbox, "Yes,

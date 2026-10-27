@@ -30,10 +30,7 @@ export async function sendAction(token: string, _prev: CaseActionState, formData
   const body = text(formData, "body").trim().slice(0, 10_000);
   if (!isStep(step) || !subject || !body) return { ok: false, message: "The message is empty. Add some text and try again." };
   const draftedOn = text(formData, "draftedOn");
-  const violations = text(formData, "openViolations");
-  const shown = isIsoDate(draftedOn)
-    ? { draftedOn, openViolations: /^\d{1,6}$/.test(violations) ? Number(violations) : null }
-    : null;
+  const shown = isIsoDate(draftedOn) ? { draftedOn } : null;
   try {
     const result = await recordStep(token, step, subject, body, shown);
     if (!result.ok) return { ok: false, message: result.message };

@@ -45,7 +45,7 @@ npm run dev
 
 | Command | What it does |
 | --- | --- |
-| `npm test` | Unit tests (estimate, ladder, templates, agent, building data) |
+| `npm test` | Unit tests (estimate, ladder, templates, agent, address lookup) |
 | `npm run typecheck` | TypeScript |
 | `npm run lint` | ESLint |
 | `npm run e2e` | Builds the app and walks the whole tenant flow on a 375px phone screen (needs Supabase). Screenshots land in `test-results/screens/` |

@@ -55,9 +55,9 @@ describe("SoQL helpers", () => {
 
   it("builds the request URL with encoded parameters", () => {
     const url = new URL(
-      soqlUrl("wvxf-dwi5", { select: "class, count(*) as n", where: "bbl='2031520047'", group: "class", limit: 5 }),
+      soqlUrl("erm2-nwe9", { select: "class, count(*) as n", where: "bbl='2031520047'", group: "class", limit: 5 }),
     );
-    expect(url.origin + url.pathname).toBe("https://data.cityofnewyork.us/resource/wvxf-dwi5.json");
+    expect(url.origin + url.pathname).toBe("https://data.cityofnewyork.us/resource/erm2-nwe9.json");
     expect(url.searchParams.get("$select")).toBe("class, count(*) as n");
     expect(url.searchParams.get("$where")).toBe("bbl='2031520047'");
     expect(url.searchParams.get("$group")).toBe("class");
@@ -79,13 +79,13 @@ describe("soql()", () => {
     const fetchMock = vi.fn(async () => Response.json([{ class: "A", n: "2" }]));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(soql("wvxf-dwi5", { select: "class" })).resolves.toEqual([{ class: "A", n: "2" }]);
+    await expect(soql("erm2-nwe9", { select: "class" })).resolves.toEqual([{ class: "A", n: "2" }]);
     const firstInit = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
     expect((firstInit.headers as Record<string, string>)["X-App-Token"]).toBeUndefined();
     expect(firstInit.signal).toBeInstanceOf(AbortSignal);
 
     vi.stubEnv("NYC_OPEN_DATA_APP_TOKEN", "test-token");
-    await soql("wvxf-dwi5", { select: "class" });
+    await soql("erm2-nwe9", { select: "class" });
     const secondInit = (fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1];
     expect((secondInit.headers as Record<string, string>)["X-App-Token"]).toBe("test-token");
   });
@@ -98,16 +98,16 @@ describe("soql()", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const shared = new AbortController();
-    await expect(soql("wvxf-dwi5", {}, { signal: shared.signal })).resolves.toEqual([]);
+    await expect(soql("erm2-nwe9", {}, { signal: shared.signal })).resolves.toEqual([]);
     shared.abort(new DOMException("deadline", "TimeoutError"));
-    await expect(soql("wvxf-dwi5", {}, { signal: shared.signal })).rejects.toThrow("deadline");
+    await expect(soql("erm2-nwe9", {}, { signal: shared.signal })).rejects.toThrow("deadline");
   });
 
   it("throws on an HTTP error or a body that isn't an array", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ message: "bad query" }, { status: 400 })));
-    await expect(soql("wvxf-dwi5", {})).rejects.toThrow("HTTP 400");
+    await expect(soql("erm2-nwe9", {})).rejects.toThrow("HTTP 400");
 
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: true })));
-    await expect(soql("wvxf-dwi5", {})).rejects.toThrow("unexpected body");
+    await expect(soql("erm2-nwe9", {})).rejects.toThrow("unexpected body");
   });
 });

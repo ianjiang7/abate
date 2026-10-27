@@ -75,22 +75,21 @@ live.
    sends), and for Abate: the tenant's email (copied on everything) and their authorization. Then
    their name, rent, an optional contact for reminders (a phone if Abate sends, since we have
    their email), and consent. Each contact is asked for once.
-2. **See the building:** open HPD violations, recent complaints, the registered managing agent.
-3. **See the case:** a timeline that fills itself in, the days unresolved, and the estimated
+2. **See the case:** a timeline that fills itself in, the days unresolved, and the estimated
    abatement so far, labeled as an estimate, not legal advice.
-4. **Each follow-up:** the app drafts it from the reviewed templates.
+3. **Each follow-up:** the app drafts it from the reviewed templates.
    - *Abate sends:* the tenant reviews (and can edit) the draft and taps **Approve and send**. It
      waits in the team's send queue; a teammate sends it from the team Gmail with the tenant CC'd
      and marks it sent. Letters are in Abate's voice ("We're writing on behalf of…").
    - *Tenant sends:* the tenant sends it from their own email (`mailto:`) and taps "I sent it".
      Letters are in the tenant's voice.
-5. **Replies:** management usually replies to the team inbox; a teammate logs it on the team page
+4. **Replies:** management usually replies to the team inbox; a teammate logs it on the team page
    with their reading. Tenants can paste replies they got directly; our team reads those too. The
    reading moves the case along the ladder. Tenants can correct a reading.
-6. **Pause:** a tenant using Abate can pause anytime (with a reason) or switch to sending
+5. **Pause:** a tenant using Abate can pause anytime (with a reason) or switch to sending
    themselves. Both count as backing out for hypothesis 2.
-7. **Invite neighbors** and the **fake door** ("we'll recover this for 25%") as before.
-8. **Private case link** (no login) to come back, follow along, or mark the repair fixed.
+6. **Invite neighbors** and the **fake door** ("we'll recover this for 25%") as before.
+7. **Private case link** (no login) to come back, follow along, or mark the repair fixed.
 
 Data: `cases` (incl. `issue_types`, most serious first, with `issue_type` as the most serious;
 `told_before`; `send_mode`, `send_authorized_at`, `tenant_email`, `paused_at`,
@@ -122,7 +121,7 @@ for the sprint so most cases get through several steps before Oct 29.
 | --- | --- | --- |
 | 1. Notice | Day 0 | The problem, when it started, when management was first told. Asks for a repair date. For the "$" group, also the estimated abatement so far. |
 | 2. Reminder | Day 3 | No response yet. Asks again for a date. |
-| 3. Formal notice | Day 5 | Restates the timeline, includes the estimated abatement so far and the building's open violation count, and may mention the warranty of habitability. |
+| 3. Formal notice | Day 5 | Restates the timeline, includes the estimated abatement so far, and may mention the warranty of habitability. |
 | 4. 311 guide | Day 7 | Shows the tenant how to file a 311 complaint themselves. We never file it. |
 
 A reply changes the path:
@@ -146,15 +145,12 @@ A reply changes the path:
   after the pilot.
 - About 30 made-up sample replies plus `npm run score-agent` measure the agent on its own.
 
-## Building intelligence
+## Address lookup
 
-- Turn the address into a building ID (BBL or BIN) with NYC Planning's free GeoSearch geocoder,
-  then read NYC Open Data: HPD violations, HPD complaints, 311 service requests, and HPD
-  registration contacts. No approval needed. Check dataset IDs and field names against the live
-  API before relying on them.
-- Show open violations by class, heat and repair complaints this season, the registered managing
-  agent, and how long complaints at this building usually stay open.
-- Read-only. Cache results per building instead of calling the APIs on every page view.
+- NYC Planning's free GeoSearch geocoder suggests addresses as tenants type and gives the building
+  ID (BBL or BIN) that neighbor invites use.
+- No HPD or NYC Open Data lookups in the app (cut Oct 27 to keep the MVP simple). The team's
+  `npm run heat-buildings` script still reads 311 heat complaints to pick buildings to flyer.
 
 ## Stretch, only after everything above works
 
@@ -245,7 +241,7 @@ tenant attorney or legal aid before real testers see them.
   phones.
 - **Claude API** (`@anthropic-ai/sdk`, `claude-opus-5-5`) for the case agent. It's billed
   separately from the team's Claude Max plan.
-- **NYC GeoSearch and NYC Open Data** for building intelligence. No key needed at our volume.
+- **NYC GeoSearch** for the address lookup. No key needed at our volume.
 - **Vitest** for the estimate math and the ladder logic; **Playwright** for one phone-size test of
   the whole flow; a script that scores the agent on the sample replies.
 - **No email or SMS service.** Our team sends from the team Gmail ("Open in Gmail" pre-fills it);
@@ -265,7 +261,8 @@ Code map:
 - `src/lib/cases/`: the data layer (`repo.ts`), operations (`service.ts`), validation and the
   view helpers for the case page. Server-only.
 - `src/lib/agent/`: the case agent (Claude reader, stand-in reader, guardrails).
-- `src/lib/building/`: NYC GeoSearch and Open Data, cached in `building_cache`.
+- `src/lib/building/`: the NYC GeoSearch address lookup, plus the 311 helper behind
+  `npm run heat-buildings`.
 - `src/app/`: pages (`/`, `/start`, `/case/[token]`, `/team/[key]`), server actions next to their
   pages, and `api/address` and `api/invite` route handlers.
 - `src/lib/cases/metrics.ts`: the two hypotheses' numbers (pure, tested); the team page shows them.

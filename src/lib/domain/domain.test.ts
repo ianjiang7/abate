@@ -186,7 +186,6 @@ describe("templates", () => {
     daysSinceReport: 12,
     estimate: estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" }),
     sentOn: { notice: "2026-10-12", reminder: "2026-10-15" },
-    openViolations: 14,
   };
 
   it("switches to plural wording when the tenant listed several problems", () => {
@@ -252,12 +251,12 @@ describe("templates", () => {
     expect(m.body).not.toMatch(/\b(abatement|warranty|owed)\b/i);
   });
 
-  it("puts the timeline, estimate and violations in the formal notice, hedged", () => {
+  it("puts the timeline and estimate in the formal notice, hedged", () => {
     const m = buildMessage("formal_notice", ctx);
     expect(m.body).toContain("- October 12, 2026: written notice sent");
     expect(m.body).toContain("warranty of habitability");
     expect(m.body).toContain("may be between $120 and $300");
-    expect(m.body).toContain("14 open violations");
+    expect(m.body).not.toMatch(/violation|HPD/);
     expect(m.body).not.toMatch(/you owe|you are owed|will get|lawsuit|sue/i);
   });
 

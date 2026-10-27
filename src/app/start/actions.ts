@@ -1,9 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { countCasesSince } from "@/lib/cases/repo";
-import { createCase, warmBuilding } from "@/lib/cases/service";
+import { createCase } from "@/lib/cases/service";
 import { newCaseSchema } from "@/lib/cases/validation";
 import { hasDatabase } from "@/lib/db/client";
 
@@ -53,8 +52,6 @@ export async function createCaseAction(_prev: StartState, formData: FormData): P
     }
     const created = await createCase(parsed.data, photos, { isTest });
     token = created.token;
-    const { bbl, bin } = parsed.data;
-    after(() => warmBuilding(bbl, bin));
   } catch {
     return { message: "Something went wrong saving your case. Please try again." };
   }

@@ -66,8 +66,7 @@ One flow on a phone-first web page, plus a team page that runs the concierge.
 
 1. **Start a case** in about 5 minutes: address, issue, dates, rent, management contact, a
    photo if they have one, and **who sends the follow-ups** (Abate's team, or the tenant).
-2. **See the building** (HPD violations, complaints, managing agent) and **the case** (timeline
-   and a growing estimate).
+2. **See the case** (timeline and a growing estimate).
 3. **Each follow-up** on the ladder (notice day 0, reminder day 3, formal notice with the dollar
    figure day 5, 311 guide day 7): the tenant approves the draft, and our team sends it from the
    team Gmail with the tenant copied. Self-send tenants send it from their own email.
@@ -142,7 +141,7 @@ see.
 - **Stack:** Next.js, TypeScript and Tailwind; Supabase for the database and photo storage;
   Vercel for a real link; Vitest and Playwright for tests.
 - **AI and data:** the Claude API reads replies in the background only, so we can compare it
-  with our team after the pilot; NYC Open Data for building records (free).
+  with our team after the pilot; NYC GeoSearch for the address lookup (free).
 - **Process:** plan, cut, one feature per request, the agent clicks through at phone width,
   commit. A second agent reviews each change.
 - **Measurement:** the team page computes both hypotheses' numbers live from Supabase; a Google

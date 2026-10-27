@@ -98,9 +98,8 @@ export function templateContext(args: {
   messages: MessageRecord[];
   today: IsoDate;
   estimate: Estimate;
-  openViolations: number | null;
 }): TemplateContext {
-  const { record, messages, today, estimate, openViolations } = args;
+  const { record, messages, today, estimate } = args;
   return {
     today,
     tenantName: record.tenantName,
@@ -119,7 +118,6 @@ export function templateContext(args: {
     daysSinceReport: estimate.days,
     estimate,
     sentOn: sentOnByStep(messages),
-    openViolations,
     replyReference: pendingReplyReference(messages),
     repairScheduledFor: record.repairScheduledFor,
     missedBecause: latestIncoming(messages)?.classification === "says_fixed" ? "says_fixed" : "appointment",

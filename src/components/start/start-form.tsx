@@ -71,7 +71,7 @@ const EMPTY: Fields = {
 type Photo = { id: string; file: File; url: string };
 
 const STEPS = [
-  { title: "Where do you live?", subtitle: "We'll look up your building's record with the city.", fields: ["address", "unit"] },
+  { title: "Where do you live?", subtitle: "It goes on every message, so management knows which apartment.", fields: ["address", "unit"] },
   { title: "What needs fixing?", subtitle: "Pick everything that applies. A photo helps if you have one.", fields: ["issueTypes", "issueDescription", "startedOn", "photos"] },
   { title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName"] },
   { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized"] },

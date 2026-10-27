@@ -1,7 +1,6 @@
 import "server-only";
 import { after } from "next/server";
 import { readReply } from "@/lib/agent";
-import { getBuildingSummary } from "@/lib/building";
 import { daysBetween, nyDate, type IsoDate } from "@/lib/domain/dates";
 import { issuesPhrase, type ReportChannelId } from "@/lib/domain/issues";
 import { dueSummary, nextAction, type ReplyCategory, type StepId } from "@/lib/domain/ladder";
@@ -70,16 +69,6 @@ export async function createCase(input: NewCaseInput, photos: File[], opts: { is
   return { ...created, uploaded };
 }
 
-/** Warms the building cache so the first case page load is fast. Never throws. */
-export async function warmBuilding(bbl: string | null, bin: string | null) {
-  if (!bbl) return;
-  try {
-    await getBuildingSummary(bbl, bin);
-  } catch {
-    // building data is optional
-  }
-}
-
 /** Recomputes the next ladder step and stores it on the case for teammates. */
 export async function refreshNextStep(record: CaseRecord, messages?: MessageRecord[]) {
   const msgs = messages ?? (await listMessages(record.id));
@@ -89,28 +78,13 @@ export async function refreshNextStep(record: CaseRecord, messages?: MessageReco
   await updateCase(record.id, { next_step: nextStep, next_due_on: nextDueOn });
 }
 
-/** The draft for a step, built from the reviewed templates. Pass `openViolations` to reuse the count the tenant saw. */
-export async function draftFor(
-  record: CaseRecord,
-  messages: MessageRecord[],
-  step: StepId,
-  today: IsoDate,
-  shown?: { openViolations: number | null },
-): Promise<DraftMessage> {
-  const estimate = caseEstimate(record, messages, today);
-  let openViolations: number | null = shown ? shown.openViolations : null;
-  if (!shown && step === "formal_notice" && record.bbl) {
-    try {
-      openViolations = (await getBuildingSummary(record.bbl, record.bin))?.openViolations.total ?? null;
-    } catch {
-      openViolations = null;
-    }
-  }
-  return buildMessage(step, templateContext({ record, messages, today, estimate, openViolations }));
+/** The draft for a step, built from the reviewed templates. */
+export function draftFor(record: CaseRecord, messages: MessageRecord[], step: StepId, today: IsoDate): DraftMessage {
+  return buildMessage(step, templateContext({ record, messages, today, estimate: caseEstimate(record, messages, today) }));
 }
 
-/** What the composer showed: the day it was drafted and the violation count it used. */
-export type ShownDraft = { draftedOn: IsoDate; openViolations: number | null };
+/** What the composer showed: the day it was drafted. */
+export type ShownDraft = { draftedOn: IsoDate };
 
 /**
  * The tenant finished a step. In "self" mode they sent it from their own email, so it's sent now.
@@ -134,7 +108,7 @@ export async function recordStep(token: string, step: StepId, subject: string, b
 
   // Rebuild the draft exactly as the tenant saw it (a tab left open overnight still compares fairly).
   const draftedOn = shown && Math.abs(daysBetween(shown.draftedOn, today)) <= 1 ? shown.draftedOn : today;
-  const draft = await draftFor(record, messages, step, draftedOn, shown ? { openViolations: shown.openViolations } : undefined);
+  const draft = draftFor(record, messages, step, draftedOn);
   const edited = draftWasEdited(draft, { subject, body });
   // When this step became ready, for hypothesis 2's "approved within a day".
   const readyOn = readyOnFor(step, action.dueOn, record, all, today);

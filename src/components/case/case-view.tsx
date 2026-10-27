@@ -1,11 +1,9 @@
 import { MapPin } from "lucide-react";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { IssueIcon } from "@/components/issue-icon";
 import { Badge, Notice } from "@/components/ui/card";
 import { isCaseToken } from "@/lib/cases/ids";
 import { getCaseBundle } from "@/lib/cases/repo";
-import { getBuildingSummary } from "@/lib/building";
 import { draftFor } from "@/lib/cases/service";
 import { buildTimeline, caseEstimate, clockStartOn, ladderInputs, ladderProgress, liveMessages, messageTime } from "@/lib/cases/view";
 import { hasDatabase } from "@/lib/db/client";
@@ -14,12 +12,10 @@ import { formatDollars } from "@/lib/domain/estimate";
 import { getIssueType, mostSeriousIssue } from "@/lib/domain/issues";
 import { nextAction, TIMED_STEPS } from "@/lib/domain/ladder";
 import { trackingAddress } from "@/lib/domain/mailto";
-import { BuildingCard } from "./building-card";
 import { EstimateCard } from "./estimate-card";
 import { NextStepCard, type LatestReply } from "./next-step-card";
 import { PhotosCard } from "./photos-card";
 import { HelpCard, InviteCard, SaveLinkCard, TrackView } from "./share-cards";
-import { CardSkeleton } from "./skeletons";
 import { TimelineCard } from "./timeline-card";
 
 export async function CaseView({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -56,17 +52,7 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
           ? "Abate is paused, so management hasn't been told yet."
           : "";
 
-  // The formal notice cites the building's open violations; look the count up once and use the same
-  // number for the draft and for judging later whether the tenant edited it.
-  let openViolations: number | null = null;
-  if (action.kind === "send" && action.step === "formal_notice" && record.bbl) {
-    try {
-      openViolations = (await getBuildingSummary(record.bbl, record.bin))?.openViolations.total ?? null;
-    } catch {
-      openViolations = null;
-    }
-  }
-  const draft = action.kind === "send" ? await draftFor(record, messages, action.step, today, { openViolations }) : null;
+  const draft = action.kind === "send" ? draftFor(record, messages, action.step, today) : null;
   const stepIndex = action.kind === "send" ? TIMED_STEPS.findIndex((s) => s.step === action.step) : -1;
 
   // The latest reply, if we haven't answered it yet, so the tenant can see and correct how it was read.
@@ -133,7 +119,6 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         fixedSummary={fixedSummary}
         hasContact={Boolean(record.tenantContact || record.tenantEmail)}
         draftedOn={today}
-        openViolations={openViolations}
         sendMode={record.sendMode}
         tenantEmail={record.tenantEmail}
         severalProblems={record.issueTypes.length > 1}
@@ -147,10 +132,6 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
 
       {/* The 25% offer only makes sense when there may be money to recover. */}
       {(record.status === "fixed" && estimate.high > 0) || action.kind === "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize /> : null}
-
-      <Suspense fallback={<CardSkeleton />}>
-        <BuildingCard bbl={record.bbl} bin={record.bin} />
-      </Suspense>
 
       <TimelineCard items={buildTimeline(record, messages)} progress={ladderProgress(messages, action.kind === "send" ? action.step : null)} today={today} />
 

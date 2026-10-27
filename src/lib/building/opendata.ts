@@ -36,11 +36,7 @@ import { isIsoDate, type IsoDate } from "@/lib/domain/dates";
 export const OPEN_DATA_BASE = "https://data.cityofnewyork.us/resource";
 
 export const DATASETS = {
-  hpdViolations: "wvxf-dwi5",
-  hpdComplaints: "ygpa-z7cr",
   serviceRequests311: "erm2-nwe9",
-  hpdRegistrations: "tesw-yqqr",
-  hpdRegistrationContacts: "feu5-w2e2",
 } as const;
 
 export type DatasetId = (typeof DATASETS)[keyof typeof DATASETS];

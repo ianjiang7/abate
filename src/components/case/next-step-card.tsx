@@ -36,9 +36,8 @@ export type NextStepProps = {
   fixedSummary: string | null;
   /** Whether teammates have a phone or email to send reminders to. */
   hasContact: boolean;
-  /** The New York date the draft was built for, and the violation count it used, for fair edit tracking. */
+  /** The New York date the draft was built for, for fair edit tracking. */
   draftedOn: string;
-  openViolations: number | null;
   /** "abate": the team sends approved messages from the team inbox. "self": the tenant sends them. */
   sendMode: "abate" | "self";
   tenantEmail: string | null;
@@ -190,7 +189,7 @@ function SendStep(props: NextStepProps & { action: Extract<NextAction, { kind: "
   );
 }
 
-function Composer({ token, to, cc, step, draft, draftedOn, openViolations, sendMode, tenantEmail }: NextStepProps & { step: StepId; draft: { subject: string; body: string } }) {
+function Composer({ token, to, cc, step, draft, draftedOn, sendMode, tenantEmail }: NextStepProps & { step: StepId; draft: { subject: string; body: string } }) {
   const byAbate = sendMode === "abate";
   const [subject, setSubject] = useState(draft.subject);
   const [body, setBody] = useState(draft.body);
@@ -310,7 +309,6 @@ function Composer({ token, to, cc, step, draft, draftedOn, openViolations, sendM
         <form action={formAction} className="mt-5 grid gap-2.5">
           <input type="hidden" name="step" value={step} />
           <input type="hidden" name="draftedOn" value={draftedOn} />
-          <input type="hidden" name="openViolations" value={openViolations ?? ""} />
           <input type="hidden" name="subject" value={subject} />
           <input type="hidden" name="body" value={body} />
           {/* Stays focusable (aria-disabled) so screen-reader users hear why it can't be used yet. */}
@@ -347,7 +345,6 @@ function Composer({ token, to, cc, step, draft, draftedOn, openViolations, sendM
         <form action={formAction} className="mt-5 rounded-2xl bg-lavender/70 p-4">
           <input type="hidden" name="step" value={step} />
           <input type="hidden" name="draftedOn" value={draftedOn} />
-          <input type="hidden" name="openViolations" value={openViolations ?? ""} />
           <input type="hidden" name="subject" value={subject} />
           <input type="hidden" name="body" value={body} />
           <p className="font-semibold">Did you send it?</p>
