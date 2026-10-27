@@ -597,8 +597,11 @@ export function StartForm() {
                   />
                   <span className="text-[14px] leading-relaxed text-slate">
                     <span className="font-semibold text-ink">I agree.</span> Abate can use what I share to draft my messages. Our team reads every reply from
-                    management, and an outside AI service (Anthropic&apos;s Claude) also reads each reply so we can compare it with our team. Abate isn&apos;t a law
-                    firm, and estimates aren&apos;t legal advice.
+                    management, and an outside AI service (Anthropic&apos;s Claude) also reads each reply so we can compare it with our team. We delete it when the pilot ends.{" "}
+                    <a href="/privacy" target="_blank" className="font-semibold text-ink underline decoration-periwinkle underline-offset-4">
+                      Privacy details
+                    </a>
+                    . Abate isn&apos;t a law firm, and estimates aren&apos;t legal advice.
                   </span>
                 </label>
                 {errors.aiConsent ? (

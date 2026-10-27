@@ -49,8 +49,9 @@ export default function Home() {
                 with the city.
               </Step>
               <Step n={2} icon={<Send className="size-5" />} title="We send every follow-up">
-                A written notice, a reminder, a formal notice, and help filing with 311, each on schedule. You approve each
-                one, and our team sends it and copies you. Rather send them yourself? You can.
+                A written notice, a reminder and a formal notice, each on schedule. You approve each one, and our team sends
+                it and copies you. If it still isn&apos;t fixed, we show you how to file with 311 yourself. Rather send them
+                yourself? You can.
               </Step>
               <Step n={3} icon={<BellRing className="size-5" />} title="We read their replies">
                 When management answers, our team reads it and sets up the right next step, while your estimate of what you
@@ -73,7 +74,10 @@ export default function Home() {
               Nothing reaches your landlord until you approve it, and you can pause anytime.
             </Trust>
             <Trust icon={<Lock className="size-5" />} title="Private by default">
-              Your case lives at a private link. No account, no password.
+              Your case lives at a private link. No account, no password. We never sell your information.{" "}
+              <Link href="/privacy" className="font-semibold text-ink underline decoration-periwinkle underline-offset-4">
+                How we handle your data
+              </Link>
             </Trust>
             <Trust icon={<CheckCircle2 className="size-5" />} title="Facts, not threats">
               Every message sticks to what happened and when. It&apos;s calm, clear and hard to ignore.
@@ -95,7 +99,12 @@ export default function Home() {
       <footer className="border-t border-line/70">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 px-5 py-8 text-sm text-slate sm:flex-row sm:justify-between">
           <p>Abate is a student project at NYU Stern, piloting with NYC tenants.</p>
-          <p>Not a law firm. Nothing here is legal advice.</p>
+          <p>
+            Not a law firm. Nothing here is legal advice. ·{" "}
+            <Link href="/privacy" className="underline underline-offset-4">
+              Privacy
+            </Link>
+          </p>
         </div>
       </footer>
     </div>

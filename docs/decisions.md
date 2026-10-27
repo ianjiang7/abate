@@ -3,6 +3,16 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-27: Privacy page and accurate 311 wording before recruiting on Reddit
+
+- **What:** added `/privacy` (what we collect, who sees it, where it's kept, deleting it when the
+  pilot ends), linked from the landing page and the consent box. The landing page now says we show
+  tenants how to file with 311 themselves, instead of "help filing with 311".
+- **Why:** a review of the recruiting post found the post promised things the site didn't say
+  (AI processing, deleting data) and the site's 311 wording could read as if we file for tenants.
+  Testers are asked for their address and rent, so a plain privacy page should help signups and
+  get mods to approve posts.
+
 ## 2026-10-24: Tenants can pick several problems
 
 - **What:** the "What needs fixing?" cards are multi-select. Cases store every problem picked
