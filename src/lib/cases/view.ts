@@ -1,7 +1,7 @@
 // Pure helpers that turn a case and its messages into what the case page shows.
 
 import { nyDate, type IsoDate } from "@/lib/domain/dates";
-import type { Estimate } from "@/lib/domain/estimate";
+import { estimateAbatement, type Estimate } from "@/lib/domain/estimate";
 import { getIssueType, reportChannelPhrase } from "@/lib/domain/issues";
 import { replyCategoryLabel, STEP_LABELS, TIMED_STEPS, type LadderCase, type LadderMessage, type StepId } from "@/lib/domain/ladder";
 import type { TemplateContext } from "@/lib/domain/templates";
@@ -19,6 +19,35 @@ export function isPendingSend(m: MessageRecord): boolean {
 /** Messages that count: withdrawn approvals (never sent) are kept only for measurement. */
 export function liveMessages(messages: MessageRecord[]): MessageRecord[] {
   return messages.filter((m) => !m.withdrawnAt);
+}
+
+/**
+ * The day management was first told, which starts the estimate's clock. A tenant who hadn't told
+ * management before starting the case tells them with the first notice, so the clock starts the
+ * day that notice is sent; until then it hasn't started (null).
+ */
+export function clockStartOn(record: CaseRecord, messages: MessageRecord[]): IsoDate | null {
+  if (record.toldBefore) return record.firstReportedOn;
+  const notice = liveMessages(messages).find((m) => m.direction === "outgoing" && m.step === "notice" && m.sentAt);
+  return notice ? nyDate(notice.sentAt!) : null;
+}
+
+/** Whether management wrote back before the first notice went out (or before now, if it hasn't). */
+function repliedBeforeNotice(messages: MessageRecord[]): boolean {
+  const live = liveMessages(messages);
+  const noticeAt = live.find((m) => m.direction === "outgoing" && m.step === "notice" && m.sentAt)?.sentAt;
+  return live.some((m) => m.direction === "incoming" && (!noticeAt || messageTime(m) < noticeAt));
+}
+
+/** The estimate for a case as of `today` (or its fix date). Zero days until the clock starts. */
+export function caseEstimate(record: CaseRecord, messages: MessageRecord[], today: IsoDate): Estimate {
+  const start = clockStartOn(record, messages);
+  return estimateAbatement({
+    monthlyRent: record.monthlyRent,
+    issueTypes: record.issueTypes,
+    noticeOn: start ?? today,
+    endOn: start ? (record.fixedOn ?? today) : today,
+  });
 }
 
 export function ladderInputs(record: CaseRecord, all: MessageRecord[]): { ladderCase: LadderCase; ladderMessages: LadderMessage[] } {
@@ -81,7 +110,10 @@ export function templateContext(args: {
     issueTypes: record.issueTypes,
     issueDescription: record.issueDescription,
     startedOn: record.startedOn,
-    firstReportedOn: record.firstReportedOn,
+    toldBefore: record.toldBefore,
+    noticeIsFirstReport: !record.toldBefore && !repliedBeforeNotice(messages),
+    // Before the first notice tells management, letters don't cite a first-report date anyway.
+    firstReportedOn: clockStartOn(record, messages) ?? today,
     firstReportedVia: record.firstReportedVia,
     priorFollowups: record.priorFollowups,
     daysSinceReport: estimate.days,
@@ -118,16 +150,21 @@ export function buildTimeline(record: CaseRecord, all: MessageRecord[]): Timelin
       detail: record.issueTypes.map((id) => getIssueType(id).label).join(" + "),
       tone: "neutral",
     },
-    {
-      id: "reported",
-      date: record.firstReportedOn,
-      kind: "reported",
-      title: "First told management",
-      detail:
-        `Reported ${reportChannelPhrase(record.firstReportedVia)}` +
-        (record.priorFollowups > 0 ? `, then followed up ${record.priorFollowups === 1 ? "once" : `${record.priorFollowups} times`}` : ""),
-      tone: "neutral",
-    },
+    // Tenants who hadn't told management before: the first notice (below) is the first report.
+    ...(record.toldBefore
+      ? [
+          {
+            id: "reported",
+            date: record.firstReportedOn,
+            kind: "reported",
+            title: "First told management",
+            detail:
+              `Reported ${reportChannelPhrase(record.firstReportedVia)}` +
+              (record.priorFollowups > 0 ? `, then followed up ${record.priorFollowups === 1 ? "once" : `${record.priorFollowups} times`}` : ""),
+            tone: "neutral",
+          } satisfies TimelineItem,
+        ]
+      : []),
     { id: "joined", date: nyDate(record.createdAt), kind: "joined", title: "Started your Abate case", tone: "brand" },
   ];
 

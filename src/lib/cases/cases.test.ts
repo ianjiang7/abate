@@ -7,7 +7,7 @@ import { estimateAbatement } from "@/lib/domain/estimate";
 import { nextAction } from "@/lib/domain/ladder";
 import { buildMessage } from "@/lib/domain/templates";
 import { computeMetrics } from "./metrics";
-import { buildTimeline, ladderInputs, ladderProgress, pendingReplyReference, sentOnByStep, templateContext } from "./view";
+import { buildTimeline, caseEstimate, clockStartOn, ladderInputs, ladderProgress, pendingReplyReference, sentOnByStep, templateContext } from "./view";
 
 const record: CaseRecord = {
   id: "c1",
@@ -22,6 +22,7 @@ const record: CaseRecord = {
   issueTypes: ["heat"],
   issueDescription: null,
   startedOn: "2026-10-05",
+  toldBefore: true,
   firstReportedOn: "2026-10-06",
   firstReportedVia: "text",
   priorFollowups: 2,
@@ -94,6 +95,31 @@ describe("view helpers", () => {
     classification: "acknowledged_no_date",
     classificationSummary: "Says they'll look into it.",
     replyReference: "On October 19 you wrote that you would look into it.",
+  });
+
+  it("starts the estimate's clock with the first notice when management hadn't been told", () => {
+    const notTold = { ...record, toldBefore: false, firstReportedOn: "2026-10-17" };
+    const draftOnly = msg({ step: "notice", approvedAt: "2026-10-17T15:00:00Z" });
+    expect(clockStartOn(notTold, [draftOnly])).toBeNull();
+    expect(caseEstimate(notTold, [draftOnly], "2026-10-25").days).toBe(0);
+    expect(caseEstimate(notTold, [draftOnly], "2026-10-25").perDayHigh).toBeGreaterThan(0);
+    const sent = msg({ step: "notice", approvedAt: "2026-10-17T15:00:00Z", sentAt: "2026-10-18T16:00:00Z" });
+    expect(clockStartOn(notTold, [sent])).toBe("2026-10-18");
+    expect(caseEstimate(notTold, [sent], "2026-10-25").days).toBe(7);
+    // The timeline has no separate "first told management" item; the notice is the first report.
+    expect(buildTimeline(notTold, [sent]).map((i) => i.kind)).not.toContain("reported");
+    // Tenants who told them before keep their own date.
+    expect(clockStartOn(record, [])).toBe(record.firstReportedOn);
+
+    // The notice is the first report only if management hadn't already written back.
+    const ctxFor = (messages: MessageRecord[]) =>
+      templateContext({ record: notTold, messages, today: "2026-10-18", estimate: caseEstimate(notTold, messages, "2026-10-18"), openViolations: null });
+    expect(ctxFor([draftOnly]).noticeIsFirstReport).toBe(true);
+    const earlyReply = msg({ direction: "incoming", receivedAt: "2026-10-17T18:00:00Z", classification: "scheduled", classifiedBy: "team" });
+    expect(ctxFor([{ ...draftOnly, withdrawnAt: "2026-10-17T18:00:00Z" }, earlyReply]).noticeIsFirstReport).toBe(false);
+    const laterReply = msg({ direction: "incoming", receivedAt: "2026-10-19T18:00:00Z", classification: "acknowledged_no_date", classifiedBy: "team" });
+    expect(ctxFor([sent, laterReply]).noticeIsFirstReport).toBe(true);
+    expect(templateContext({ record, messages: [], today: "2026-10-18", estimate: caseEstimate(record, [], "2026-10-18"), openViolations: null }).noticeIsFirstReport).toBe(false);
   });
 
   it("orders the timeline by date, with started and reported first", () => {
@@ -203,6 +229,19 @@ describe("newCaseSchema", () => {
     expect(newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on", mgmtEmail: "repairs@example.com" }).success).toBe(true);
     // Self-send tenants can leave it blank.
     expect(newCaseSchema.safeParse({ ...valid, sendMode: "self" }).success).toBe(true);
+  });
+
+  it("skips the first-report questions when management hasn't been told yet", () => {
+    const notYet = newCaseSchema.safeParse({ ...valid, toldManagement: "no", firstReportedOn: undefined, firstReportedVia: undefined, priorFollowups: undefined });
+    expect(notYet.success).toBe(true);
+    if (notYet.success) expect(notYet.data).toMatchObject({ toldBefore: false, firstReportedOn: undefined, firstReportedVia: undefined, priorFollowups: 0 });
+    // Told them: the date and channel are required.
+    const missing = newCaseSchema.safeParse({ ...valid, toldManagement: "yes", firstReportedOn: undefined, firstReportedVia: undefined });
+    expect(missing.success).toBe(false);
+    if (!missing.success) expect(new Set(missing.error.issues.map((i) => String(i.path[0])))).toEqual(new Set(["firstReportedOn", "firstReportedVia"]));
+    // A tab opened before the question existed still counts as "told" when it sent a date.
+    const old = newCaseSchema.safeParse(valid);
+    expect(old.success && old.data.toldBefore).toBe(true);
   });
 
   it("rejects a report date before the problem started", () => {
@@ -329,6 +368,9 @@ describe("metrics", () => {
     const m = computeMetrics([quick, silent, fresh], now);
     expect(m.h1).toMatchObject({ started: 3, judged: 2, responded: 1, waiting: 1, rate: 0.5, pass: true, medianDaysToReply: 2 });
     expect(m.h1.medianBaselineDays).toBe(9); // waits of 9, 7 and 17 days before the first notice
+    // A tenant who hadn't told management before has no earlier wait to compare.
+    const firstContact = { ...fresh, record: { ...fresh.record, id: "d", toldBefore: false, firstReportedOn: "2026-10-23" } };
+    expect(computeMetrics([quick, silent, fresh, firstContact], now).h1.medianBaselineDays).toBe(9);
     expect(m.h1.firstReplyAfterStep).toEqual({ notice: 1 });
     // Approvals: 3 approved (2 within a day of being ready) plus 2 drafts ready for over a day and
     // still unapproved (case a's ask-for-a-date, case b's reminder).

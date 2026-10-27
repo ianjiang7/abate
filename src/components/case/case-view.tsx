@@ -7,10 +7,10 @@ import { isCaseToken } from "@/lib/cases/ids";
 import { getCaseBundle } from "@/lib/cases/repo";
 import { getBuildingSummary } from "@/lib/building";
 import { draftFor } from "@/lib/cases/service";
-import { buildTimeline, ladderInputs, ladderProgress, liveMessages, messageTime } from "@/lib/cases/view";
+import { buildTimeline, caseEstimate, clockStartOn, ladderInputs, ladderProgress, liveMessages, messageTime } from "@/lib/cases/view";
 import { hasDatabase } from "@/lib/db/client";
 import { formatLongDate, formatShortDate, nyDate } from "@/lib/domain/dates";
-import { estimateAbatement, formatDollars } from "@/lib/domain/estimate";
+import { formatDollars } from "@/lib/domain/estimate";
 import { getIssueType, mostSeriousIssue } from "@/lib/domain/issues";
 import { nextAction, TIMED_STEPS } from "@/lib/domain/ladder";
 import { trackingAddress } from "@/lib/domain/mailto";
@@ -42,12 +42,19 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
   const otherIssues = record.issueTypes.filter((id) => id !== issue.id).map((id) => getIssueType(id).label);
   const { ladderCase, ladderMessages } = ladderInputs(record, messages);
   const action = nextAction(ladderCase, ladderMessages, today);
-  const estimate = estimateAbatement({
-    monthlyRent: record.monthlyRent,
-    issueTypes: record.issueTypes,
-    noticeOn: record.firstReportedOn,
-    endOn: record.fixedOn ?? today,
-  });
+  const estimate = caseEstimate(record, messages, today);
+  // Tenants who hadn't told management before: the clock starts when the first notice goes out.
+  const clockStarted = clockStartOn(record, messages) !== null;
+  const clockNote =
+    action.kind === "send" && action.step === "notice"
+      ? record.sendMode === "abate"
+        ? "Approve the notice above so our team can send it."
+        : "Send the notice above to start it."
+      : action.kind === "awaiting_send"
+        ? "Our team is sending your approved notice."
+        : action.kind === "paused"
+          ? "Abate is paused, so management hasn't been told yet."
+          : "";
 
   // The formal notice cites the building's open violations; look the count up once and use the same
   // number for the draft and for judging later whether the tenant edited it.
@@ -71,7 +78,7 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
       : null;
 
   const fixedSummary =
-    record.status === "fixed" && record.fixedOn
+    record.status === "fixed" && record.fixedOn && clockStarted
       ? `It took ${estimate.days === 1 ? "1 day" : `${estimate.days} days`} after you told management.` +
         (estimate.high > 0 ? ` For that stretch you may be owed ${formatDollars(estimate.low)}–${formatDollars(estimate.high)}.` : "")
       : null;
@@ -133,9 +140,13 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         unreadReplyId={last && last.direction === "incoming" && (!last.classification || last.classification === "unclear") ? last.id : null}
       />
 
-      <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} ofSeveral={otherIssues.length > 0} />
+      <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} ofSeveral={otherIssues.length > 0}
+        clockStarted={clockStarted}
+        clockNote={clockNote}
+      />
 
-      {record.status === "fixed" || action.kind === "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize /> : null}
+      {/* The 25% offer only makes sense when there may be money to recover. */}
+      {(record.status === "fixed" && estimate.high > 0) || action.kind === "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize /> : null}
 
       <Suspense fallback={<CardSkeleton />}>
         <BuildingCard bbl={record.bbl} bin={record.bin} />

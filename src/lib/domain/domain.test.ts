@@ -222,6 +222,25 @@ describe("templates", () => {
     }
   });
 
+  it("says the first notice is the first report when management hadn't been told", () => {
+    for (const voice of ["tenant", "abate"] as const) {
+      const notice = buildMessage("notice", { ...ctx, voice, toldBefore: false, noticeIsFirstReport: true, priorFollowups: 0, daysSinceReport: 0 }).body;
+      expect(notice).toContain("The problem started on October 5, 2026, and this is the first time it is being reported to you.");
+      expect(notice).not.toMatch(/first reported it to you on|still not fixed/);
+    }
+    expect(buildMessage("notice", { ...ctx, issueTypes: ["heat", "mold"], toldBefore: false, noticeIsFirstReport: true }).body).toContain(
+      "The problems started on October 5, 2026, and this is the first time they are being reported to you.",
+    );
+    // The formal notice's timeline treats the written notice as the first report.
+    const formal = buildMessage("formal_notice", { ...ctx, toldBefore: false, noticeIsFirstReport: true, firstReportedOn: "2026-10-12" }).body;
+    expect(formal).toContain("- October 12, 2026: written notice sent (first report)");
+    expect(formal).not.toContain("first reported to you by");
+    // Management already wrote back before the notice went out: don't call it the first report.
+    const afterReply = buildMessage("notice", { ...ctx, toldBefore: false, noticeIsFirstReport: false }).body;
+    expect(afterReply).toContain("The problem started on October 5, 2026, and it is still not fixed.");
+    expect(afterReply).not.toMatch(/first time|first reported/);
+  });
+
   it("writes a factual first notice with a reply-by date", () => {
     const m = buildMessage("notice", ctx);
     expect(m.subject).toBe("Repair needed at 123 Example St, Bronx, NY 10452, Apt 4B");

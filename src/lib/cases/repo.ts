@@ -9,7 +9,7 @@ import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_types, issue_description, started_on, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_types, issue_description, started_on, told_before, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
 
 const MESSAGE_COLUMNS =
   "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, claimed_at, withdrawn_at, edited, draft_body, received_at, logged_by, classification, ai_classification, classified_by, classified_at, classification_summary, classification_date, reply_reference, ai_source";
@@ -33,6 +33,7 @@ function toCase(r: Row): CaseRecord {
     issueTypes: sortIssues((Array.isArray(r.issue_types) && r.issue_types.length > 0 ? r.issue_types : [r.issue_type]).filter(isIssueTypeId)),
     issueDescription: str(r.issue_description),
     startedOn: r.started_on as string,
+    toldBefore: r.told_before !== false,
     firstReportedOn: r.first_reported_on as string,
     firstReportedVia: r.first_reported_via as ReportChannelId,
     priorFollowups: Number(r.prior_followups ?? 0),
@@ -93,8 +94,8 @@ function check<T>(result: { data: T; error: { message: string; code?: string } |
 
 /** Inserts a case, retrying if the random token or code collides. */
 export async function insertCase(
-  input: NewCaseInput,
-  extra: { isTest: boolean; invitedByCaseId: string | null; nextStep: string; nextDueOn: string; dollarInNotice: boolean },
+  input: Omit<NewCaseInput, "firstReportedOn" | "firstReportedVia"> & { firstReportedOn: string; firstReportedVia: ReportChannelId },
+  extra: { isTest: boolean; invitedByCaseId: string | null; nextStep: string; nextDueOn: string; dollarInNotice: boolean | null },
 ): Promise<{ id: string; token: string; code: string }> {
   for (let attempt = 0; attempt < 5; attempt++) {
     const token = newCaseToken();
@@ -114,6 +115,7 @@ export async function insertCase(
         issue_types: input.issueTypes,
         issue_description: input.issueDescription,
         started_on: input.startedOn,
+        told_before: input.toldBefore,
         first_reported_on: input.firstReportedOn,
         first_reported_via: input.firstReportedVia,
         prior_followups: input.priorFollowups,

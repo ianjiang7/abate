@@ -43,9 +43,13 @@ export const newCaseSchema = z
       .transform((ids) => sortIssues(ids as IssueTypeId[])),
     issueDescription: optionalText(500),
     startedOn: isoDate,
-    firstReportedOn: isoDate,
-    firstReportedVia: z.string().refine(isReportChannelId, "Choose how you told them."),
-    priorFollowups: z.coerce.number().int().min(0).max(99),
+    // "no": they haven't told management yet, so the first notice is the first report and the
+    // date, channel and follow-up questions are skipped. Missing (a tab opened before this question
+    // existed) means "yes" when a first-report date was sent.
+    toldManagement: z.enum(["yes", "no"]).optional(),
+    firstReportedOn: z.string().optional(),
+    firstReportedVia: z.string().optional(),
+    priorFollowups: z.coerce.number().int().min(0).max(99).optional(),
     mgmtName: optionalText(120),
     mgmtEmail: z
       .string()
@@ -68,6 +72,16 @@ export const newCaseSchema = z
     invite: optionalText(10),
   })
   .transform((v) => (v.sendMode === "self" ? { ...v, tenantEmail: null, sendAuthorized: undefined } : v))
+  .transform(({ toldManagement, ...v }) => {
+    const toldBefore = toldManagement ? toldManagement === "yes" : Boolean(v.firstReportedOn);
+    return {
+      ...v,
+      toldBefore,
+      firstReportedOn: toldBefore ? v.firstReportedOn : undefined,
+      firstReportedVia: toldBefore ? v.firstReportedVia : undefined,
+      priorFollowups: toldBefore ? (v.priorFollowups ?? 0) : 0,
+    };
+  })
   .superRefine((v, ctx) => {
     if (v.sendMode === "abate") {
       // Abate can't send anything without management's address.
@@ -78,8 +92,13 @@ export const newCaseSchema = z
       else if (!z.email().safeParse(v.tenantEmail).success) ctx.addIssue({ code: "custom", path: ["tenantEmail"], message: "That email doesn't look right." });
       if (!v.sendAuthorized) ctx.addIssue({ code: "custom", path: ["sendAuthorized"], message: "Please confirm we can email management for you." });
     }
-    if (v.firstReportedOn < v.startedOn) {
-      ctx.addIssue({ code: "custom", path: ["firstReportedOn"], message: "This is before the problem started." });
+    if (v.toldBefore) {
+      if (!v.firstReportedOn || !isIsoDate(v.firstReportedOn)) {
+        ctx.addIssue({ code: "custom", path: ["firstReportedOn"], message: "Pick the date you first told them." });
+      } else if (v.firstReportedOn < v.startedOn) {
+        ctx.addIssue({ code: "custom", path: ["firstReportedOn"], message: "This is before the problem started." });
+      }
+      if (!isReportChannelId(v.firstReportedVia)) ctx.addIssue({ code: "custom", path: ["firstReportedVia"], message: "Choose how you told them." });
     }
   });
 

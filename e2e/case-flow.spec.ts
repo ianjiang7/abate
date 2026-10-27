@@ -37,7 +37,12 @@ async function shot(page: Page, name: string) {
 const visibleText = (page: Page, text: string | RegExp) => page.getByText(text).filter({ visible: true });
 
 /** Fills the start form through the "who sends" step. Returns on the case page. */
-async function startCase(page: Page, sendMode: "abate" | "self", prefix: string, { photo, alsoMold = false }: { photo: boolean; alsoMold?: boolean }) {
+async function startCase(
+  page: Page,
+  sendMode: "abate" | "self",
+  prefix: string,
+  { photo, alsoMold = false, toldBefore = true }: { photo: boolean; alsoMold?: boolean; toldBefore?: boolean },
+) {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Repair still not fixed/ })).toBeVisible();
   await shot(page, `${prefix}-01-landing`);
@@ -81,11 +86,18 @@ async function startCase(page: Page, sendMode: "abate" | "self", prefix: string,
   }
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 3: who they told
-  await expect(page.getByRole("heading", { name: "Who have you told?" })).toBeVisible();
-  await page.getByLabel("When did you first tell management?").fill(isoDaysAgo(12));
-  await page.locator("label").filter({ hasText: "Text message" }).filter({ visible: true }).click();
-  await page.getByRole("button", { name: "One more" }).click();
+  // Step 3: have they told management? The date questions only show for tenants who have.
+  await expect(page.getByRole("heading", { name: "Have you reached out to management yet?" })).toBeVisible();
+  await expect(page.getByLabel("When did you first tell management?")).toHaveCount(0);
+  if (toldBefore) {
+    await page.getByRole("checkbox", { name: /already reached out/ }).check();
+    await page.getByLabel("When did you first tell management?").fill(isoDaysAgo(12));
+    await page.locator("label").filter({ hasText: "Text message" }).filter({ visible: true }).click();
+    await page.getByRole("button", { name: "One more" }).click();
+  } else {
+    await expect(visibleText(page, /first notice will be the first time management hears about it/)).toBeVisible();
+    await shot(page, `${prefix}-03-not-told`);
+  }
   await page.getByLabel(/Management company or landlord/).fill("Example Property Management");
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -143,10 +155,12 @@ const teamUrl = `/team/${TEAM_KEY}?test=only`;
 const teamItem = (page: Page, code: string) => page.locator("li").filter({ hasText: code }).filter({ visible: true }).first();
 
 test("concierge: the tenant approves, our team sends and reads replies, then the case closes", async ({ page }) => {
-  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true, alsoMold: true });
+  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true, alsoMold: true, toldBefore: false });
   await expect(page.getByRole("heading", { name: "Approve your written notice" })).toBeVisible();
   await expect(visibleText(page, "From:")).toBeVisible();
-  await expect(visibleText(page, /may be owed so far/i)).toBeVisible();
+  // They hadn't told management: the notice is the first report, and the estimate is per day until it goes out.
+  await expect(visibleText(page, /this is the first time they are being reported to you/)).toBeVisible();
+  await expect(visibleText(page, /Approve the notice above so our team can send it/)).toBeVisible();
   await expect(page.getByRole("heading", { name: "Photos", exact: true })).toBeVisible();
   // The most serious problem leads; the other is listed under it.
   await expect(page.getByRole("heading", { level: 1, name: "No heat or hot water" })).toBeVisible();
@@ -157,6 +171,9 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   await page.getByRole("button", { name: "Approve and send" }).click();
   await expect(page.getByRole("heading", { name: "Our team is sending your written notice" })).toBeVisible();
   await expect(visibleText(page, "Written notice approved")).toBeVisible();
+  // Approved but not sent yet: the estimate card says the team is sending it, not "approve".
+  await expect(visibleText(page, /Our team is sending your approved notice/)).toBeVisible();
+  await expect(visibleText(page, /Approve the notice above/)).toHaveCount(0);
   await shot(page, "c-06-approved");
 
   // The team sends it from the team inbox and marks it sent.
@@ -176,6 +193,8 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   await page.goto(caseUrl);
   await expect(page.getByRole("heading", { name: /Next up: reminder on/ })).toBeVisible();
   await expect(visibleText(page, "Written notice sent by Abate")).toBeVisible();
+  // The team sent the first notice, so management has been told and the clock has started.
+  await expect(visibleText(page, /days? since you told management/)).toBeVisible();
 
   // Management writes to the tenant directly; the tenant passes it to the team.
   await page.getByRole("button", { name: "Management replied" }).first().click();
@@ -220,6 +239,9 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
 test("self-send: the tenant sends from their own email", async ({ page }) => {
   const { caseUrl } = await startCase(page, "self", "s", { photo: false });
   await expect(page.getByRole("heading", { name: "Send your written notice" })).toBeVisible();
+  // They told management 12 days ago: the notice cites that, and the estimate already counts those days.
+  await expect(visibleText(page, /first reported it to you on/)).toBeVisible();
+  await expect(visibleText(page, /12 days since you told management/)).toBeVisible();
   // No photo was added, so the case page leaves out the Photos card.
   await expect(page.getByRole("heading", { name: "Photos", exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Copy the message instead" }).click();

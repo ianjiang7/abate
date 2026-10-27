@@ -117,7 +117,8 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       started++;
       const firstSentAt = sent[0].sentAt!;
       const firstSentOn = nyDate(firstSentAt);
-      baselines.push(Math.max(0, daysBetween(record.firstReportedOn, firstSentOn)));
+      // The earlier wait only exists for tenants who had told management before Abate.
+      if (record.toldBefore) baselines.push(Math.max(0, daysBetween(record.firstReportedOn, firstSentOn)));
 
       const replies = live
         .filter((m) => m.direction === "incoming" && (m.receivedAt ?? m.createdAt) >= firstSentAt)

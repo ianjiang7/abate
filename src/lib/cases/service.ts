@@ -3,8 +3,7 @@ import { after } from "next/server";
 import { readReply } from "@/lib/agent";
 import { getBuildingSummary } from "@/lib/building";
 import { daysBetween, nyDate, type IsoDate } from "@/lib/domain/dates";
-import { estimateAbatement } from "@/lib/domain/estimate";
-import { issuesPhrase } from "@/lib/domain/issues";
+import { issuesPhrase, type ReportChannelId } from "@/lib/domain/issues";
 import { dueSummary, nextAction, type ReplyCategory, type StepId } from "@/lib/domain/ladder";
 import { buildMessage, unfilledPlaceholders, type DraftMessage } from "@/lib/domain/templates";
 import { isCaseCode } from "./ids";
@@ -30,7 +29,7 @@ import {
 import { chooseDollarInNotice, draftWasEdited, firstReplyAfterNotice, readyOnFor, receivedAtFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import type { NewCaseInput } from "./validation";
-import { isPendingSend, ladderInputs, liveMessages, messageTime, templateContext } from "./view";
+import { caseEstimate, isPendingSend, ladderInputs, liveMessages, messageTime, templateContext } from "./view";
 
 /**
  * Who decides what a landlord's reply means. "concierge" (the pilot default): our team reads every
@@ -50,14 +49,20 @@ export async function createCase(input: NewCaseInput, photos: File[], opts: { is
   if (input.invite && isCaseCode(input.invite)) {
     invitedByCaseId = (await findBuildingByCode(input.invite))?.id ?? null;
   }
-  const dollarInNotice = chooseDollarInNotice(await countDollarGroups(input.sendMode, opts.isTest), Math.random());
-  const created = await insertCase(input, { isTest: opts.isTest, invitedByCaseId, nextStep: "notice", nextDueOn: today, dollarInNotice });
+  // Tenants who hadn't told management: the first notice is the first report, so there's no earlier
+  // date yet (the estimate starts when the notice is sent) and no dollar figure it could carry.
+  const reported = input.toldBefore
+    ? { firstReportedOn: input.firstReportedOn!, firstReportedVia: input.firstReportedVia as ReportChannelId, priorFollowups: input.priorFollowups }
+    : { firstReportedOn: today, firstReportedVia: "email" as const, priorFollowups: 0 };
+  const dollarInNotice = input.toldBefore ? chooseDollarInNotice(await countDollarGroups(input.sendMode, opts.isTest), Math.random()) : null;
+  const created = await insertCase({ ...input, ...reported }, { isTest: opts.isTest, invitedByCaseId, nextStep: "notice", nextDueOn: today, dollarInNotice });
   const uploaded = photos.length > 0 ? await uploadCasePhotos(created.id, photos) : 0;
   await logEvent(created.id, "case_created", {
     issueTypes: input.issueTypes,
     photos: uploaded,
     invited: Boolean(invitedByCaseId),
-    priorFollowups: input.priorFollowups,
+    toldBefore: input.toldBefore,
+    priorFollowups: reported.priorFollowups,
     hasMgmtEmail: Boolean(input.mgmtEmail),
     sendMode: input.sendMode,
     dollarInNotice,
@@ -92,12 +97,7 @@ export async function draftFor(
   today: IsoDate,
   shown?: { openViolations: number | null },
 ): Promise<DraftMessage> {
-  const estimate = estimateAbatement({
-    monthlyRent: record.monthlyRent,
-    issueTypes: record.issueTypes,
-    noticeOn: record.firstReportedOn,
-    endOn: record.fixedOn ?? today,
-  });
+  const estimate = caseEstimate(record, messages, today);
   let openViolations: number | null = shown ? shown.openViolations : null;
   if (!shown && step === "formal_notice" && record.bbl) {
     try {
@@ -347,7 +347,8 @@ export async function confirmFixed(token: string, fixedOn: IsoDate): Promise<Act
   const record = await findCaseByToken(token);
   if (!record) return NOT_FOUND;
   await updateCase(record.id, { status: "fixed", fixed_on: fixedOn, next_step: null, next_due_on: null });
-  await logEvent(record.id, "marked_fixed", { fixedOn, days: estimateAbatement({ monthlyRent: record.monthlyRent, issueTypes: record.issueTypes, noticeOn: record.firstReportedOn, endOn: fixedOn }).days });
+  const days = caseEstimate({ ...record, fixedOn }, await listMessages(record.id), fixedOn).days;
+  await logEvent(record.id, "marked_fixed", { fixedOn, days });
   return { ok: true };
 }
 

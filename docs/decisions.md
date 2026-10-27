@@ -13,6 +13,21 @@ portfolio and the Nov 5 memo.
   Testers are asked for their address and rent, so a plain privacy page should help signups and
   get mods to approve posts.
 
+## 2026-10-27: Ask whether they've reached out to management yet
+
+- **What:** from tester feedback, the "Who have you told?" step now opens with a checkbox, "Yes,
+  I've already reached out to them about this". Checked: the usual questions (when, how, follow-ups
+  since). Unchecked: those are skipped, and the first notice is the first report ("this is the
+  first time it is being reported to you").
+- **Estimate:** for tenants who hadn't told management, the clock starts the day the first notice
+  is sent. Until then the case page shows the per-day amount instead of a running total. *Why:*
+  the brief counts days from when management was told; counting from when the problem started
+  would overstate what may be owed.
+- **Measurement:** these cases (`told_before = false`) have no earlier chasing to compare against
+  and their first notice can't carry an accrued dollar figure, so they're left out of the
+  with/without-$ comparison (`dollar_in_notice` is null) and of the "earlier wait" baseline. They
+  still count toward the 7-day response rate and hypothesis 2.
+
 ## 2026-10-24: Tenants can pick several problems
 
 - **What:** the "What needs fixing?" cards are multi-select. Cases store every problem picked

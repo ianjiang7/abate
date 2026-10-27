@@ -18,6 +18,10 @@ export type TemplateContext = {
   issueTypes: readonly IssueTypeId[];
   issueDescription?: string | null;
   startedOn: IsoDate;
+  /** Whether management had been told before Abate. Defaults to true. */
+  toldBefore?: boolean;
+  /** Not told before, and no reply came in before the notice went out: the notice is the first report. */
+  noticeIsFirstReport?: boolean;
   firstReportedOn: IsoDate;
   firstReportedVia: ReportChannelId;
   priorFollowups: number;
@@ -174,7 +178,12 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
           byAbate(ctx)
             ? `We're writing on behalf of ${ctx.tenantName}, your tenant at ${where}, about ${w.aRepairThatIs} needed: ${problem(ctx)}.`
             : `I'm writing about ${w.aRepair} needed in my apartment at ${where}: ${problem(ctx)}.`,
-          `${w.Problem} started on ${started}. ${who(ctx)} first reported ${w.it} to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since ${w.itWas} first reported, and ${w.itIs}` : w.ItIs} still not fixed.`,
+          ctx.toldBefore === false
+            ? ctx.noticeIsFirstReport
+              ? `${w.Problem} started on ${started}, and this is the first time ${w.itIs} being reported to you.`
+              : // Management already wrote back before this notice, so don't call it the first report.
+                `${w.Problem} started on ${started}, and ${w.itIs} still not fixed.`
+            : `${w.Problem} started on ${started}. ${who(ctx)} first reported ${w.it} to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since ${w.itWas} first reported, and ${w.itIs}` : w.ItIs} still not fixed.`,
           ...(ctx.estimateInNotice && estimateParagraph(ctx) ? [estimateParagraph(ctx)] : []),
           `Please reply by ${replyBy(ctx)} with the date the ${w.repair} will be made.`,
           recordLine(ctx),
@@ -199,11 +208,10 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
     }
 
     case "formal_notice": {
-      const lines = [
-        `- ${formatFullDate(ctx.startedOn)}: ${w.problem} started`,
-        `- ${firstReported}: first reported to you ${reportChannelPhrase(ctx.firstReportedVia)}`,
-      ];
-      if (ctx.sentOn.notice) lines.push(`- ${formatFullDate(ctx.sentOn.notice)}: written notice sent`);
+      const lines = [`- ${formatFullDate(ctx.startedOn)}: ${w.problem} started`];
+      // When management hadn't been told before, the written notice was the first report.
+      if (ctx.toldBefore !== false) lines.push(`- ${firstReported}: first reported to you ${reportChannelPhrase(ctx.firstReportedVia)}`);
+      if (ctx.sentOn.notice) lines.push(`- ${formatFullDate(ctx.sentOn.notice)}: written notice sent${ctx.noticeIsFirstReport ? " (first report)" : ""}`);
       if (ctx.sentOn.reminder) lines.push(`- ${formatFullDate(ctx.sentOn.reminder)}: written follow-up sent`);
       lines.push(`- ${formatFullDate(ctx.today)}: still not repaired${ctx.daysSinceReport > 0 ? `, ${days(ctx.daysSinceReport)} after ${w.itWas} first reported` : ""}`);
 

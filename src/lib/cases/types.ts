@@ -17,6 +17,12 @@ export type CaseRecord = {
   issueTypes: IssueTypeId[];
   issueDescription: string | null;
   startedOn: IsoDate;
+  /**
+   * Whether management had been told before the case started. When false, the first notice is the
+   * first report: firstReportedOn is the day the case started and the estimate's clock starts when
+   * that notice is sent (see clockStartOn).
+   */
+  toldBefore: boolean;
   firstReportedOn: IsoDate;
   firstReportedVia: ReportChannelId;
   priorFollowups: number;

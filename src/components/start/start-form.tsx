@@ -26,6 +26,8 @@ type Fields = {
   issueTypes: IssueTypeId[];
   issueDescription: string;
   startedOn: string;
+  /** Whether they've already told management. If not, the first notice is the first report. */
+  toldManagement: boolean;
   firstReportedOn: string;
   firstReportedVia: ReportChannelId | "";
   priorFollowups: number;
@@ -50,6 +52,7 @@ const EMPTY: Fields = {
   issueTypes: [],
   issueDescription: "",
   startedOn: "",
+  toldManagement: false,
   firstReportedOn: "",
   firstReportedVia: "",
   priorFollowups: 0,
@@ -70,7 +73,7 @@ type Photo = { id: string; file: File; url: string };
 const STEPS = [
   { title: "Where do you live?", subtitle: "We'll look up your building's record with the city.", fields: ["address", "unit"] },
   { title: "What needs fixing?", subtitle: "Pick everything that applies. A photo helps if you have one.", fields: ["issueTypes", "issueDescription", "startedOn", "photos"] },
-  { title: "Who have you told?", subtitle: "The clock for what you may be owed starts when management was told.", fields: ["firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName"] },
+  { title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName"] },
   { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized"] },
   { title: "Last few details", subtitle: "We use these to sign your messages and estimate what you may be owed.", fields: ["tenantName", "monthlyRent", "tenantContact", "aiConsent"] },
 ] as const;
@@ -90,7 +93,8 @@ function validateStep(step: number, f: Fields, today: string): Record<string, st
     if (!f.startedOn) e.startedOn = f.issueTypes.length > 1 ? "Pick the date the first one started (a guess is fine)." : "Pick the date it started (a guess is fine).";
     else if (today && f.startedOn > today) e.startedOn = "That date is in the future.";
   }
-  if (step === 2) {
+  // Only tenants who already told management answer when and how; for the rest, the first notice tells them.
+  if (step === 2 && f.toldManagement) {
     if (!f.firstReportedOn) e.firstReportedOn = "Pick the date you first told them.";
     else if (today && f.firstReportedOn > today) e.firstReportedOn = "That date is in the future.";
     else if (f.startedOn && f.firstReportedOn < f.startedOn) e.firstReportedOn = f.issueTypes.length > 1 ? "This is before the first problem started." : "This is before the problem started.";
@@ -236,7 +240,10 @@ export function StartForm() {
     const fd = new FormData();
     for (const [key, value] of Object.entries(fields)) {
       if ((key === "tenantEmail" || key === "sendAuthorized") && fields.sendMode !== "abate") continue;
-      if (Array.isArray(value)) {
+      if ((key === "firstReportedOn" || key === "firstReportedVia" || key === "priorFollowups") && !fields.toldManagement) continue;
+      if (key === "toldManagement") {
+        fd.append(key, value ? "yes" : "no");
+      } else if (Array.isArray(value)) {
         for (const v of value) fd.append(key, v);
       } else if (key === "aiConsent" || key === "sendAuthorized") {
         if (value) fd.append(key, "on");
@@ -395,63 +402,85 @@ export function StartForm() {
 
             {step === 2 ? (
               <>
-                <Field label="When did you first tell management?" htmlFor="firstReportedOn" error={errors.firstReportedOn}>
-                  <Input
-                    id="firstReportedOn"
-                    type="date"
-                    value={fields.firstReportedOn}
-                    min={fields.startedOn || undefined}
-                    max={today || undefined}
-                    onChange={(e) => set("firstReportedOn", e.target.value)}
-                    aria-invalid={Boolean(errors.firstReportedOn)}
+                <label className="flex cursor-pointer gap-3 rounded-2xl bg-white p-4 ring-1 ring-line has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
+                  <input
+                    type="checkbox"
+                    checked={fields.toldManagement}
+                    onChange={(e) => set("toldManagement", e.target.checked)}
+                    className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
                   />
-                </Field>
+                  <span className="text-[15px] leading-relaxed">
+                    <span className="font-semibold">Yes, I&apos;ve already reached out to them about this</span>
+                    <span className="block text-sm text-slate">A text, call, email, portal request or a word with the super all count.</span>
+                  </span>
+                </label>
 
-                <fieldset data-invalid={errors.firstReportedVia ? "true" : undefined} aria-describedby={errors.firstReportedVia ? "firstReportedVia-error" : undefined}>
-                  <legend className="text-[15px] font-semibold">How did you tell them?</legend>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {REPORT_CHANNELS.map((c) => {
-                      const active = fields.firstReportedVia === c.id;
-                      return (
-                        <label
-                          key={c.id}
-                          className={cn(
-                            "inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold ring-1 transition",
-                            "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
-                            active ? "bg-ink text-white ring-ink" : "bg-white ring-line hover:ring-periwinkle",
-                          )}
-                        >
-                          <input type="radio" name="firstReportedVia" value={c.id} checked={active} onChange={() => set("firstReportedVia", c.id)} className="sr-only" />
-                          {active ? <Check className="size-4" aria-hidden="true" /> : null}
-                          {c.label}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {errors.firstReportedVia ? (
-                    <p id="firstReportedVia-error" role="alert" className="mt-2 text-sm font-medium text-bad">
-                      {errors.firstReportedVia}
-                    </p>
-                  ) : null}
-                </fieldset>
+                {fields.toldManagement ? (
+                  <>
+                    <Field label="When did you first tell management?" htmlFor="firstReportedOn" error={errors.firstReportedOn}>
+                      <Input
+                        id="firstReportedOn"
+                        type="date"
+                        value={fields.firstReportedOn}
+                        min={fields.startedOn || undefined}
+                        max={today || undefined}
+                        onChange={(e) => set("firstReportedOn", e.target.value)}
+                        aria-invalid={Boolean(errors.firstReportedOn)}
+                      />
+                    </Field>
 
-                <div className="space-y-2">
-                  <p className="text-[15px] font-semibold" id="followups-label">
-                    How many times have you followed up since?
-                  </p>
-                  <div className="flex items-center gap-4" role="group" aria-labelledby="followups-label">
-                    <button type="button" aria-label="One fewer" onClick={() => set("priorFollowups", Math.max(0, fields.priorFollowups - 1))} className="grid size-12 place-items-center rounded-full bg-white ring-1 ring-line hover:bg-lavender">
-                      <Minus className="size-5" />
-                    </button>
-                    <span className="min-w-12 text-center text-2xl font-bold tabular-nums" aria-live="polite">
-                      {fields.priorFollowups}
-                    </span>
-                    <button type="button" aria-label="One more" onClick={() => set("priorFollowups", Math.min(99, fields.priorFollowups + 1))} className="grid size-12 place-items-center rounded-full bg-white ring-1 ring-line hover:bg-lavender">
-                      <Plus className="size-5" />
-                    </button>
-                  </div>
-                  <p className="text-sm text-slate">Texts, calls, emails, knocking on the super&apos;s door: it all counts.</p>
-                </div>
+                    <fieldset data-invalid={errors.firstReportedVia ? "true" : undefined} aria-describedby={errors.firstReportedVia ? "firstReportedVia-error" : undefined}>
+                      <legend className="text-[15px] font-semibold">How did you tell them?</legend>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {REPORT_CHANNELS.map((c) => {
+                          const active = fields.firstReportedVia === c.id;
+                          return (
+                            <label
+                              key={c.id}
+                              className={cn(
+                                "inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold ring-1 transition",
+                                "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
+                                active ? "bg-ink text-white ring-ink" : "bg-white ring-line hover:ring-periwinkle",
+                              )}
+                            >
+                              <input type="radio" name="firstReportedVia" value={c.id} checked={active} onChange={() => set("firstReportedVia", c.id)} className="sr-only" />
+                              {active ? <Check className="size-4" aria-hidden="true" /> : null}
+                              {c.label}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      {errors.firstReportedVia ? (
+                        <p id="firstReportedVia-error" role="alert" className="mt-2 text-sm font-medium text-bad">
+                          {errors.firstReportedVia}
+                        </p>
+                      ) : null}
+                    </fieldset>
+
+                    <div className="space-y-2">
+                      <p className="text-[15px] font-semibold" id="followups-label">
+                        How many times have you followed up since?
+                      </p>
+                      <div className="flex items-center gap-4" role="group" aria-labelledby="followups-label">
+                        <button type="button" aria-label="One fewer" onClick={() => set("priorFollowups", Math.max(0, fields.priorFollowups - 1))} className="grid size-12 place-items-center rounded-full bg-white ring-1 ring-line hover:bg-lavender">
+                          <Minus className="size-5" />
+                        </button>
+                        <span className="min-w-12 text-center text-2xl font-bold tabular-nums" aria-live="polite">
+                          {fields.priorFollowups}
+                        </span>
+                        <button type="button" aria-label="One more" onClick={() => set("priorFollowups", Math.min(99, fields.priorFollowups + 1))} className="grid size-12 place-items-center rounded-full bg-white ring-1 ring-line hover:bg-lavender">
+                          <Plus className="size-5" />
+                        </button>
+                      </div>
+                      <p className="text-sm text-slate">Texts, calls, emails, knocking on the super&apos;s door: it all counts.</p>
+                    </div>
+                  </>
+                ) : (
+                  <Notice tone="brand">
+                    That&apos;s fine. Your first notice will be the first time management hears about it, and the estimate of what you may be owed starts the day
+                    it goes out.
+                  </Notice>
+                )}
 
                 <Field label="Management company or landlord" htmlFor="mgmtName" optional>
                   <Input id="mgmtName" value={fields.mgmtName} onChange={(e) => set("mgmtName", e.target.value)} placeholder="e.g. Acme Property Management" autoComplete="off" maxLength={120} />
