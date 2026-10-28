@@ -29,7 +29,8 @@ export default function PrivacyPage() {
           Only what your follow-ups need: your address and unit, what needs fixing and when it started, a photo if you add one,
           when and how you told management, management&apos;s name and email, your name, your monthly rent (to estimate what you may
           be owed), your email if our team sends for you, an optional phone or email for reminders, and the replies you or
-          management send.
+          management send. On the home page, the start form and this page, we also see which screens you reach (PostHog,
+          below).
         </Section>
 
         <Section title="Who sees it">
@@ -46,16 +47,23 @@ export default function PrivacyPage() {
               never writes to your landlord.
             </li>
             <li>
-              <strong className="text-ink">NYC&apos;s public address lookup</strong> (GeoSearch) gets your street address to find your
-              building&apos;s city record. Your unit, name and case aren&apos;t sent.
+              <strong className="text-ink">NYC&apos;s public address lookup</strong> (GeoSearch) gets the street address you type, to
+              suggest matching addresses and find your building&apos;s ID, which neighbor invites use. Your unit, name and case
+              aren&apos;t sent.
+            </li>
+            <li>
+              <strong className="text-ink">PostHog, our analytics service</strong>, shows us which screens people reach on the home
+              page, the start form and this page, so we can see where people stop. It records taps and scrolling on those screens,
+              but what you type is hidden in recordings. When you create a case, it learns only who sends your follow-ups and how
+              many problems you picked. It never runs on your case page.
             </li>
           </ul>
         </Section>
 
         <Section title="Where it's kept">
           Cases are stored in our database (Supabase) and photos in a private storage bucket. Your case page lives at a private
-          link with no login, so keep the link to yourself. We never sell or share your information, and we don&apos;t use ads or
-          tracking.
+          link with no login, so keep the link to yourself. We never sell or share your information, and we don&apos;t use ads. The
+          only analytics is PostHog, described above.
         </Section>
 
         <Section title="When we delete it">

@@ -28,6 +28,7 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     timeout: 240_000,
     reuseExistingServer: !process.env.CI,
-    env: { E2E_TEST: "1", ABATE_AGENT: "standin", TEAM_KEY },
+    // An empty PostHog key wins over .env.local, so test runs never send analytics.
+    env: { E2E_TEST: "1", ABATE_AGENT: "standin", TEAM_KEY, NEXT_PUBLIC_POSTHOG_KEY: "" },
   },
 });

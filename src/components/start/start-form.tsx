@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Field, Input, MoneyInput, Textarea } from "@/components/ui/field";
+import { track } from "@/lib/analytics/client";
 import type { AddressMatch } from "@/lib/building/types";
 import { resizeImage } from "@/lib/client/resize-image";
 import { useToday } from "@/lib/client/use-today";
@@ -199,6 +200,11 @@ export function StartForm() {
   useEffect(() => {
     headingRef.current?.focus({ preventScroll: true });
     window.scrollTo({ top: 0 });
+  }, [step]);
+
+  // Analytics: which step people reach, by its title. Never their answers.
+  useEffect(() => {
+    track("form_step_viewed", { step: step + 1, title: STEPS[step].title });
   }, [step]);
 
   const switchToSelf = () => {

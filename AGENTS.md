@@ -228,7 +228,9 @@ tenant attorney or legal aid before real testers see them.
   the flow needs. Tell testers that what they share is processed by an AI service, and get their
   consent when they start a case. Keep the photo bucket private. Never log personal data. Never put
   real tenant data in the repo, seeds or tests; use made-up data. Delete tester data after the
-  sprint.
+  sprint. PostHog analytics runs only on `/`, `/start` and `/privacy`: never add it to case or team
+  pages, never put an answer in an event property, and give any text that repeats an answer the
+  `ph-mask` class so session recordings hide it (inputs are masked already).
 - **Secrets** (including `ANTHROPIC_API_KEY`) live in `.env.local`, which is never committed.
   `.env.example` lists variable names only. Set a spending cap on the Anthropic key.
 
@@ -242,6 +244,7 @@ tenant attorney or legal aid before real testers see them.
 - **Claude API** (`@anthropic-ai/sdk`, `claude-opus-5-5`) for the case agent. It's billed
   separately from the team's Claude Max plan.
 - **NYC GeoSearch** for the address lookup. No key needed at our volume.
+- **PostHog** (`posthog-js`) for the signup funnel and session replay on the public pages.
 - **Vitest** for the estimate math and the ladder logic; **Playwright** for one phone-size test of
   the whole flow; a script that scores the agent on the sample replies.
 - **No email or SMS service.** Our team sends from the team Gmail ("Open in Gmail" pre-fills it);
@@ -266,6 +269,8 @@ Code map:
 - `src/app/`: pages (`/`, `/start`, `/case/[token]`, `/team/[key]`), server actions next to their
   pages, and `api/address` and `api/invite` route handlers.
 - `src/lib/cases/metrics.ts`: the two hypotheses' numbers (pure, tested); the team page shows them.
+- `src/lib/analytics/` and `src/components/analytics.tsx`: PostHog funnel events and replay on the
+  public pages; what it may see is in `privacy.ts` (pure, tested).
 - `src/components/`: UI. Design tokens (Sprint 1 indigo palette, Work Sans) live in
   `src/app/globals.css`.
 
