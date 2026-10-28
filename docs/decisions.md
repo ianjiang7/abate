@@ -16,7 +16,7 @@ portfolio and the Nov 5 memo.
   phone or email, our only way to reach them). Tenants can add any of these to a draft before
   approving it.
 - **Data:** no migration. Cases that were told before store `first_reported_via = "other"`
-  (letters read "first reported it to you on <date> directly") and `prior_followups = 0`. Neither
+  (letters leave it out: "first reported it to you on <date>") and `prior_followups = 0`. Neither
   feeds the hypothesis numbers.
 - **Why:** our professor's feedback (Oct 28) and testers dropping off: the form asked for too much
   up front, and its very first question was the tenant's home address. Most tenants have never

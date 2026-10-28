@@ -80,7 +80,7 @@ export const newCaseSchema = z
       ...v,
       toldBefore,
       firstReportedOn: toldBefore ? v.firstReportedOn : undefined,
-      // Not asked anymore: "other" reads as "first reported it to you on <date> directly".
+      // Not asked anymore: letters leave "other" out ("first reported it to you on <date>").
       firstReportedVia: toldBefore ? v.firstReportedVia || "other" : undefined,
       priorFollowups: toldBefore ? (v.priorFollowups ?? 0) : 0,
     };
