@@ -44,10 +44,12 @@ export const newCaseSchema = z
     issueDescription: optionalText(500),
     startedOn: isoDate,
     // "no": they haven't told management yet, so the first notice is the first report and the
-    // date, channel and follow-up questions are skipped. Missing (a tab opened before this question
-    // existed) means "yes" when a first-report date was sent.
+    // date question is skipped. Missing (a tab opened before this question existed) means "yes"
+    // when a first-report date was sent.
     toldManagement: z.enum(["yes", "no"]).optional(),
     firstReportedOn: z.string().optional(),
+    // The form stopped asking how they told management and how often they followed up (Oct 28, to
+    // shorten it). Older tabs may still send both.
     firstReportedVia: z.string().optional(),
     priorFollowups: z.coerce.number().int().min(0).max(99).optional(),
     mgmtName: optionalText(120),
@@ -78,11 +80,16 @@ export const newCaseSchema = z
       ...v,
       toldBefore,
       firstReportedOn: toldBefore ? v.firstReportedOn : undefined,
-      firstReportedVia: toldBefore ? v.firstReportedVia : undefined,
+      // Not asked anymore: "other" reads as "first reported it to you on <date> directly".
+      firstReportedVia: toldBefore ? v.firstReportedVia || "other" : undefined,
       priorFollowups: toldBefore ? (v.priorFollowups ?? 0) : 0,
     };
   })
   .superRefine((v, ctx) => {
+    // "Something else" reads as "a repair problem" in letters, so the tenant says what it is.
+    if (v.issueTypes.includes("other") && !v.issueDescription) {
+      ctx.addIssue({ code: "custom", path: ["issueDescription"], message: "Say what needs fixing." });
+    }
     if (v.sendMode === "abate") {
       // Abate can't send anything without management's address.
       if (!v.mgmtEmail) {

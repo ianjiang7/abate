@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Building2, Camera, Check, Minus, Plus, Users, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Camera, Check, Users, X } from "lucide-react";
 import Link from "next/link";
 import { unstable_isUnrecognizedActionError, unstable_rethrow } from "next/navigation";
 import { startTransition, useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createCaseAction, type StartState } from "@/app/start/actions";
 import { Logo } from "@/components/brand/logo";
+import { EstimateCard } from "@/components/case/estimate-card";
 import { IssueIcon } from "@/components/issue-icon";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/card";
@@ -14,7 +15,8 @@ import { Field, Input, MoneyInput, Textarea } from "@/components/ui/field";
 import type { AddressMatch } from "@/lib/building/types";
 import { resizeImage } from "@/lib/client/resize-image";
 import { useToday } from "@/lib/client/use-today";
-import { ISSUE_TYPES, REPORT_CHANNELS, type IssueTypeId, type ReportChannelId } from "@/lib/domain/issues";
+import { estimateAbatement } from "@/lib/domain/estimate";
+import { ISSUE_TYPES, mostSeriousIssue, type IssueTypeId } from "@/lib/domain/issues";
 
 type Fields = {
   address: string;
@@ -24,14 +26,12 @@ type Fields = {
   bin: string;
   /** Every problem picked; tenants can choose several. */
   issueTypes: IssueTypeId[];
+  /** Only asked for "Something else", which letters can't name on their own. */
   issueDescription: string;
   startedOn: string;
   /** Whether they've already told management. If not, the first notice is the first report. */
   toldManagement: boolean;
   firstReportedOn: string;
-  firstReportedVia: ReportChannelId | "";
-  priorFollowups: number;
-  mgmtName: string;
   mgmtEmail: string;
   tenantName: string;
   monthlyRent: string;
@@ -54,9 +54,6 @@ const EMPTY: Fields = {
   startedOn: "",
   toldManagement: false,
   firstReportedOn: "",
-  firstReportedVia: "",
-  priorFollowups: 0,
-  mgmtName: "",
   mgmtEmail: "",
   tenantName: "",
   monthlyRent: "",
@@ -70,12 +67,14 @@ const EMPTY: Fields = {
 
 type Photo = { id: string; file: File; url: string };
 
+// Nothing that identifies the tenant comes before the estimate: the problem, the dates and the rent
+// come first, then who sends, and their name and address last.
 const STEPS = [
-  { title: "Where do you live?", subtitle: "It goes on every message, so management knows which apartment.", fields: ["address", "unit"] },
-  { title: "What needs fixing?", subtitle: "Pick everything that applies. A photo helps if you have one.", fields: ["issueTypes", "issueDescription", "startedOn", "photos"] },
-  { title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn", "firstReportedVia", "priorFollowups", "mgmtName"] },
-  { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized"] },
-  { title: "Last few details", subtitle: "We use these to sign your messages and estimate what you may be owed.", fields: ["tenantName", "monthlyRent", "tenantContact", "aiConsent"] },
+  { title: "What needs fixing?", subtitle: "About 2 minutes. Nothing is saved until the last step.", fields: ["issueTypes", "issueDescription", "startedOn"] },
+  { title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn"] },
+  { title: "What's your monthly rent?", subtitle: "We use it to estimate what you may be owed.", fields: ["monthlyRent"] },
+  { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized", "tenantContact"] },
+  { title: "Where do you live?", subtitle: "Your name and address go on every message, so management knows which apartment.", fields: ["tenantName", "address", "unit", "photos", "aiConsent"] },
 ] as const;
 
 const MAX_PHOTOS = 4;
@@ -83,22 +82,25 @@ const MAX_PHOTOS = 4;
 const MAX_TOTAL_PHOTO_BYTES = 3_400_000;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const parseRent = (value: string) => Number(value.replace(/[$,\s]/g, ""));
+
 function validateStep(step: number, f: Fields, today: string): Record<string, string> {
   const e: Record<string, string> = {};
   if (step === 0) {
-    if (f.address.trim().length < 5) e.address = "Enter your street address.";
-  }
-  if (step === 1) {
     if (f.issueTypes.length === 0) e.issueTypes = "Choose what needs fixing.";
+    if (f.issueTypes.includes("other") && !f.issueDescription.trim()) e.issueDescription = "Say what needs fixing.";
     if (!f.startedOn) e.startedOn = f.issueTypes.length > 1 ? "Pick the date the first one started (a guess is fine)." : "Pick the date it started (a guess is fine).";
     else if (today && f.startedOn > today) e.startedOn = "That date is in the future.";
   }
-  // Only tenants who already told management answer when and how; for the rest, the first notice tells them.
-  if (step === 2 && f.toldManagement) {
+  // Only tenants who already told management answer when; for the rest, the first notice tells them.
+  if (step === 1 && f.toldManagement) {
     if (!f.firstReportedOn) e.firstReportedOn = "Pick the date you first told them.";
     else if (today && f.firstReportedOn > today) e.firstReportedOn = "That date is in the future.";
     else if (f.startedOn && f.firstReportedOn < f.startedOn) e.firstReportedOn = f.issueTypes.length > 1 ? "This is before the first problem started." : "This is before the problem started.";
-    if (!f.firstReportedVia) e.firstReportedVia = "Choose how you told them.";
+  }
+  if (step === 2) {
+    const rent = parseRent(f.monthlyRent);
+    if (!rent || rent <= 0) e.monthlyRent = "Enter your monthly rent.";
   }
   if (step === 3) {
     if (!f.sendMode) e.sendMode = "Choose who sends the follow-ups.";
@@ -113,8 +115,7 @@ function validateStep(step: number, f: Fields, today: string): Record<string, st
   }
   if (step === 4) {
     if (f.tenantName.trim().length < 2) e.tenantName = "Enter the name you sign messages with.";
-    const rent = Number(f.monthlyRent.replace(/[$,\s]/g, ""));
-    if (!rent || rent <= 0) e.monthlyRent = "Enter your monthly rent.";
+    if (f.address.trim().length < 5) e.address = "Enter your street address.";
     if (!f.aiConsent) e.aiConsent = "Please agree so we can set up your case.";
   }
   return e;
@@ -239,8 +240,12 @@ export function StartForm() {
   const submit = () => {
     const fd = new FormData();
     for (const [key, value] of Object.entries(fields)) {
+      // Answers to questions that are hidden now (after switching who sends, or unpicking
+      // "Something else") stay behind.
       if ((key === "tenantEmail" || key === "sendAuthorized") && fields.sendMode !== "abate") continue;
-      if ((key === "firstReportedOn" || key === "firstReportedVia" || key === "priorFollowups") && !fields.toldManagement) continue;
+      if (key === "tenantContact" && fields.sendMode !== "self") continue;
+      if (key === "issueDescription" && !fields.issueTypes.includes("other")) continue;
+      if (key === "firstReportedOn" && !fields.toldManagement) continue;
       if (key === "toldManagement") {
         fd.append(key, value ? "yes" : "no");
       } else if (Array.isArray(value)) {
@@ -302,27 +307,9 @@ export function StartForm() {
               <>
                 {inviteBuilding ? (
                   <Notice icon={<Users className="size-5" />}>
-                    A neighbor invited you, so we filled in your building. Add your apartment number below.
+                    A neighbor invited you, so we filled in your building. You&apos;ll add your apartment number at the end.
                   </Notice>
                 ) : null}
-                <AddressField
-                  value={fields.address}
-                  selected={Boolean(fields.bbl)}
-                  error={errors.address}
-                  onType={(address) => setFields((f) => ({ ...f, address, borough: "", bbl: "", bin: "" }))}
-                  onPick={(m) => {
-                    setFields((f) => ({ ...f, address: `${m.street}, ${m.borough}, NY${m.zip ? ` ${m.zip}` : ""}`, borough: m.borough, bbl: m.bbl ?? "", bin: m.bin ?? "" }));
-                    setErrors((e) => ({ ...e, address: "" }));
-                  }}
-                />
-                <Field label="Apartment" htmlFor="unit" optional hint="So your landlord knows exactly which unit.">
-                  <Input id="unit" value={fields.unit} onChange={(e) => set("unit", e.target.value)} placeholder="e.g. 4B" autoComplete="address-line2" maxLength={20} />
-                </Field>
-              </>
-            ) : null}
-
-            {step === 1 ? (
-              <>
                 <fieldset data-invalid={errors.issueTypes ? "true" : undefined} aria-describedby={errors.issueTypes ? "issueTypes-error" : undefined}>
                   <legend className="text-[15px] font-semibold">
                     What&apos;s wrong? <span className="font-normal text-slate">Pick all that apply.</span>
@@ -371,21 +358,20 @@ export function StartForm() {
                   ) : null}
                 </fieldset>
 
-                <Field
-                  label={fields.issueTypes.length > 1 ? "Describe them in a sentence or two" : "Describe it in a sentence"}
-                  htmlFor="issueDescription"
-                  optional
-                  hint="This goes into your messages, so keep it factual."
-                >
-                  <Textarea
-                    id="issueDescription"
-                    value={fields.issueDescription}
-                    onChange={(e) => set("issueDescription", e.target.value)}
-                    placeholder="e.g. Radiators are cold and there's no hot water in the bathroom."
-                    maxLength={500}
-                    rows={3}
-                  />
-                </Field>
+                {/* Letters name every other problem on their own; "Something else" needs a few words. */}
+                {fields.issueTypes.includes("other") ? (
+                  <Field label="What's the problem?" htmlFor="issueDescription" error={errors.issueDescription} hint="It goes into your messages, so keep it to the facts.">
+                    <Textarea
+                      id="issueDescription"
+                      value={fields.issueDescription}
+                      onChange={(e) => set("issueDescription", e.target.value)}
+                      placeholder="e.g. The front door buzzer hasn't worked for three weeks."
+                      maxLength={500}
+                      rows={2}
+                      aria-invalid={Boolean(errors.issueDescription)}
+                    />
+                  </Field>
+                ) : null}
 
                 <Field
                   label={fields.issueTypes.length > 1 ? "When did the first one start?" : "When did it start?"}
@@ -395,12 +381,10 @@ export function StartForm() {
                 >
                   <Input id="startedOn" type="date" value={fields.startedOn} max={today || undefined} onChange={(e) => set("startedOn", e.target.value)} aria-invalid={Boolean(errors.startedOn)} />
                 </Field>
-
-                <PhotoPicker photos={photos} setPhotos={setPhotos} error={errors.photos} clearError={() => setErrors((e) => ({ ...e, photos: "" }))} />
               </>
             ) : null}
 
-            {step === 2 ? (
+            {step === 1 ? (
               <>
                 <label className="flex cursor-pointer gap-3 rounded-2xl bg-white p-4 ring-1 ring-line has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
                   <input
@@ -416,75 +400,32 @@ export function StartForm() {
                 </label>
 
                 {fields.toldManagement ? (
-                  <>
-                    <Field label="When did you first tell management?" htmlFor="firstReportedOn" error={errors.firstReportedOn}>
-                      <Input
-                        id="firstReportedOn"
-                        type="date"
-                        value={fields.firstReportedOn}
-                        min={fields.startedOn || undefined}
-                        max={today || undefined}
-                        onChange={(e) => set("firstReportedOn", e.target.value)}
-                        aria-invalid={Boolean(errors.firstReportedOn)}
-                      />
-                    </Field>
-
-                    <fieldset data-invalid={errors.firstReportedVia ? "true" : undefined} aria-describedby={errors.firstReportedVia ? "firstReportedVia-error" : undefined}>
-                      <legend className="text-[15px] font-semibold">How did you tell them?</legend>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {REPORT_CHANNELS.map((c) => {
-                          const active = fields.firstReportedVia === c.id;
-                          return (
-                            <label
-                              key={c.id}
-                              className={cn(
-                                "inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold ring-1 transition",
-                                "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
-                                active ? "bg-ink text-white ring-ink" : "bg-white ring-line hover:ring-periwinkle",
-                              )}
-                            >
-                              <input type="radio" name="firstReportedVia" value={c.id} checked={active} onChange={() => set("firstReportedVia", c.id)} className="sr-only" />
-                              {active ? <Check className="size-4" aria-hidden="true" /> : null}
-                              {c.label}
-                            </label>
-                          );
-                        })}
-                      </div>
-                      {errors.firstReportedVia ? (
-                        <p id="firstReportedVia-error" role="alert" className="mt-2 text-sm font-medium text-bad">
-                          {errors.firstReportedVia}
-                        </p>
-                      ) : null}
-                    </fieldset>
-
-                    <div className="space-y-2">
-                      <p className="text-[15px] font-semibold" id="followups-label">
-                        How many times have you followed up since?
-                      </p>
-                      <div className="flex items-center gap-4" role="group" aria-labelledby="followups-label">
-                        <button type="button" aria-label="One fewer" onClick={() => set("priorFollowups", Math.max(0, fields.priorFollowups - 1))} className="grid size-12 place-items-center rounded-full bg-white ring-1 ring-line hover:bg-lavender">
-                          <Minus className="size-5" />
-                        </button>
-                        <span className="min-w-12 text-center text-2xl font-bold tabular-nums" aria-live="polite">
-                          {fields.priorFollowups}
-                        </span>
-                        <button type="button" aria-label="One more" onClick={() => set("priorFollowups", Math.min(99, fields.priorFollowups + 1))} className="grid size-12 place-items-center rounded-full bg-white ring-1 ring-line hover:bg-lavender">
-                          <Plus className="size-5" />
-                        </button>
-                      </div>
-                      <p className="text-sm text-slate">Texts, calls, emails, knocking on the super&apos;s door: it all counts.</p>
-                    </div>
-                  </>
+                  <Field label="When did you first tell management?" htmlFor="firstReportedOn" error={errors.firstReportedOn}>
+                    <Input
+                      id="firstReportedOn"
+                      type="date"
+                      value={fields.firstReportedOn}
+                      min={fields.startedOn || undefined}
+                      max={today || undefined}
+                      onChange={(e) => set("firstReportedOn", e.target.value)}
+                      aria-invalid={Boolean(errors.firstReportedOn)}
+                    />
+                  </Field>
                 ) : (
                   <Notice tone="brand">
                     That&apos;s fine. Your first notice will be the first time management hears about it, and the estimate of what you may be owed starts the day
                     it goes out.
                   </Notice>
                 )}
+              </>
+            ) : null}
 
-                <Field label="Management company or landlord" htmlFor="mgmtName" optional>
-                  <Input id="mgmtName" value={fields.mgmtName} onChange={(e) => set("mgmtName", e.target.value)} placeholder="e.g. Acme Property Management" autoComplete="off" maxLength={120} />
+            {step === 2 ? (
+              <>
+                <Field label="Monthly rent" htmlFor="monthlyRent" error={errors.monthlyRent} hint="It never goes in a message unless you add it.">
+                  <MoneyInput id="monthlyRent" value={fields.monthlyRent} onChange={(e) => set("monthlyRent", e.target.value)} placeholder="1,850" aria-invalid={Boolean(errors.monthlyRent)} />
                 </Field>
+                <EstimatePreview fields={fields} today={today} />
               </>
             ) : null}
 
@@ -583,7 +524,7 @@ export function StartForm() {
                         className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
                       />
                       <span className="text-[14px] leading-relaxed text-slate">
-                        <span className="font-semibold text-ink">I authorize Abate</span> to email {fields.mgmtName.trim() || "my building's management"} about this repair on my behalf.
+                        <span className="font-semibold text-ink">I authorize Abate</span> to email my building&apos;s management about this repair on my behalf.
                         I&apos;ll approve each message before it&apos;s sent.
                       </span>
                     </label>
@@ -594,27 +535,41 @@ export function StartForm() {
                     ) : null}
                   </>
                 ) : null}
+
+                {/* Abate tenants are emailed reminders at the address they just gave; self-send tenants
+                    gave none, so this is our only way to reach them. */}
+                {fields.sendMode === "self" ? (
+                  <Field label="Phone or email for reminders" htmlFor="tenantContact" optional hint="Our team will remind you when your next step is ready. We never share it.">
+                    <Input id="tenantContact" value={fields.tenantContact} onChange={(e) => set("tenantContact", e.target.value)} autoComplete="tel" maxLength={120} />
+                  </Field>
+                ) : null}
               </>
             ) : null}
 
             {step === 4 ? (
               <>
+                {inviteBuilding ? (
+                  <Notice icon={<Users className="size-5" />}>
+                    A neighbor invited you, so we filled in your building. Add your apartment number below.
+                  </Notice>
+                ) : null}
                 <Field label="Your name" htmlFor="tenantName" error={errors.tenantName} hint="Messages are signed with it.">
                   <Input id="tenantName" value={fields.tenantName} onChange={(e) => set("tenantName", e.target.value)} autoComplete="name" maxLength={120} aria-invalid={Boolean(errors.tenantName)} />
                 </Field>
-                <Field label="Monthly rent" htmlFor="monthlyRent" error={errors.monthlyRent} hint="Only used to estimate what you may be owed. It never goes in a message unless you add it.">
-                  <MoneyInput id="monthlyRent" value={fields.monthlyRent} onChange={(e) => set("monthlyRent", e.target.value)} placeholder="1,850" aria-invalid={Boolean(errors.monthlyRent)} />
+                <AddressField
+                  value={fields.address}
+                  selected={Boolean(fields.bbl)}
+                  error={errors.address}
+                  onType={(address) => setFields((f) => ({ ...f, address, borough: "", bbl: "", bin: "" }))}
+                  onPick={(m) => {
+                    setFields((f) => ({ ...f, address: `${m.street}, ${m.borough}, NY${m.zip ? ` ${m.zip}` : ""}`, borough: m.borough, bbl: m.bbl ?? "", bin: m.bin ?? "" }));
+                    setErrors((e) => ({ ...e, address: "" }));
+                  }}
+                />
+                <Field label="Apartment" htmlFor="unit" optional hint="So your landlord knows exactly which unit.">
+                  <Input id="unit" value={fields.unit} onChange={(e) => set("unit", e.target.value)} placeholder="e.g. 4B" autoComplete="address-line2" maxLength={20} />
                 </Field>
-                {fields.sendMode === "abate" ? (
-                  // We already have their email from the previous step, so only ask for a phone.
-                  <Field label="Phone for text reminders" htmlFor="tenantContact" optional hint="Our team texts you when a message is ready to approve. Without a phone, we'll email you. We never share it.">
-                    <Input id="tenantContact" type="tel" inputMode="tel" value={fields.tenantContact} onChange={(e) => set("tenantContact", e.target.value)} autoComplete="tel" maxLength={120} />
-                  </Field>
-                ) : (
-                  <Field label="Phone or email for reminders" htmlFor="tenantContact" optional hint="Our team will remind you when your next step is ready. We never share it.">
-                    <Input id="tenantContact" value={fields.tenantContact} onChange={(e) => set("tenantContact", e.target.value)} autoComplete="tel" maxLength={120} />
-                  </Field>
-                )}
+                <PhotoPicker photos={photos} setPhotos={setPhotos} error={errors.photos} clearError={() => setErrors((e) => ({ ...e, photos: "" }))} />
                 <label className={cn("flex gap-3 rounded-2xl bg-white p-4 ring-1", errors.aiConsent ? "ring-bad" : "ring-line")}>
                   <input
                     type="checkbox"
@@ -660,6 +615,32 @@ export function StartForm() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** The case page's estimate, shown as soon as there's a rent: what tenants get before we ask who they are. */
+function EstimatePreview({ fields, today }: { fields: Fields; today: string }) {
+  const rent = parseRent(fields.monthlyRent);
+  if (!today || !(rent > 0) || fields.issueTypes.length === 0) return null;
+  const issue = mostSeriousIssue(fields.issueTypes);
+  // Tenants who haven't told management yet start the clock with the first notice.
+  const clockStarted = fields.toldManagement && Boolean(fields.firstReportedOn);
+  const estimate = estimateAbatement({
+    monthlyRent: rent,
+    issueTypes: fields.issueTypes,
+    noticeOn: clockStarted ? fields.firstReportedOn : today,
+    endOn: today,
+  });
+  return (
+    <EstimateCard
+      estimate={estimate}
+      fixed={false}
+      issueLabel={issue.label}
+      lowPct={issue.low}
+      highPct={issue.high}
+      ofSeveral={fields.issueTypes.length > 1}
+      clockStarted={clockStarted}
+    />
   );
 }
 

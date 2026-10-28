@@ -198,6 +198,13 @@ describe("newCaseSchema", () => {
     expect(newCaseSchema.safeParse({ ...valid, bbl: "", bin: "", borough: "" }).success).toBe(true);
   });
 
+  it("asks what the problem is only for Something else", () => {
+    const other = newCaseSchema.safeParse({ ...valid, issueTypes: ["heat", "other"] });
+    expect(other.success).toBe(false);
+    if (!other.success) expect(other.error.issues.map((i) => String(i.path[0]))).toEqual(["issueDescription"]);
+    expect(newCaseSchema.safeParse({ ...valid, issueTypes: ["heat", "other"], issueDescription: "The buzzer is broken." }).success).toBe(true);
+  });
+
   it("accepts several problems, stored most serious first", () => {
     const r = newCaseSchema.safeParse({ ...valid, issueTypes: ["mold", "heat", "mold"] });
     expect(r.success).toBe(true);
@@ -235,10 +242,14 @@ describe("newCaseSchema", () => {
     const notYet = newCaseSchema.safeParse({ ...valid, toldManagement: "no", firstReportedOn: undefined, firstReportedVia: undefined, priorFollowups: undefined });
     expect(notYet.success).toBe(true);
     if (notYet.success) expect(notYet.data).toMatchObject({ toldBefore: false, firstReportedOn: undefined, firstReportedVia: undefined, priorFollowups: 0 });
-    // Told them: the date and channel are required.
+    // Told them: the date is required.
     const missing = newCaseSchema.safeParse({ ...valid, toldManagement: "yes", firstReportedOn: undefined, firstReportedVia: undefined });
     expect(missing.success).toBe(false);
-    if (!missing.success) expect(new Set(missing.error.issues.map((i) => String(i.path[0])))).toEqual(new Set(["firstReportedOn", "firstReportedVia"]));
+    if (!missing.success) expect(missing.error.issues.map((i) => String(i.path[0]))).toEqual(["firstReportedOn"]);
+    // The form no longer asks how they told management or how often they followed up.
+    const notAsked = newCaseSchema.safeParse({ ...valid, toldManagement: "yes", firstReportedVia: undefined, priorFollowups: undefined });
+    expect(notAsked.success).toBe(true);
+    if (notAsked.success) expect(notAsked.data).toMatchObject({ toldBefore: true, firstReportedVia: "other", priorFollowups: 0 });
     // A tab opened before the question existed still counts as "told" when it sent a date.
     const old = newCaseSchema.safeParse(valid);
     expect(old.success && old.data.toldBefore).toBe(true);

@@ -48,26 +48,10 @@ async function startCase(
   await shot(page, `${prefix}-01-landing`);
   await page.getByRole("link", { name: "Start your case" }).first().click();
 
-  // Step 1: address
-  await expect(page.getByRole("heading", { name: "Where do you live?" })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(visibleText(page, "Enter your street address.")).toBeVisible();
-  await page.getByRole("combobox", { name: "Street address" }).fill("245 East 7th Street");
-  const firstOption = page.getByRole("option").first();
-  // Pick the NYC geocoder's match when it answers; a free-text address also works.
-  const matched = await firstOption
-    .waitFor({ state: "visible", timeout: 8_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (matched) {
-    await firstOption.click();
-    await expect(visibleText(page, "Found your building in NYC records")).toBeVisible();
-  }
-  await page.getByLabel("Apartment").fill("4B");
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  // Step 2: the problems. Choices are native checkboxes inside tappable cards; tap the card.
+  // Step 1: the problems. Choices are native checkboxes inside tappable cards; tap the card.
   await expect(page.getByRole("heading", { name: "What needs fixing?" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(visibleText(page, "Choose what needs fixing.")).toBeVisible();
   await page.locator("label").filter({ hasText: "No heat or hot water" }).filter({ visible: true }).click();
   await expect(page.getByRole("checkbox", { name: /No heat or hot water/ })).toBeChecked();
   if (alsoMold) {
@@ -77,28 +61,30 @@ async function startCase(
     await expect(page.getByRole("checkbox", { name: /No heat or hot water/ })).toBeChecked();
     await shot(page, `${prefix}-02-problems`);
   }
-  await page.getByLabel(/^Describe (it in a sentence|them in a sentence or two)/).fill("Radiators are cold and there is no hot water.");
+  // Only "Something else" asks for a description.
+  await expect(page.getByLabel("What's the problem?")).toHaveCount(0);
   await page.getByLabel(alsoMold ? "When did the first one start?" : "When did it start?").fill(isoDaysAgo(14));
-  // Photos are optional (nothing to photograph for no heat); one test adds one, the other skips it.
-  if (photo) {
-    await page.getByLabel("Choose photos").setInputFiles({ name: "radiator.jpg", mimeType: "image/jpeg", buffer: await fakePhoto(page) });
-    await expect(page.getByRole("img", { name: "Photo of the problem" })).toBeVisible();
-  }
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 3: have they told management? The date questions only show for tenants who have.
+  // Step 2: have they told management? The date only shows for tenants who have.
   await expect(page.getByRole("heading", { name: "Have you reached out to management yet?" })).toBeVisible();
   await expect(page.getByLabel("When did you first tell management?")).toHaveCount(0);
   if (toldBefore) {
     await page.getByRole("checkbox", { name: /already reached out/ }).check();
     await page.getByLabel("When did you first tell management?").fill(isoDaysAgo(12));
-    await page.locator("label").filter({ hasText: "Text message" }).filter({ visible: true }).click();
-    await page.getByRole("button", { name: "One more" }).click();
   } else {
     await expect(visibleText(page, /first notice will be the first time management hears about it/)).toBeVisible();
     await shot(page, `${prefix}-03-not-told`);
   }
-  await page.getByLabel(/Management company or landlord/).fill("Example Property Management");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  // Step 3: rent. The estimate shows before we ask who they are or where they live.
+  await expect(page.getByRole("heading", { name: "What's your monthly rent?" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(visibleText(page, "Enter your monthly rent.")).toBeVisible();
+  await page.getByLabel("Monthly rent").fill("1,850");
+  await expect(visibleText(page, toldBefore ? /^Estimated amount you may be owed so far$/ : /^What you may be owed$/)).toBeVisible();
+  await shot(page, `${prefix}-03-estimate`);
   await page.getByRole("button", { name: "Continue" }).click();
 
   // Step 4: who sends
@@ -110,6 +96,8 @@ async function startCase(
     // Management's email is asked for once, here, and is required when Abate sends.
     await page.getByLabel("Your email").fill("tenant@example.com");
     await page.getByRole("checkbox").filter({ visible: true }).check();
+    // We email Abate tenants their reminders, so there's no separate contact question.
+    await expect(page.getByLabel("Phone or email for reminders")).toHaveCount(0);
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(visibleText(page, /^Add management's email so we can send your follow-ups/)).toBeVisible();
     await shot(page, `${prefix}-04-mgmt-email-required`);
@@ -128,16 +116,34 @@ async function startCase(
     await page.getByRole("button", { name: "Continue" }).click();
     await expect(visibleText(page, "That email doesn't look right.")).toBeVisible();
     await page.getByLabel("Management's email").fill("repairs@example.com");
+    // Self-send tenants gave no email, so this is how our team reaches them.
+    await expect(page.getByLabel("Phone or email for reminders")).toBeVisible();
   }
   await shot(page, `${prefix}-04-who-sends`);
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 5: details
-  await expect(page.getByRole("heading", { name: "Last few details" })).toBeVisible();
+  // Step 5: name and address come last.
+  await expect(page.getByRole("heading", { name: "Where do you live?" })).toBeVisible();
+  await page.getByRole("button", { name: "Create my case" }).click();
+  await expect(visibleText(page, "Enter your street address.")).toBeVisible();
   await page.getByLabel("Your name").fill("Test Tenant");
-  await page.getByLabel("Monthly rent").fill("1,850");
-  // We already have an Abate tenant's email, so reminders only ask for a phone.
-  await expect(page.getByLabel(sendMode === "abate" ? "Phone for text reminders" : "Phone or email for reminders")).toBeVisible();
+  await page.getByRole("combobox", { name: "Street address" }).fill("245 East 7th Street");
+  const firstOption = page.getByRole("option").first();
+  // Pick the NYC geocoder's match when it answers; a free-text address also works.
+  const matched = await firstOption
+    .waitFor({ state: "visible", timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (matched) {
+    await firstOption.click();
+    await expect(visibleText(page, "Found your building in NYC records")).toBeVisible();
+  }
+  await page.getByLabel("Apartment").fill("4B");
+  // Photos are optional (nothing to photograph for no heat); one test adds one, the other skips it.
+  if (photo) {
+    await page.getByLabel("Choose photos").setInputFiles({ name: "radiator.jpg", mimeType: "image/jpeg", buffer: await fakePhoto(page) });
+    await expect(page.getByRole("img", { name: "Photo of the problem" })).toBeVisible();
+  }
   await page.getByRole("checkbox").filter({ visible: true }).check();
   await page.getByRole("button", { name: "Create my case" }).click();
 

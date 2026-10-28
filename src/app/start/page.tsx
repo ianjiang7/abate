@@ -3,7 +3,7 @@ import { StartForm } from "@/components/start/start-form";
 
 export const metadata: Metadata = {
   title: "Start your case",
-  description: "Tell Abate what needs fixing. About 5 minutes, no account.",
+  description: "Tell Abate what needs fixing. About 2 minutes, no account.",
 };
 
 export default function StartPage() {

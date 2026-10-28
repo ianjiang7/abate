@@ -67,14 +67,16 @@ live.
 
 ## What we are building: one flow, phone-first
 
-1. **Start a case** (about 5 minutes): address and unit, the problems (one or more), when it started, a photo if
-   they have one, whether they've reached out to management yet (if so: when, how, and follow-ups
-   since; if not, the first notice is the first report), management's name,
-   then **who sends the follow-ups** (Abate's team, or the tenant). Neither choice is
-   pre-selected; the choice measures hypothesis 2. Then management's email (required if Abate
-   sends), and for Abate: the tenant's email (copied on everything) and their authorization. Then
-   their name, rent, an optional contact for reminders (a phone if Abate sends, since we have
-   their email), and consent. Each contact is asked for once.
+1. **Start a case** (about 2 minutes). Nothing that identifies the tenant comes before the
+   estimate: first the problems (one or more; "Something else" asks for a line describing it),
+   when it started, and whether they've reached out to management yet (if so, when; if not, the
+   first notice is the first report). Then their rent, and the estimate shows right there. Then
+   **who sends the follow-ups** (Abate's team, or the tenant). Neither choice is pre-selected; the
+   choice measures hypothesis 2. Then management's email (required if Abate sends), and for
+   Abate: the tenant's email (copied on everything) and their authorization; for self-send, an
+   optional phone or email for reminders. Last: their name, address and unit, a photo if they have
+   one, and consent. Each contact is asked for once. The form doesn't ask how management was told,
+   follow-ups since, or management's name; tenants can add those to a draft before approving it.
 2. **See the case:** a timeline that fills itself in, the days unresolved, and the estimated
    abatement so far, labeled as an estimate, not legal advice.
 3. **Each follow-up:** the app drafts it from the reviewed templates.

@@ -33,7 +33,7 @@ export default function Home() {
               <ButtonLink href="/start" size="lg" icon={null}>
                 Start your case <ArrowRight className="size-5" aria-hidden="true" />
               </ButtonLink>
-              <p className="text-sm text-slate">About 5 minutes · No account · You approve every message</p>
+              <p className="text-sm text-slate">About 2 minutes · No account · You approve every message</p>
             </div>
           </div>
 
