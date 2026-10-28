@@ -46,7 +46,7 @@ async function startCase(
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Repair still not fixed/ })).toBeVisible();
   await shot(page, `${prefix}-01-landing`);
-  await page.getByRole("link", { name: "Start your case" }).first().click();
+  await page.getByRole("link", { name: "Start my case" }).first().click();
 
   // Step 1: address
   await expect(page.getByRole("heading", { name: "Where do you live?" })).toBeVisible();

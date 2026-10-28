@@ -3,6 +3,29 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-10-28: Landing page redone in a plain style, modeled on Monzo's site
+
+- **What:** the landing page follows the layout, spacing, type sizes and tone of Monzo's site (the
+  team's pick; none of its branding or text): a big plain headline, one "How it works" block, a
+  sample first notice, "Who we are", a short FAQ and a closing call to action. Removed the glow
+  behind the hero, the pill badge, the icon squares, the step and trust cards, the phone mockup and
+  "Ready when you are."
+- **One button, one label:** "Start my case" in the header, the hero and at the bottom. It was
+  "Start a case" in the header and "Start your case" below.
+- **Privacy where people decide:** under each button, "We never sell your information, and we
+  delete it when the pilot ends." with a link to `/privacy`. It only repeats claims the privacy page
+  makes. *Not "or share":* the privacy page lists an AI service that reads replies, and analytics
+  are being added, so "never shared" would overpromise.
+- **The real letter:** the sample is built from `templates.ts` with made-up details (Abate's voice,
+  no dollar figure), so it changes when the template does. The page no longer says every message
+  "sticks to the facts", since the formal notice also mentions the warranty of habitability and
+  the estimate.
+- **Why:** testers weren't signing up, and our professor said the site looked "vibe-coded", the call
+  to action wasn't clear, and how we keep information private wasn't visible.
+- **Kept:** the headline, the tenant quote from our interviews, Abate's colors and font.
+- **Not changed yet:** the privacy page's header still says "Start a case"; another session is
+  editing that page.
+
 ## 2026-10-27: Privacy page and accurate 311 wording before recruiting on Reddit
 
 - **What:** added `/privacy` (what we collect, who sees it, where it's kept, deleting it when the
