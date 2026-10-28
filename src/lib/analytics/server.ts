@@ -1,6 +1,6 @@
 import "server-only";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { POSTHOG_COOKIE, visitorFromCookie } from "./privacy";
 
 /**
@@ -12,7 +12,8 @@ export async function trackCaseCreated(details: { sendMode: "abate" | "self"; pr
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
   const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
   if (!key || !host) return;
-  const visitor = visitorFromCookie((await cookies()).get(POSTHOG_COOKIE)?.value);
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
+  const visitor = visitorFromCookie(cookieStore.get(POSTHOG_COOKIE)?.value);
   if (!visitor) return;
   try {
     await fetch(`${host.replace(/\/+$/, "")}/i/v0/e/`, {
@@ -25,6 +26,8 @@ export async function trackCaseCreated(details: { sendMode: "abate" | "self"; pr
         properties: {
           send_mode: details.sendMode,
           problems: details.problems,
+          // PostHog's test-traffic filter matches on $host, so local runs (localhost) stay out of the funnel.
+          $host: headerStore.get("host") ?? undefined,
           $session_id: visitor.sessionId,
           $process_person_profile: false,
         },
