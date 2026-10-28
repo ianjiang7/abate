@@ -37,7 +37,7 @@ export default function Home() {
                 Questions
               </a>
             </nav>
-            <ButtonLink href="/start" size="sm">
+            <ButtonLink href="/start" size="sm" className="min-h-11">
               {START}
             </ButtonLink>
           </div>
@@ -74,7 +74,7 @@ export default function Home() {
                 it with you copied. Rather send them yourself? You can.
               </Step>
               <Step n={3} title="We read the replies">
-                Our team reads what management says back and sets up the next step. Still not fixed after a week? We show you
+                Our team reads any reply from management and sets up the next step. Still not fixed after a week? We show you
                 how to file a 311 complaint yourself.
               </Step>
             </ol>
@@ -86,8 +86,8 @@ export default function Home() {
             <div>
               <h2 className="text-[32px] font-bold leading-tight tracking-tight md:text-5xl">What management receives</h2>
               <p className="mt-4 text-lg leading-relaxed text-slate">
-                Every message sticks to the facts: what&apos;s broken, since when, and a request for a repair date. Here&apos;s a
-                first notice our team would send, with made-up details.
+                Each message says what&apos;s broken and since when, and asks for a repair date. Some also include an estimate
+                of the rent you may be owed. Here&apos;s a first notice our team would send, with made-up details.
               </p>
             </div>
             <SampleNotice />
@@ -134,18 +134,19 @@ export default function Home() {
                 Yes. The follow-ups are free while we pilot Abate, and there&apos;s no card to enter.
               </Question>
               <Question q="Is this legal advice?">
-                No. We&apos;re students, not lawyers, and Abate isn&apos;t a law firm. Our messages stick to the facts and ask for
-                a repair date. Any dollar figure we show is an estimate of the rent you may be owed, not a promise.
+                No. We&apos;re students, not lawyers, and Abate isn&apos;t a law firm. Our messages say what&apos;s broken and since
+                when, and ask for a repair date. Any dollar figure we show is an estimate of the rent you may be owed, not a
+                promise.
               </Question>
               <Question q="Will management know it's me?">
-                Yes. They need to know whose apartment needs the repair, so every message names you and your unit. When our
+                Yes. They need to know whose apartment needs the repair, so every message names you and your address. When our
                 team sends them, they come from Abate, say we&apos;re writing on your behalf, and copy you. Nothing goes out
                 until you approve it, and you can pause anytime. If you&apos;d rather, you can send each one yourself from your
                 own email.
               </Question>
               <Question q="What happens to my information?">
                 Our four-person team reads your case, and management sees only the messages you approve or send yourself. We
-                never sell or share your information, and we delete it when the pilot ends.{" "}
+                never sell your information, and we delete it when the pilot ends.{" "}
                 <Link href="/privacy" className="font-semibold text-ink underline decoration-periwinkle underline-offset-4">
                   Our privacy page
                 </Link>{" "}
@@ -194,7 +195,7 @@ function PrivacyPromise({ onDark = false }: { onDark?: boolean }) {
     <p className={cn("mt-4 flex gap-2 text-[15px] leading-snug", onDark ? "text-periwinkle-soft" : "text-slate")}>
       <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
       <span>
-        Never sold or shared. Deleted when the pilot ends.{" "}
+        We never sell your information, and we delete it when the pilot ends.{" "}
         <Link href="/privacy" className={cn("font-semibold underline decoration-periwinkle underline-offset-4", onDark ? "text-white" : "text-ink")}>
           How we keep it private
         </Link>
@@ -226,8 +227,7 @@ function Question({ q, children }: { q: string; children: ReactNode }) {
 }
 
 // A first notice from the real template, with made-up details. Fixed dates, so the page never reads
-// the clock while prerendering. No management name, channel or follow-up count, matching the
-// shorter start form; no dollar figure, since only half of first notices carry one.
+// the clock while prerendering. No dollar figure, since only half of first notices carry one.
 const SAMPLE_TOLD_ON = "2026-10-05";
 const SAMPLE_SENT_ON = "2026-10-19";
 const SAMPLE: TemplateContext = {
@@ -240,7 +240,7 @@ const SAMPLE: TemplateContext = {
   startedOn: "2026-10-02",
   toldBefore: true,
   firstReportedOn: SAMPLE_TOLD_ON,
-  firstReportedVia: "other",
+  firstReportedVia: "call",
   priorFollowups: 0,
   daysSinceReport: daysBetween(SAMPLE_TOLD_ON, SAMPLE_SENT_ON),
   estimate: estimateAbatement({ monthlyRent: 1850, issueTypes: ["heat"], noticeOn: SAMPLE_TOLD_ON, endOn: SAMPLE_SENT_ON }),

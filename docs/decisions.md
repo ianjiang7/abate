@@ -12,11 +12,14 @@ portfolio and the Nov 5 memo.
   "Ready when you are."
 - **One button, one label:** "Start my case" in the header, the hero and at the bottom. It was
   "Start a case" in the header and "Start your case" below.
-- **Privacy where people decide:** under each button, "Never sold or shared. Deleted when the pilot
-  ends." with a link to `/privacy`. It only repeats claims the privacy page makes.
+- **Privacy where people decide:** under each button, "We never sell your information, and we
+  delete it when the pilot ends." with a link to `/privacy`. It only repeats claims the privacy page
+  makes. *Not "or share":* the privacy page lists an AI service that reads replies, and analytics
+  are being added, so "never shared" would overpromise.
 - **The real letter:** the sample is built from `templates.ts` with made-up details (Abate's voice,
-  no dollar figure, no management name or channel, as the shorter start form sends it), so it
-  changes when the template does.
+  no dollar figure), so it changes when the template does. The page no longer says every message
+  "sticks to the facts", since the formal notice also mentions the warranty of habitability and
+  the estimate.
 - **Why:** testers weren't signing up, and our professor said the site looked "vibe-coded", the call
   to action wasn't clear, and how we keep information private wasn't visible.
 - **Kept:** the headline, the tenant quote from our interviews, Abate's colors and font.
