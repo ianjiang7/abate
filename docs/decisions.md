@@ -21,6 +21,11 @@ portfolio and the Nov 5 memo.
   unit, rent, name, email, phone or case token.
 - **Without the key** (`NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`) nothing loads.
   `npm run e2e` blanks the key so test runs never send analytics.
+- **PostHog project** ("Abate" in the abate org, US region): replay on, client IPs discarded,
+  `/case/` and `/team/` on the replay blocklist as a backup, and autocapture, heatmaps, console and
+  network capture off to match the code. Visits from localhost count as test traffic and are left
+  out of insights, so `case_created` (sent from the server) carries the request's host. The pinned
+  "Signup funnel" dashboard holds both funnels and a daily count.
 - **Why:** our advisor asked whether we track analytics, and visitors aren't finishing the start
   form. A funnel shows which step loses them; recordings show why. The privacy page now says so.
   It no longer claims we don't use tracking, and it no longer says GeoSearch looks up the
