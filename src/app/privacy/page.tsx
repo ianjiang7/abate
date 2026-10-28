@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <header className="flex items-center justify-between">
         <Logo />
         <Link href="/start" className="rounded-full px-4 py-2 text-sm font-semibold text-ink hover:bg-lavender">
-          Start a case
+          Start my case
         </Link>
       </header>
 
@@ -62,8 +62,8 @@ export default function PrivacyPage() {
 
         <Section title="Where it's kept">
           Cases are stored in our database (Supabase) and photos in a private storage bucket. Your case page lives at a private
-          link with no login, so keep the link to yourself. We never sell or share your information, and we don&apos;t use ads. The
-          only analytics is PostHog, described above.
+          link with no login, so keep the link to yourself. We never sell your information, and we don&apos;t use ads. The only
+          analytics is PostHog, described above.
         </Section>
 
         <Section title="When we delete it">
