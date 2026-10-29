@@ -138,6 +138,11 @@ function followupsPhrase(n: number): string {
   return n === 1 ? ", and followed up once since" : `, and followed up ${n} times since`;
 }
 
+// " by email". The start form stopped asking how (Oct 28) and stores "other", which letters leave out.
+function viaPhrase(id: ReportChannelId): string {
+  return id === "other" ? "" : ` ${reportChannelPhrase(id)}`;
+}
+
 function recordLine(ctx: TemplateContext): string {
   return byAbate(ctx)
     ? `We're keeping a dated record of this request and any replies. ${firstName(ctx)} is copied on this email.`
@@ -181,7 +186,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
               ? `${w.Problem} started on ${started}, and this is the first time ${w.itIs} being reported to you.`
               : // Management already wrote back before this notice, so don't call it the first report.
                 `${w.Problem} started on ${started}, and ${w.itIs} still not fixed.`
-            : `${w.Problem} started on ${started}. ${who(ctx)} first reported ${w.it} to you on ${firstReported} ${reportChannelPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since ${w.itWas} first reported, and ${w.itIs}` : w.ItIs} still not fixed.`,
+            : `${w.Problem} started on ${started}. ${who(ctx)} first reported ${w.it} to you on ${firstReported}${viaPhrase(ctx.firstReportedVia)}${followupsPhrase(ctx.priorFollowups)}. ${ctx.daysSinceReport > 0 ? `It has now been ${days(ctx.daysSinceReport)} since ${w.itWas} first reported, and ${w.itIs}` : w.ItIs} still not fixed.`,
           ...(ctx.estimateInNotice && estimateParagraph(ctx) ? [estimateParagraph(ctx)] : []),
           `Please reply by ${replyBy(ctx)} with the date the ${w.repair} will be made.`,
           recordLine(ctx),
@@ -208,7 +213,7 @@ export function buildMessage(step: StepId, ctx: TemplateContext): DraftMessage {
     case "formal_notice": {
       const lines = [`- ${formatFullDate(ctx.startedOn)}: ${w.problem} started`];
       // When management hadn't been told before, the written notice was the first report.
-      if (ctx.toldBefore !== false) lines.push(`- ${firstReported}: first reported to you ${reportChannelPhrase(ctx.firstReportedVia)}`);
+      if (ctx.toldBefore !== false) lines.push(`- ${firstReported}: first reported to you${viaPhrase(ctx.firstReportedVia)}`);
       if (ctx.sentOn.notice) lines.push(`- ${formatFullDate(ctx.sentOn.notice)}: written notice sent${ctx.noticeIsFirstReport ? " (first report)" : ""}`);
       if (ctx.sentOn.reminder) lines.push(`- ${formatFullDate(ctx.sentOn.reminder)}: written follow-up sent`);
       lines.push(`- ${formatFullDate(ctx.today)}: still not repaired${ctx.daysSinceReport > 0 ? `, ${days(ctx.daysSinceReport)} after ${w.itWas} first reported` : ""}`);

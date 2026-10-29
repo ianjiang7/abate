@@ -91,7 +91,7 @@ export function InviteCard({ token, code }: { token: string; code: string }) {
   const { copied, copy } = useCopy();
   const share = async () => {
     const url = `${window.location.origin}/start?invite=${code}`;
-    const text = "Our building has repair problems too. Abate helps you push management to fix them, with a dated record. It takes 5 minutes:";
+    const text = "Our building has repair problems too. Abate helps you push management to fix them, with a dated record. It takes about 2 minutes:";
     void trackAction(token, "neighbor_invited", { via: "share" in navigator ? "share" : "copy" });
     if (navigator.share) {
       try {
