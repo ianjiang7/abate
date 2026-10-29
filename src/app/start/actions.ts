@@ -1,6 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { trackCaseCreated } from "@/lib/analytics/server";
 import { countCasesSince } from "@/lib/cases/repo";
 import { createCase } from "@/lib/cases/service";
 import { newCaseSchema } from "@/lib/cases/validation";
@@ -56,5 +58,7 @@ export async function createCaseAction(_prev: StartState, formData: FormData): P
     return { message: "Something went wrong saving your case. Please try again." };
   }
 
+  // Analytics: the funnel's last step, with only the send mode and how many problems were picked.
+  after(() => trackCaseCreated({ sendMode: parsed.data.sendMode, problems: parsed.data.issueTypes.length }));
   redirect(`/case/${token}?new=1`);
 }

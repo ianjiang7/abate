@@ -44,6 +44,33 @@ portfolio and the Nov 5 memo.
   up front, and its very first question was the tenant's home address. Most tenants have never
   heard of a rent abatement, so the estimate is what gets them interested; showing it before we
   ask who they are lets them see what they'd get before sharing anything identifying.
+## 2026-10-28: PostHog analytics on the landing, start and privacy pages
+
+- **What:** added `posthog-js` (our only new dependency) to see where visitors drop off between
+  the landing page and a finished case. Funnel: landing `$pageview` → `start_clicked` →
+  `form_step_viewed` (step number and title) → `case_created` (only `send_mode` and the number of
+  problems; sent by the server once the case is saved, joined to the visitor through PostHog's
+  anonymous cookie). Session replay is on, with every input masked and the address suggestions,
+  the sentences next to checkboxes and photo previews hidden. Code: `src/lib/analytics/` and
+  `src/components/analytics.tsx`.
+- **Excluded:** case and team pages (secret links that show tenant data). PostHog never loads on
+  them; if a visitor moves from the form to their case page, the recording stops first, nothing is
+  sent while they're there, and replay stays off in that tab until a reload, because Next keeps
+  visited pages in the document. Also off: autocapture, rage and dead clicks, heatmaps, network and
+  console recording, feature flags, surveys. Every URL loses its query string and hash, and links
+  to pages other than our three shrink to the site's address. No event property holds an address,
+  unit, rent, name, email, phone or case token.
+- **Without the key** (`NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST`) nothing loads.
+  `npm run e2e` blanks the key so test runs never send analytics.
+- **PostHog project** ("Abate" in the abate org, US region): replay on, client IPs discarded,
+  `/case/` and `/team/` on the replay blocklist as a backup, and autocapture, heatmaps, console and
+  network capture off to match the code. Visits from localhost count as test traffic and are left
+  out of insights, so `case_created` (sent from the server) carries the request's host. The pinned
+  "Signup funnel" dashboard holds both funnels and a daily count.
+- **Why:** our advisor asked whether we track analytics, and visitors aren't finishing the start
+  form. A funnel shows which step loses them; recordings show why. The privacy page now says so.
+  It no longer claims we don't use tracking, and it no longer says GeoSearch looks up the
+  building's city record (that was removed Oct 27).
 
 ## 2026-10-27: Privacy page and accurate 311 wording before recruiting on Reddit
 
