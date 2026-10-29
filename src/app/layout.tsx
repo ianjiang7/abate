@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Work_Sans } from "next/font/google";
+import { Suspense } from "react";
+import { Analytics } from "@/components/analytics";
 import "./globals.css";
 
 const workSans = Work_Sans({
@@ -25,7 +27,15 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${workSans.variable} h-full`}>
-      <body className="min-h-full bg-mist font-sans text-ink">{children}</body>
+      <body className="min-h-full bg-mist font-sans text-ink">
+        {children}
+        {/* PostHog, only when its key is set. Suspense: case and team URLs aren't known while prerendering. */}
+        {process.env.NEXT_PUBLIC_POSTHOG_KEY && process.env.NEXT_PUBLIC_POSTHOG_HOST ? (
+          <Suspense fallback={null}>
+            <Analytics />
+          </Suspense>
+        ) : null}
+      </body>
     </html>
   );
 }

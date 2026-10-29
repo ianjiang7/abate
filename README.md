@@ -28,6 +28,8 @@ Create `.env.local` in the project root (it is gitignored, never commit it) with
 | `TEAM_KEY` | A long random secret (24+ characters). The team page lives at `/team/<TEAM_KEY>` |
 | `TEAM_GMAIL` | The team Gmail address we send from. "Open in Gmail" opens that account even if a teammate is signed in to several (falls back to `CC_EMAIL`) |
 | `FORMAL_NOTICE_REVIEWED` | Set to `1` once legal aid or a tenant attorney has reviewed the formal notice; until then the send queue warns before each one |
+| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog → Project settings → Project API key (`phc_…`; it is public, browsers get it). Optional: without it no analytics load, and `npm run e2e` always runs without it |
+| `NEXT_PUBLIC_POSTHOG_HOST` | `https://us.i.posthog.com` for a US PostHog project (`https://eu.i.posthog.com` for EU) |
 
 Set up the database tables once (and again after adding a migration):
 
