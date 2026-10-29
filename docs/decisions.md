@@ -25,6 +25,25 @@ portfolio and the Nov 5 memo.
 - **Kept:** the headline, the tenant quote from our interviews, Abate's colors and font.
 - **Not changed yet:** the privacy page's header still says "Start a case"; another session is
   editing that page.
+## 2026-10-28: Shorter start form, with the estimate before anything personal
+
+- **What:** the start form went from 19 fields to about 12 (Abate mode). New order: problems and
+  when they started → whether management was told and when → rent, with the estimate shown right
+  there → who sends (plus emails and authorization) → name, address, apartment, optional photo
+  and consent. The first screen says it takes about 2 minutes and nothing is saved until the
+  last step.
+- **Cut:** the free-text description (now only for "Something else", where it's required, since
+  letters can't name that problem), how management was told, follow-ups since, management's name,
+  and the reminder phone for Abate tenants (we email them; self-send tenants still get an optional
+  phone or email, our only way to reach them). Tenants can add any of these to a draft before
+  approving it.
+- **Data:** no migration. Cases that were told before store `first_reported_via = "other"`
+  (letters leave it out: "first reported it to you on <date>") and `prior_followups = 0`. Neither
+  feeds the hypothesis numbers.
+- **Why:** our professor's feedback (Oct 28) and testers dropping off: the form asked for too much
+  up front, and its very first question was the tenant's home address. Most tenants have never
+  heard of a rent abatement, so the estimate is what gets them interested; showing it before we
+  ask who they are lets them see what they'd get before sharing anything identifying.
 
 ## 2026-10-27: Privacy page and accurate 311 wording before recruiting on Reddit
 

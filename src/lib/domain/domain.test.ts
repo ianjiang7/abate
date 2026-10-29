@@ -251,6 +251,14 @@ describe("templates", () => {
     expect(m.body).not.toMatch(/\b(abatement|warranty|owed)\b/i);
   });
 
+  it("leaves out how management was told when the start form didn't ask", () => {
+    const notice = buildMessage("notice", { ...ctx, firstReportedVia: "other", priorFollowups: 0 }).body;
+    expect(notice).toContain("I first reported it to you on October 6, 2026. It has now been 12 days");
+    const formal = buildMessage("formal_notice", { ...ctx, firstReportedVia: "other" }).body;
+    expect(formal).toMatch(/^- October 6, 2026: first reported to you$/m);
+    expect(`${notice}\n${formal}`).not.toContain("directly");
+  });
+
   it("puts the timeline and estimate in the formal notice, hedged", () => {
     const m = buildMessage("formal_notice", ctx);
     expect(m.body).toContain("- October 12, 2026: written notice sent");
