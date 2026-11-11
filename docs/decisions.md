@@ -3,6 +3,61 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## 2026-11-10: Price test on the start form (fake door, nothing charged)
+
+- **What:** a new step on `/start`, right after the rent and the estimate: "Get the whole
+  follow-up plan", with one price and two equal buttons, "Get the full plan – $29" and "Just the
+  free first letter". There is no checkout and nothing is ever charged. Buy shows "Paid plans
+  aren't open yet. Nothing was charged, and you get the full plan free during the pilot." and an
+  optional "Tell me when paid plans open. It's OK to ask me 3 quick questions." box; the buttons go
+  away, so Buy can't be undone. Tenants with no heat or hot water also see that they can file a
+  free 311 complaint any time. Each browser gets one price (an "arm") by weight, $29 for two in
+  three and $9 for one in three, and keeps it if they reload. The arms and the copy live in
+  `src/lib/domain/pricing.ts`. On Nov 16 the $9 arm is swapped for $49, $19 or "$29, only once
+  your repair is fixed". An arm is never edited or reused; it's retired by setting its weight to 0.
+- **Measurement:** one data point is one person who sees the price step, and "yes" is a Buy tap.
+  The official Buy rate is PostHog's funnel, `price_viewed` → `price_buy_tapped` counted by
+  unique users, split by price and then by ad source (`utm_source`). There's no Free event: Free
+  means reaching the next step without tapping Buy. The team page's tile reads cases, so it
+  counts only tenants who went on to finish the form, and says so.
+- **Data:** migration `20261110000000_price_test.sql` adds `price_arm`, `price_choice` (`buy` or
+  `free`) and `price_ok_to_ask` (only after Buy) to `cases`. They're null for cases from before
+  the test. Price fields never fail a case: an unknown value is saved as null.
+- **Privacy:** price events carry only `price_arm`, never an answer. Ad tags (`utm_source`,
+  `utm_medium`, `utm_campaign`, `utm_content`) are kept as their own PostHog properties; URLs
+  still lose their query string, and click ids stay masked. `utm_term` and `ph_keyword` are
+  dropped, because search words can describe the tenant's problem. No ad pixels or conversion
+  tags from Google or Meta. Replays now hide the estimate (`ph-mask`), the 311 line (it reveals
+  the problem) and the OK-to-ask box (`ph-no-capture`). The privacy page now says we advertise on
+  Google and Meta, and lists the price data we save.
+- **Cut:** a real checkout or payment provider; an exposure table and `/api/price` route (PostHog
+  already counts who saw a price); a `traffic_source` column (the ad source lives in PostHog); a
+  `price_shown` column (the arm id is what was shown); PostHog feature flags (they're off, and the
+  e2e runs without PostHog, so our own config picks the arm).
+- **step_id:** the new step shifts the step numbers, so `form_step_viewed` also sends a stable
+  `step_id` (`problems`, `told`, `rent`, `price`, `sender`, `address`). Funnels should match on
+  `step_id` or the title, not the number.
+- **After review:**
+  - For 0.45s after the page changes under the tenant's finger (a new step, or Buy scrolling the
+    page), taps on the page and the Continue bar are ignored, so the second tap of a quick double
+    tap can't pick Buy or Free before the price is seen, tick the OK-to-ask box, skip "Nothing was
+    charged" through the Continue bar that appears after Buy, or pick who sends. (A
+    disabled bottom bar was tried first; it covered both choices on iPhone SE and 12–15 screens.)
+  - Either choice is final: Back shows it as made. Free choosers then see "During the pilot you
+    get the full follow-up plan free either way", which can't sway a choice already made.
+  - Ad tags are kept in the browser tab (sessionStorage) from the moment a tracked page loads and
+    added to every event the app sends from that tab, because PostHog only reads them once it has
+    loaded and the landing page's Start links drop the query string. A link with any campaign
+    parameter replaces them. Only plain-word values are kept. (Registering them as PostHog
+    session properties was tried first; PostHog clears those when it starts a new session.)
+  - The landing page said the follow-ups were free while the price card asked $29 for them. It
+    now says "Your first letter is free, and there's no card to enter."
+  - The price card describes sending letters yourself, right before "who sends", so sender choices
+    from Nov 10 on shouldn't be pooled with Sprint 2's hypothesis 2. The team page's hypothesis 2
+    tiles aren't date-limited; for Sprint 2's numbers, use cases created before Nov 10.
+- **Why:** to see whether tenants would pay for the follow-ups, and at what price, without
+  building payments.
+
 ## 2026-10-28: Landing page redone in a plain style, modeled on Monzo's site
 
 - **What:** the landing page follows the layout, spacing, type sizes and tone of Monzo's site (the
@@ -25,6 +80,7 @@ portfolio and the Nov 5 memo.
 - **Kept:** the headline, the tenant quote from our interviews, Abate's colors and font.
 - **Not changed yet:** the privacy page's header still says "Start a case"; another session is
   editing that page.
+
 ## 2026-10-28: Shorter start form, with the estimate before anything personal
 
 - **What:** the start form went from 19 fields to about 12 (Abate mode). New order: problems and
@@ -44,6 +100,7 @@ portfolio and the Nov 5 memo.
   up front, and its very first question was the tenant's home address. Most tenants have never
   heard of a rent abatement, so the estimate is what gets them interested; showing it before we
   ask who they are lets them see what they'd get before sharing anything identifying.
+
 ## 2026-10-28: PostHog analytics on the landing, start and privacy pages
 
 - **What:** added `posthog-js` (our only new dependency) to see where visitors drop off between

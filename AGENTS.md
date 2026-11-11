@@ -71,8 +71,16 @@ live.
    estimate: first the problems (one or more; "Something else" asks for a line describing it),
    when it started, and whether they've reached out to management yet (if so, when; if not, the
    first notice is the first report). Then their rent, and the estimate shows right there. Then
-   **who sends the follow-ups** (Abate's team, or the tenant). Neither choice is pre-selected; the
-   choice measures hypothesis 2. Then management's email (required if Abate sends), and for
+   the **price step**, a fake door: one price for the whole follow-up plan (each browser keeps the
+   one it was given while that price is still being tested; the prices live in
+   `src/lib/domain/pricing.ts`), with a Buy button and "Just the free first letter". Nothing is
+   ever charged: Buy says paid plans aren't open yet and offers an optional "tell me when paid
+   plans open" box; Free choosers are then told the pilot gives them the full plan anyway. Either
+   choice is final, and the form goes on. Then **who sends the follow-ups** (Abate's team, or the
+   tenant). Neither choice is pre-selected; the choice measured hypothesis 2 in Sprint 2. Since
+   Nov 10 it comes right after a price card that describes sending letters yourself, so later
+   choices shouldn't be pooled with Sprint 2's (the team page's hypothesis 2 tiles count every
+   case; use cases created before Nov 10 for Sprint 2's numbers). Then management's email (required if Abate sends), and for
    Abate: the tenant's email (copied on everything) and their authorization; for self-send, an
    optional phone or email for reminders. Last: their name, address and unit, a photo if they have
    one, and consent. Each contact is asked for once. The form doesn't ask how management was told,
@@ -90,17 +98,20 @@ live.
    reading moves the case along the ladder. Tenants can correct a reading.
 5. **Pause:** a tenant using Abate can pause anytime (with a reason) or switch to sending
    themselves. Both count as backing out for hypothesis 2.
-6. **Invite neighbors** and the **fake door** ("we'll recover this for 25%") as before.
+6. **Invite neighbors**, and two **fake doors**: "we'll recover this for 25%" on the case page, as
+   before, and the price step on the start form (item 1).
 7. **Private case link** (no login) to come back, follow along, or mark the repair fixed.
 
 Data: `cases` (incl. `issue_types`, most serious first, with `issue_type` as the most serious;
 `told_before`; `send_mode`, `send_authorized_at`, `tenant_email`, `paused_at`,
-`pause_reason`), `photos`, `messages` (outgoing: `ready_on`, `approved_at`, `sent_at`, `sent_by`;
-incoming: `classification`, `classified_by`, and the AI's shadow `ai_classification`), `events`.
+`pause_reason`; the price test's `price_arm`, `price_choice` and `price_ok_to_ask`), `photos`,
+`messages` (outgoing: `ready_on`, `approved_at`, `sent_at`, `sent_by`; incoming:
+`classification`, `classified_by`, and the AI's shadow `ai_classification`), `events`.
 
 **The team page** lives at `/team/<TEAM_KEY>` (a secret link, like case links): the send queue
 with "Open in Gmail" and "Mark sent", replies to read, a form to log replies from the inbox,
-tenants to nudge, and the live hypothesis results. Add `?test=1` to include test cases, or
+tenants to nudge, the live hypothesis results, and the Buy rate by price (only tenants who
+finished the form; the full Buy rate is in PostHog). Add `?test=1` to include test cases, or
 `?test=only` for only them.
 
 Concierge safety rules (keep them when changing this flow):
@@ -176,9 +187,10 @@ A reply changes the path:
 
 ## Do not build
 
-Login, accounts or passwords; payments or fee collection; admin dashboards or settings pages
-beyond the team page; SMS, WhatsApp or push notifications; anything that sends a message to a
-landlord automatically (a person sends every one, after the tenant approves it);
+Login, accounts or passwords; payments or fee collection (the price step is a fake door: no
+checkout, card fields or payment provider); ad pixels or conversion tags; admin dashboards or
+settings pages beyond the team page; SMS, WhatsApp or push notifications; anything that sends a
+message to a landlord automatically (a person sends every one, after the tenant approves it);
 access to tenants' own email inboxes; filing anything with 311, HPD or the courts; portfolio-wide
 landlord analytics; building-wide case features beyond the invite link; native apps; translations;
 AI-written legal wording. If a task seems to need one of these, stop and ask.
@@ -232,7 +244,11 @@ tenant attorney or legal aid before real testers see them.
   real tenant data in the repo, seeds or tests; use made-up data. Delete tester data after the
   sprint. PostHog analytics runs only on `/`, `/start` and `/privacy`: never add it to case or team
   pages, never put an answer in an event property, and give any text that repeats an answer the
-  `ph-mask` class so session recordings hide it (inputs are masked already).
+  `ph-mask` class so session recordings hide it (inputs are masked already). Price events carry
+  only `price_arm`, plus the tab's ad tags that every event carries. Ad tags (`utm_source` and the
+  like, plain words only) are kept as event properties, but URLs
+  lose their query string and search words (`utm_term`, `ph_keyword`) are dropped, since they can
+  describe the problem (`src/lib/analytics/privacy.ts`).
 - **Secrets** (including `ANTHROPIC_API_KEY`) live in `.env.local`, which is never committed.
   `.env.example` lists variable names only. Set a spending cap on the Anthropic key.
 
@@ -262,7 +278,8 @@ Setup, env variables and every command are in [README.md](README.md). In short:
 Code map:
 
 - `src/lib/domain/`: pure logic with tests (dates in New York time, estimate, ladder, templates,
-  mailto). No I/O.
+  mailto). No I/O. `pricing.ts` holds the price test's arms, weights and copy; retire an arm by
+  setting its weight to 0, never by editing or reusing it.
 - `src/lib/cases/`: the data layer (`repo.ts`), operations (`service.ts`), validation and the
   view helpers for the case page. Server-only.
 - `src/lib/agent/`: the case agent (Claude reader, stand-in reader, guardrails).
@@ -299,4 +316,5 @@ prerender. Read the bundled docs in `node_modules/next/dist/docs/` before changi
 ## Key dates
 
 Oct 20 standup · Oct 22 first notices out, so cases get 7 days · Oct 23 advisor (refinement and
-user testing) · Oct 29 five-minute live demo, with 10 user tests done.
+user testing) · Oct 29 five-minute live demo, with 10 user tests done · Mon Nov 16: swap the $9
+arm (runbook in README.md).

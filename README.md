@@ -81,6 +81,44 @@ or `?test=only` to see only those.
 At the day-7 check-in, ask each tester "How comfortable were you with Abate contacting your
 landlord?" and note the quote.
 
+## Price test
+
+The start form shows one price for the full follow-up plan, right after the estimate. It's a fake
+door: nothing is ever charged. The prices ("arms"), how often each is shown, and the copy live in
+`src/lib/domain/pricing.ts`. Each browser keeps the price it was given while that price is still
+being tested.
+
+- **Ad and partner links** look like `/?utm_source=google&utm_medium=cpc&utm_campaign=nov-price`.
+  Use plain lowercase words only (hyphens are fine). Partners use `utm_source=partner-<name>`
+  (for example `partner-bronx`), and the team's own clicks use `utm_source=test`. Never add
+  `utm_term`: search words can describe a tenant's problem, so the app drops them anyway.
+- **The Buy rate is read in PostHog**, not on the team page. Make a funnel of `price_viewed` →
+  `price_buy_tapped`, counted by unique users, broken down by `price_arm`, with breakdown
+  attribution set to **All steps** (so the view and the Buy must carry the same price; the
+  default, first touch, would credit a browser's later Buy at a new price to its old one). For
+  the split by ad source, break down by the event property `utm_source`: the app keeps the tag
+  from the ad link for the whole tab, even if the tenant taps Start before PostHog has loaded.
+  Don't use `$session_entry_utm_source`, which misses those fast tappers.
+- **Leave out test traffic:** filter `$host` to the production domain only (this drops localhost
+  and Vercel previews) and drop events whose `utm_source` is `test`.
+- **Free** means reaching the next step (`form_step_viewed` with `step_id` `sender`) without
+  tapping Buy; anyone else who saw a price left at the price step. Price events carry only
+  `price_arm` (plus the tab's ad tags, which every event carries), and there is no Free event. The team page's "Buy · $N" tiles count only tenants
+  who went on to create a case.
+- **Signup funnel:** the price step shifts the step numbers (who sends is now step 5 of 6), so
+  the dashboard's `form_step_viewed` steps should match on `step_id` (`problems`, `told`, `rent`,
+  `price`, `sender`, `address`) or the title, not `step`. Events from before the price step went
+  live have no `step_id`, so use the title for funnels that reach back past it.
+- **Nov 16 swap (runbook):**
+  1. In `pricing.ts`, set `p9`'s weight to 0 and one of `p49`, `p19` or `p29_fixed` to 1. Change
+     nothing else: never edit an arm's text or reuse its id (add a new arm instead).
+  2. Run `npm test`; it checks the arms.
+  3. Push to `main` (Vercel deploys it).
+  4. Add a PostHog annotation at the deploy time naming the new arms.
+  5. Compare $29 with $9 using a date range that ends at the annotation, and the new arm using
+     one that starts there. A browser that was shown $9 gets a new price the next time it reaches
+     the price step.
+
 ## Deploy
 
 Import the GitHub repo in Vercel, add the same environment variables, including `TEAM_KEY` (Production and Preview;
