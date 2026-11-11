@@ -2,6 +2,7 @@
 
 import { daysBetween, nyDate, type IsoDate } from "@/lib/domain/dates";
 import { nextAction, type StepId } from "@/lib/domain/ladder";
+import { PRICE_ARMS } from "@/lib/domain/pricing";
 import { readyOnFor } from "./rules";
 import type { CaseRecord, MessageRecord } from "./types";
 import { ladderInputs, liveMessages } from "./view";
@@ -32,6 +33,23 @@ export type NoticeSplit = {
   /** H1b: how much more often notices with $ got a response than without, in points (0 to 1). */
   dollarLift: number | null;
   dollarPass: boolean | null;
+};
+
+/**
+ * The price test on the start form (a fake door, nothing is charged): Buy taps for one price, among
+ * tenants who went on to create a case. The real Buy rate, over everyone who saw a price, is in PostHog.
+ */
+export type PriceCell = {
+  /** The arm id from src/lib/domain/pricing.ts. */
+  arm: string;
+  label: string;
+  /** Still being shown (weight above 0). Retired arms are listed only if they have cases. */
+  active: boolean;
+  shown: number;
+  buy: number;
+  /** Tapped Buy and ticked "It's OK to ask me 3 quick questions". */
+  okToAsk: number;
+  rate: number | null;
 };
 
 export type Metrics = {
@@ -71,6 +89,8 @@ export type Metrics = {
     pauseReasons: Record<string, number>;
   };
   shadow: { compared: number; agreed: number; rate: number | null };
+  /** One cell per price, in the order of PRICE_ARMS. No pass mark: this isn't a hypothesis. */
+  price: PriceCell[];
 };
 
 const median = (xs: number[]): number | null => {
@@ -104,6 +124,7 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
   let agreed = 0;
   const cell = (): NoticeCell => ({ judged: 0, responded: 0, waiting: 0, rate: null });
   const split = { abateWith: cell(), abateWithout: cell(), selfWith: cell(), selfWithout: cell() };
+  const priceCounts = new Map<string, { shown: number; buy: number; okToAsk: number }>();
 
   for (const { record, messages } of rows) {
     if (record.status === "fixed") fixed++;
@@ -197,6 +218,16 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       compared++;
       if (m.aiClassification === m.classification) agreed++;
     }
+
+    // Price test: which price this tenant saw on the start form, and whether they tapped Buy.
+    // Cases from before the test have no price and aren't counted.
+    if (record.priceArm) {
+      const p = priceCounts.get(record.priceArm) ?? { shown: 0, buy: 0, okToAsk: 0 };
+      p.shown++;
+      if (record.priceChoice === "buy") p.buy++;
+      if (record.priceOkToAsk) p.okToAsk++;
+      priceCounts.set(record.priceArm, p);
+    }
   }
 
   for (const c of Object.values(split)) c.rate = ratio(c.responded, c.judged);
@@ -216,6 +247,12 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
     dollarLift,
     dollarPass: dollarLift === null ? null : dollarLift >= PASS.dollarLift,
   };
+
+  // Every price still being shown (even before anyone has seen it), plus retired ones with cases.
+  const price: PriceCell[] = PRICE_ARMS.map((a) => {
+    const c = priceCounts.get(a.id) ?? { shown: 0, buy: 0, okToAsk: 0 };
+    return { arm: a.id, label: a.label, active: a.weight > 0, ...c, rate: ratio(c.buy, c.shown) };
+  }).filter((c) => c.active || c.shown > 0);
 
   const rate = ratio(responded, judged);
   const authRate = ratio(authorized, offered);
@@ -250,5 +287,6 @@ export function computeMetrics(rows: Array<{ record: CaseRecord; messages: Messa
       pauseReasons,
     },
     shadow: { compared, agreed, rate: ratio(agreed, compared) },
+    price,
   };
 }

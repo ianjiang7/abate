@@ -9,15 +9,17 @@ import { Logo } from "@/components/brand/logo";
 import { EstimateCard } from "@/components/case/estimate-card";
 import { IssueIcon } from "@/components/issue-icon";
 import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/card";
+import { Card, Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Field, Input, MoneyInput, Textarea } from "@/components/ui/field";
 import { track } from "@/lib/analytics/client";
 import type { AddressMatch } from "@/lib/building/types";
+import { stickyPriceArm } from "@/lib/client/price-arm";
 import { resizeImage } from "@/lib/client/resize-image";
 import { useToday } from "@/lib/client/use-today";
 import { estimateAbatement } from "@/lib/domain/estimate";
 import { ISSUE_TYPES, mostSeriousIssue, type IssueTypeId } from "@/lib/domain/issues";
+import { PRICE_COPY, priceArmById, priceEventProps } from "@/lib/domain/pricing";
 
 type Fields = {
   address: string;
@@ -42,6 +44,12 @@ type Fields = {
   sendAuthorized: boolean;
   aiConsent: boolean;
   invite: string;
+  /** The price test (a fake door, nothing is charged): the arm id shown, set when leaving the rent step. */
+  priceArm: string;
+  /** "buy" once they tap Buy (it can't be undone), "free" for the free first letter. */
+  priceChoice: "buy" | "free" | "";
+  /** The optional "Tell me when paid plans open" box, only shown after Buy. */
+  priceOkToAsk: boolean;
 };
 
 const EMPTY: Fields = {
@@ -64,19 +72,26 @@ const EMPTY: Fields = {
   sendAuthorized: false,
   aiConsent: false,
   invite: "",
+  priceArm: "",
+  priceChoice: "",
+  priceOkToAsk: false,
 };
 
 type Photo = { id: string; file: File; url: string };
 
 // Nothing that identifies the tenant comes before the estimate: the problem, the dates and the rent
-// come first, then who sends, and their name and address last.
+// come first, then the price test, who sends, and their name and address last.
+// Each step has an id, so code (and the form_step_viewed event) never depends on step numbers.
 const STEPS = [
-  { title: "What needs fixing?", subtitle: "About 2 minutes. Nothing is saved until the last step.", fields: ["issueTypes", "issueDescription", "startedOn"] },
-  { title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn"] },
-  { title: "What's your monthly rent?", subtitle: "We use it to estimate what you may be owed.", fields: ["monthlyRent"] },
-  { title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized", "tenantContact"] },
-  { title: "Where do you live?", subtitle: "Your name and address go on every message, so management knows which apartment.", fields: ["tenantName", "address", "unit", "photos", "aiConsent"] },
+  { id: "problems", title: "What needs fixing?", subtitle: "About 2 minutes. Nothing is saved until the last step.", fields: ["issueTypes", "issueDescription", "startedOn"] },
+  { id: "told", title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn"] },
+  { id: "rent", title: "What's your monthly rent?", subtitle: "We use it to estimate what you may be owed.", fields: ["monthlyRent"] },
+  { id: "price", title: PRICE_COPY.title, subtitle: PRICE_COPY.subtitle, fields: ["priceArm", "priceChoice", "priceOkToAsk"] },
+  { id: "sender", title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized", "tenantContact"] },
+  { id: "address", title: "Where do you live?", subtitle: "Your name and address go on every message, so management knows which apartment.", fields: ["tenantName", "address", "unit", "photos", "aiConsent"] },
 ] as const;
+
+type StepId = (typeof STEPS)[number]["id"];
 
 const MAX_PHOTOS = 4;
 // The whole submission must stay under the 4MB server action limit (Vercel caps bodies at 4.5MB).
@@ -85,25 +100,26 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const parseRent = (value: string) => Number(value.replace(/[$,\s]/g, ""));
 
-function validateStep(step: number, f: Fields, today: string): Record<string, string> {
+function validateStep(id: StepId, f: Fields, today: string): Record<string, string> {
   const e: Record<string, string> = {};
-  if (step === 0) {
+  if (id === "problems") {
     if (f.issueTypes.length === 0) e.issueTypes = "Choose what needs fixing.";
     if (f.issueTypes.includes("other") && !f.issueDescription.trim()) e.issueDescription = "Say what needs fixing.";
     if (!f.startedOn) e.startedOn = f.issueTypes.length > 1 ? "Pick the date the first one started (a guess is fine)." : "Pick the date it started (a guess is fine).";
     else if (today && f.startedOn > today) e.startedOn = "That date is in the future.";
   }
   // Only tenants who already told management answer when; for the rest, the first notice tells them.
-  if (step === 1 && f.toldManagement) {
+  if (id === "told" && f.toldManagement) {
     if (!f.firstReportedOn) e.firstReportedOn = "Pick the date you first told them.";
     else if (today && f.firstReportedOn > today) e.firstReportedOn = "That date is in the future.";
     else if (f.startedOn && f.firstReportedOn < f.startedOn) e.firstReportedOn = f.issueTypes.length > 1 ? "This is before the first problem started." : "This is before the problem started.";
   }
-  if (step === 2) {
+  if (id === "rent") {
     const rent = parseRent(f.monthlyRent);
     if (!rent || rent <= 0) e.monthlyRent = "Enter your monthly rent.";
   }
-  if (step === 3) {
+  // The price step has nothing to check: Buy and the free letter are both fine, and the box is optional.
+  if (id === "sender") {
     if (!f.sendMode) e.sendMode = "Choose who sends the follow-ups.";
     // We can't send anything without management's address; self-send tenants can add it in their email app.
     const mgmtEmail = f.mgmtEmail.trim();
@@ -114,7 +130,7 @@ function validateStep(step: number, f: Fields, today: string): Record<string, st
       if (!f.sendAuthorized) e.sendAuthorized = "Please confirm we can email management for you.";
     }
   }
-  if (step === 4) {
+  if (id === "address") {
     if (f.tenantName.trim().length < 2) e.tenantName = "Enter the name you sign messages with.";
     if (f.address.trim().length < 5) e.address = "Enter your street address.";
     if (!f.aiConsent) e.aiConsent = "Please agree so we can set up your case.";
@@ -140,7 +156,7 @@ export function StartForm() {
       result = await createCaseAction(prev, fd);
     } catch (err) {
       // Let the success redirect through; anything else (a dropped connection, a body the server
-      // rejected, a deploy that replaced this page's actions) must not wipe four steps of answers.
+      // rejected, a deploy that replaced this page's actions) must not wipe five steps of answers.
       unstable_rethrow(err);
       submittedRef.current = false;
       return {
@@ -203,9 +219,9 @@ export function StartForm() {
     window.scrollTo({ top: 0 });
   }, [step]);
 
-  // Analytics: which step people reach, by its title. Never their answers.
+  // Analytics: which step people reach, by its id and title. Never their answers.
   useEffect(() => {
-    track("form_step_viewed", { step: step + 1, title: STEPS[step].title });
+    track("form_step_viewed", { step: step + 1, step_id: STEPS[step].id, title: STEPS[step].title });
   }, [step]);
 
   const switchToSelf = () => {
@@ -227,8 +243,27 @@ export function StartForm() {
     });
   };
 
+  const current = STEPS[step];
+  // The price shown on the price step (null before it's picked) and whether they tapped Buy.
+  const arm = priceArmById(fields.priceArm);
+  const bought = fields.priceChoice === "buy";
+  const boughtRef = useRef<HTMLDivElement>(null);
+
+  // For a moment after the page under the tenant's finger changes (a new step, or Buy scrolling the
+  // page), taps on it are ignored. Otherwise the second tap of a quick double tap lands on whatever
+  // just appeared there: Buy or the free letter before the price was seen, the OK-to-ask box, who
+  // sends, or the Continue bar that appears after Buy (skipping "Nothing was charged"). Back, in the
+  // header, stays tappable, and so does the keyboard.
+  const [settling, setSettling] = useState(false);
+  const settleTimer = useRef<number | undefined>(undefined);
+  const settle = () => {
+    setSettling(true);
+    window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => setSettling(false), 450);
+  };
+
   const next = () => {
-    const e = validateStep(step, fields, today);
+    const e = validateStep(current.id, fields, today);
     setErrors(e);
     if (Object.keys(e).length > 0) {
       // Move focus to the first problem (on a phone it's often below the fold) so it's seen and read out.
@@ -239,8 +274,39 @@ export function StartForm() {
       });
       return;
     }
-    if (step < STEPS.length - 1) setStep(step + 1);
-    else submit();
+    // Pick the price on the way to the price step, here in the tap and not during render. It's
+    // picked once per form fill: Back keeps it, so price_viewed isn't sent twice.
+    if (current.id === "rent" && !fields.priceArm) {
+      const picked = stickyPriceArm();
+      set("priceArm", picked.id);
+      track("price_viewed", priceEventProps(picked));
+    }
+    if (step < STEPS.length - 1) {
+      settle();
+      setStep(step + 1);
+    } else submit();
+  };
+
+  // Buy is a fake door: nothing is charged and there's no checkout. Either choice is final (Back
+  // shows it as made), so each form fill has one answer, and "buy" means they tapped Buy.
+  const buy = () => {
+    if (!arm || fields.priceChoice) return;
+    track("price_buy_tapped", priceEventProps(arm));
+    settle();
+    set("priceChoice", "buy");
+    // The tapped button is gone: move focus to "Paid plans aren't open yet" (screen readers read it)
+    // and bring it and the optional box above the Continue bar.
+    requestAnimationFrame(() => {
+      boughtRef.current?.focus({ preventScroll: true });
+      boughtRef.current?.scrollIntoView({ block: "center" });
+    });
+  };
+
+  const chooseFree = () => {
+    if (fields.priceChoice) return;
+    set("priceChoice", "free");
+    settle();
+    setStep(step + 1);
   };
 
   const submit = () => {
@@ -252,11 +318,14 @@ export function StartForm() {
       if (key === "tenantContact" && fields.sendMode !== "self") continue;
       if (key === "issueDescription" && !fields.issueTypes.includes("other")) continue;
       if (key === "firstReportedOn" && !fields.toldManagement) continue;
+      // The price test: nothing to send before a price was shown or picked, and the box only counts after Buy.
+      if ((key === "priceArm" || key === "priceChoice") && !value) continue;
+      if (key === "priceOkToAsk" && fields.priceChoice !== "buy") continue;
       if (key === "toldManagement") {
         fd.append(key, value ? "yes" : "no");
       } else if (Array.isArray(value)) {
         for (const v of value) fd.append(key, v);
-      } else if (key === "aiConsent" || key === "sendAuthorized") {
+      } else if (key === "aiConsent" || key === "sendAuthorized" || key === "priceOkToAsk") {
         if (value) fd.append(key, "on");
       } else if (key === "monthlyRent") {
         fd.append(key, String(value).replace(/[$,\s]/g, ""));
@@ -268,8 +337,6 @@ export function StartForm() {
     submittedRef.current = true;
     startTransition(() => formAction(fd));
   };
-
-  const current = STEPS[step];
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
@@ -296,7 +363,7 @@ export function StartForm() {
       </header>
 
       <main className="flex-1 px-5 pb-32 pt-4">
-        <div key={step} className="animate-rise">
+        <div key={step} className={cn("animate-rise", settling && "pointer-events-none")}>
           <h1 ref={headingRef} tabIndex={-1} className="text-[28px] font-bold leading-tight tracking-tight outline-none">
             {current.title}
           </h1>
@@ -309,7 +376,7 @@ export function StartForm() {
           ) : null}
 
           <div className="mt-7 space-y-6">
-            {step === 0 ? (
+            {current.id === "problems" ? (
               <>
                 {inviteBuilding ? (
                   <Notice icon={<Users className="size-5" />}>
@@ -390,7 +457,7 @@ export function StartForm() {
               </>
             ) : null}
 
-            {step === 1 ? (
+            {current.id === "told" ? (
               <>
                 <label className="flex cursor-pointer gap-3 rounded-2xl bg-white p-4 ring-1 ring-line has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink">
                   <input
@@ -426,7 +493,7 @@ export function StartForm() {
               </>
             ) : null}
 
-            {step === 2 ? (
+            {current.id === "rent" ? (
               <>
                 <Field label="Monthly rent" htmlFor="monthlyRent" error={errors.monthlyRent} hint="It never goes in a message unless you add it.">
                   <MoneyInput id="monthlyRent" value={fields.monthlyRent} onChange={(e) => set("monthlyRent", e.target.value)} placeholder="1,850" aria-invalid={Boolean(errors.monthlyRent)} />
@@ -435,8 +502,61 @@ export function StartForm() {
               </>
             ) : null}
 
-            {step === 3 ? (
+            {/* The price test, a fake door: nothing is ever charged, and there's no checkout or card field. */}
+            {current.id === "price" && arm ? (
               <>
+                <Card>
+                  <p className="text-2xl font-bold tracking-tight">{arm.line}</p>
+                  <p className="mt-2 text-[15px] leading-relaxed text-slate">{PRICE_COPY.body}</p>
+                  {/* Masked in session replays: it shows they picked no heat or hot water. */}
+                  {fields.issueTypes.includes("heat") ? <Notice className="ph-mask mt-4">{PRICE_COPY.heat311}</Notice> : null}
+                </Card>
+
+                {!fields.priceChoice ? (
+                  <div className="grid gap-3">
+                    <Button type="button" variant="secondary" size="lg" block onClick={buy}>
+                      {arm.button}
+                    </Button>
+                    <Button type="button" variant="secondary" size="lg" block onClick={chooseFree}>
+                      {PRICE_COPY.free}
+                    </Button>
+                  </div>
+                ) : null}
+
+                <div ref={boughtRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
+                  {bought ? (
+                    <Notice tone="good" icon={<Check className="size-5" />}>
+                      {PRICE_COPY.bought}
+                    </Notice>
+                  ) : fields.priceChoice === "free" ? (
+                    <Notice icon={<Check className="size-5" />}>
+                      {PRICE_COPY.freePicked} {PRICE_COPY.freeChosen}
+                    </Notice>
+                  ) : null}
+                </div>
+
+                {bought ? (
+                  // The input stays right before its span, so replays mask the sentence; ph-no-capture
+                  // keeps the box's checked state out of them too.
+                  <label className="flex gap-3 rounded-2xl bg-white p-4 ring-1 ring-line">
+                    <input
+                      type="checkbox"
+                      checked={fields.priceOkToAsk}
+                      onChange={(e) => set("priceOkToAsk", e.target.checked)}
+                      className="ph-no-capture mt-0.5 size-5 shrink-0 accent-[#08014E]"
+                    />
+                    <span className="text-[14px] leading-relaxed text-slate">
+                      <span className="font-semibold text-ink">{PRICE_COPY.okToAskLead}</span> {PRICE_COPY.okToAskRest}
+                    </span>
+                  </label>
+                ) : null}
+              </>
+            ) : null}
+
+            {current.id === "sender" ? (
+              <>
+                {/* Said only after the free choice, which is final, so it can't sway the tap; Buy tappers were told on the price step. */}
+                {fields.priceChoice === "free" ? <Notice icon={<Check className="size-5" />}>{PRICE_COPY.freeChosen}</Notice> : null}
                 <fieldset data-invalid={errors.sendMode ? "true" : undefined} aria-describedby={errors.sendMode ? "sendMode-error" : undefined} className="space-y-3">
                   <legend className="sr-only">Who sends the follow-ups</legend>
                   {(
@@ -552,7 +672,7 @@ export function StartForm() {
               </>
             ) : null}
 
-            {step === 4 ? (
+            {current.id === "address" ? (
               <>
                 {inviteBuilding ? (
                   <Notice icon={<Users className="size-5" />}>
@@ -605,21 +725,24 @@ export function StartForm() {
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line/70 bg-white/95 backdrop-blur">
-        <div className="mx-auto max-w-md px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          <Button type="button" size="lg" block onClick={next} loading={pending}>
-            {step < STEPS.length - 1 ? (
-              <>
-                Continue <ArrowRight className="size-5" aria-hidden="true" />
-              </>
-            ) : pending ? (
-              "Creating your case…"
-            ) : (
-              "Create my case"
-            )}
-          </Button>
+      {/* On the price step the two choices move the form along, so Continue only shows once one is made. */}
+      {current.id === "price" && arm && !fields.priceChoice ? null : (
+        <div className={cn("fixed inset-x-0 bottom-0 z-20 border-t border-line/70 bg-white/95 backdrop-blur", settling && "pointer-events-none")}>
+          <div className="mx-auto max-w-md px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <Button type="button" size="lg" block onClick={next} loading={pending}>
+              {step < STEPS.length - 1 ? (
+                <>
+                  Continue <ArrowRight className="size-5" aria-hidden="true" />
+                </>
+              ) : pending ? (
+                "Creating your case…"
+              ) : (
+                "Create my case"
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -637,16 +760,19 @@ function EstimatePreview({ fields, today }: { fields: Fields; today: string }) {
     noticeOn: clockStarted ? fields.firstReportedOn : today,
     endOn: today,
   });
+  // ph-mask hides the amounts, day counts and percentages in session replays: they repeat the answers.
   return (
-    <EstimateCard
-      estimate={estimate}
-      fixed={false}
-      issueLabel={issue.label}
-      lowPct={issue.low}
-      highPct={issue.high}
-      ofSeveral={fields.issueTypes.length > 1}
-      clockStarted={clockStarted}
-    />
+    <div className="ph-mask">
+      <EstimateCard
+        estimate={estimate}
+        fixed={false}
+        issueLabel={issue.label}
+        lowPct={issue.low}
+        highPct={issue.high}
+        ofSeveral={fields.issueTypes.length > 1}
+        clockStarted={clockStarted}
+      />
+    </div>
   );
 }
 

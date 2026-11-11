@@ -29,10 +29,18 @@ export function scrubUrl(value: string, ownOrigin: string): string {
 
 type Props = Record<string, unknown>;
 
+/**
+ * Search words: utm_term (the words that matched an ad) and ph_keyword (what someone typed into a
+ * search engine), with PostHog's $session_entry_ and $initial_ copies. They can describe the
+ * tenant's problem, so they always go. The other ad tags (utm_source, utm_campaign…) stay.
+ */
+const SEARCH_WORDS = /(utm_term|ph_keyword)$/;
+
 function scrubProps(props: Props, ownOrigin: string): Props {
   const out: Props = {};
   for (const [key, value] of Object.entries(props)) {
-    if (typeof value === "string" && /^https?:\/\//i.test(value)) out[key] = scrubUrl(value, ownOrigin);
+    if (SEARCH_WORDS.test(key)) continue;
+    else if (typeof value === "string" && /^https?:\/\//i.test(value)) out[key] = scrubUrl(value, ownOrigin);
     // $pathname, $initial_pathname and the like: drop any path that isn't a tracked page.
     else if (typeof value === "string" && key.endsWith("pathname") && !isTrackedPath(value)) continue;
     else out[key] = value;
@@ -40,7 +48,10 @@ function scrubProps(props: Props, ownOrigin: string): Props {
   return out;
 }
 
-/** Scrubs every URL in an event's properties and in the person properties it sets. */
+/**
+ * Scrubs every URL in an event's properties and in the person properties it sets, and drops search
+ * words. Ad tags such as utm_source=google stay as their own properties (never inside a URL).
+ */
 export function scrubEvent<E extends { properties: Props; $set?: Props; $set_once?: Props }>(event: E, ownOrigin: string): E {
   return {
     ...event,
@@ -48,6 +59,24 @@ export function scrubEvent<E extends { properties: Props; $set?: Props; $set_onc
     ...(event.$set ? { $set: scrubProps(event.$set, ownOrigin) } : {}),
     ...(event.$set_once ? { $set_once: scrubProps(event.$set_once, ownOrigin) } : {}),
   };
+}
+
+/** The ad tags we keep from a link: never utm_term (search words). */
+export const AD_TAG_KEYS = ["utm_source", "utm_medium", "utm_campaign", "utm_content"] as const;
+
+/**
+ * The ad tags in a link's query string (for example "?utm_source=google"), so the browser can keep
+ * them before PostHog has loaded. Only plain words are kept (letters, digits, - _ .), up to 64
+ * characters, so a tag can't carry anything a tenant typed.
+ */
+export function adTagsFrom(search: string): Record<string, string> {
+  const params = new URLSearchParams(search);
+  const tags: Record<string, string> = {};
+  for (const key of AD_TAG_KEYS) {
+    const value = params.get(key);
+    if (value && /^[A-Za-z0-9._-]{1,64}$/.test(value)) tags[key] = value;
+  }
+  return tags;
 }
 
 /**

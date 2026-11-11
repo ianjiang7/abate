@@ -5,6 +5,7 @@ import type { CaseRecord, MessageRecord } from "./types";
 import { newCaseSchema, replySchema } from "./validation";
 import { estimateAbatement } from "@/lib/domain/estimate";
 import { nextAction } from "@/lib/domain/ladder";
+import { PRICE_ARMS } from "@/lib/domain/pricing";
 import { buildMessage } from "@/lib/domain/templates";
 import { computeMetrics } from "./metrics";
 import { buildTimeline, caseEstimate, clockStartOn, ladderInputs, ladderProgress, pendingReplyReference, sentOnByStep, templateContext } from "./view";
@@ -44,6 +45,9 @@ const record: CaseRecord = {
   repairMissedAt: null,
   fixedOn: null,
   helpRequestedAt: null,
+  priceArm: null,
+  priceChoice: null,
+  priceOkToAsk: null,
 };
 
 function msg(partial: Partial<MessageRecord>): MessageRecord {
@@ -262,6 +266,38 @@ describe("newCaseSchema", () => {
     expect(r.error.issues[0].path[0]).toBe("firstReportedOn");
   });
 
+  describe("price test fields", () => {
+    const priceOf = (extra: Record<string, unknown>) => {
+      const r = newCaseSchema.safeParse({ ...valid, ...extra });
+      expect(r.success).toBe(true);
+      return r.success ? { priceArm: r.data.priceArm, priceChoice: r.data.priceChoice, priceOkToAsk: r.data.priceOkToAsk } : null;
+    };
+    const active = PRICE_ARMS.find((a) => a.weight > 0)!.id;
+
+    it("saves nulls when the form sent no price (a tab opened before the test)", () => {
+      expect(priceOf({})).toEqual({ priceArm: null, priceChoice: null, priceOkToAsk: null });
+    });
+
+    it("never fails a case over a price field", () => {
+      expect(priceOf({ priceArm: "zzz", priceChoice: "buy", priceOkToAsk: "on" })).toEqual({ priceArm: null, priceChoice: null, priceOkToAsk: null });
+      expect(priceOf({ priceArm: active, priceChoice: "maybe", priceOkToAsk: "yes" })).toEqual({ priceArm: active, priceChoice: null, priceOkToAsk: null });
+    });
+
+    it("accepts every arm id, including retired ones (weight 0)", () => {
+      for (const arm of PRICE_ARMS) expect(priceOf({ priceArm: arm.id, priceChoice: "free" })?.priceArm).toBe(arm.id);
+    });
+
+    it("keeps the OK-to-ask box only after Buy", () => {
+      expect(priceOf({ priceArm: active, priceChoice: "buy", priceOkToAsk: "on" })).toEqual({ priceArm: active, priceChoice: "buy", priceOkToAsk: true });
+      expect(priceOf({ priceArm: active, priceChoice: "buy" })).toEqual({ priceArm: active, priceChoice: "buy", priceOkToAsk: false });
+      expect(priceOf({ priceArm: active, priceChoice: "free", priceOkToAsk: "on" })).toEqual({ priceArm: active, priceChoice: "free", priceOkToAsk: null });
+    });
+
+    it("drops a choice made without a price", () => {
+      expect(priceOf({ priceChoice: "buy", priceOkToAsk: "on" })).toEqual({ priceArm: null, priceChoice: null, priceOkToAsk: null });
+    });
+  });
+
   it("requires reply text", () => {
     expect(replySchema.safeParse({ text: " ", receivedOn: "2026-10-18" }).success).toBe(false);
     expect(replySchema.safeParse({ text: "We'll come Tuesday.", receivedOn: "2026-10-18" }).success).toBe(true);
@@ -408,6 +444,42 @@ describe("metrics", () => {
     };
     const m = computeMetrics([silentFix], now);
     expect(m.h1).toMatchObject({ judged: 1, responded: 1, medianDaysToReply: 4, fixed: 1 });
+  });
+
+  // Written against whatever PRICE_ARMS says, so the Nov 16 weight swap doesn't break them.
+  describe("price test tile", () => {
+    const active = PRICE_ARMS.filter((a) => a.weight > 0);
+    const retired = PRICE_ARMS.filter((a) => a.weight === 0);
+    const beforeTest = { record, messages: [] };
+    const priced = (id: string, priceArm: string, priceChoice: "buy" | "free", priceOkToAsk: boolean | null = null) => ({
+      record: { ...record, id, priceArm, priceChoice, priceOkToAsk },
+      messages: [],
+    });
+
+    it("lists every running price, even before anyone has seen it", () => {
+      expect(computeMetrics([beforeTest], now).price).toEqual(
+        active.map((a) => ({ arm: a.id, label: a.label, active: true, shown: 0, buy: 0, okToAsk: 0, rate: null })),
+      );
+    });
+
+    it("counts Buy taps and OK-to-ask boxes per price, leaving out cases from before the test", () => {
+      const [arm] = active;
+      const rows = [priced("1", arm.id, "buy", true), priced("2", arm.id, "buy", false), priced("3", arm.id, "free"), priced("4", arm.id, "free"), beforeTest];
+      const cell = computeMetrics(rows, now).price.find((c) => c.arm === arm.id);
+      expect(cell).toEqual({ arm: arm.id, label: arm.label, active: true, shown: 4, buy: 2, okToAsk: 1, rate: 0.5 });
+    });
+
+    it("lists a retired price only once it has cases, marked as retired", () => {
+      const [old] = retired;
+      expect(computeMetrics([beforeTest], now).price.map((c) => c.arm)).not.toContain(old.id);
+      const cell = computeMetrics([priced("1", old.id, "free")], now).price.find((c) => c.arm === old.id);
+      expect(cell).toMatchObject({ arm: old.id, active: false, shown: 1, buy: 0, okToAsk: 0, rate: 0 });
+    });
+
+    it("keeps the order of the price config", () => {
+      const rows = [...PRICE_ARMS].reverse().map((a, i) => priced(String(i), a.id, "buy"));
+      expect(computeMetrics(rows, now).price.map((c) => c.arm)).toEqual(PRICE_ARMS.map((a) => a.id));
+    });
   });
 });
 

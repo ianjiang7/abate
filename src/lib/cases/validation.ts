@@ -3,6 +3,7 @@ import { isIsoDate } from "@/lib/domain/dates";
 import { ISSUE_TYPES, isIssueTypeId, isReportChannelId, sortIssues, type IssueTypeId } from "@/lib/domain/issues";
 import { bareUnit } from "@/lib/domain/templates";
 import { isReplyCategory } from "@/lib/domain/ladder";
+import { isPriceArmId } from "@/lib/domain/pricing";
 
 const isoDate = z.string().refine(isIsoDate, "Pick a date.");
 const optionalText = (max: number) =>
@@ -72,8 +73,24 @@ export const newCaseSchema = z
     sendAuthorized: z.literal("on").optional(),
     aiConsent: z.literal("on", { message: "Please agree so we can set up your case." }),
     invite: optionalText(10),
+    // The price test (a fake door, nothing is charged). These never fail a case: anything unexpected
+    // is saved as null. Retired arms still count, so a tab opened before a swap still saves.
+    priceArm: z
+      .string()
+      .optional()
+      .transform((v) => (isPriceArmId(v) ? v : null)),
+    priceChoice: z
+      .string()
+      .optional()
+      .transform((v) => (v === "buy" || v === "free" ? v : null)),
+    priceOkToAsk: z.string().optional(),
   })
   .transform((v) => (v.sendMode === "self" ? { ...v, tenantEmail: null, sendAuthorized: undefined } : v))
+  // A choice only counts with the price it was made on; the OK-to-ask box only shows after Buy.
+  .transform((v) => {
+    const priceChoice = v.priceArm ? v.priceChoice : null;
+    return { ...v, priceChoice, priceOkToAsk: priceChoice === "buy" ? v.priceOkToAsk === "on" : null };
+  })
   .transform(({ toldManagement, ...v }) => {
     const toldBefore = toldManagement ? toldManagement === "yes" : Boolean(v.firstReportedOn);
     return {

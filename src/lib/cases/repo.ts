@@ -9,7 +9,7 @@ import type { CaseBundle, CaseRecord, MessageRecord, PhotoRecord } from "./types
 import type { NewCaseInput } from "./validation";
 
 const CASE_COLUMNS =
-  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_types, issue_description, started_on, told_before, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at";
+  "id, token, code, created_at, address, unit, borough, bbl, bin, issue_type, issue_types, issue_description, started_on, told_before, first_reported_on, first_reported_via, prior_followups, monthly_rent, tenant_name, tenant_contact, mgmt_name, mgmt_email, status, send_mode, send_mode_chosen, dollar_in_notice, send_authorized_at, tenant_email, paused_at, pause_reason, repair_scheduled_for, repair_scheduled_at, repair_missed_at, fixed_on, help_requested_at, price_arm, price_choice, price_ok_to_ask";
 
 const MESSAGE_COLUMNS =
   "id, case_id, direction, created_at, step, subject, body, sent_at, approved_at, ready_on, sent_by, claimed_at, withdrawn_at, edited, draft_body, received_at, logged_by, classification, ai_classification, classified_by, classified_at, classification_summary, classification_date, reply_reference, ai_source";
@@ -55,6 +55,9 @@ function toCase(r: Row): CaseRecord {
     repairMissedAt: str(r.repair_missed_at),
     fixedOn: str(r.fixed_on),
     helpRequestedAt: str(r.help_requested_at),
+    priceArm: str(r.price_arm),
+    priceChoice: r.price_choice === "buy" || r.price_choice === "free" ? r.price_choice : null,
+    priceOkToAsk: typeof r.price_ok_to_ask === "boolean" ? r.price_ok_to_ask : null,
   };
 }
 
@@ -128,6 +131,9 @@ export async function insertCase(
         send_mode: input.sendMode,
         send_mode_chosen: true,
         dollar_in_notice: extra.dollarInNotice,
+        price_arm: input.priceArm,
+        price_choice: input.priceChoice,
+        price_ok_to_ask: input.priceOkToAsk,
         send_authorized_at: input.sendMode === "abate" ? new Date().toISOString() : null,
         tenant_email: input.sendMode === "abate" ? input.tenantEmail : null,
         invited_by_case_id: extra.invitedByCaseId,

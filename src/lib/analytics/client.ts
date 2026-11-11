@@ -1,5 +1,5 @@
 import type { PostHog } from "posthog-js";
-import { isTrackedPath, mayCapture, POSTHOG_PERSISTENCE_NAME, scrubEvent, scrubUrl } from "./privacy";
+import { adTagsFrom, isTrackedPath, mayCapture, POSTHOG_PERSISTENCE_NAME, scrubEvent, scrubUrl } from "./privacy";
 
 // PostHog in the browser: funnel events and session replay on the landing, start and privacy pages
 // only. Without NEXT_PUBLIC_POSTHOG_KEY and NEXT_PUBLIC_POSTHOG_HOST (local dev, e2e) nothing loads.
@@ -15,6 +15,9 @@ let shownPath = "";
 let sawOtherPage = false;
 /** Events from before PostHog finished loading. */
 const waiting: [string, Properties][] = [];
+/** The ad tags (utm_source and the like) from the link that brought this tab, kept for the session. */
+const AD_TAGS_KEY = "abate_ad_tags";
+let adTags: Record<string, string> = {};
 
 /** Called by <Analytics /> whenever the page on screen changes, before the browser paints it. */
 export function showPage(pathname: string): void {
@@ -26,15 +29,54 @@ export function showPage(pathname: string): void {
     posthog?.stopSessionRecording();
     return;
   }
+  rememberAdTags();
   track("$pageview");
   load();
 }
 
-/** Sends a funnel event. Properties never hold anything a tenant typed. */
+/**
+ * PostHog reads ad tags from the URL only once it has loaded, so a tenant who taps Start on the
+ * landing page before then would lose them (the Start links have no query string). We keep them
+ * ourselves, in this tab only, and add them to every event track() sends (not as PostHog session
+ * properties, which PostHog clears when it starts a new session). A link with any campaign
+ * parameter (utm_* or an ad click id) is a new visit and replaces the tags, even with none we keep;
+ * a page reached from the landing page by a full page load reads them from the referrer; anything
+ * else keeps the tab's earlier tags.
+ */
+function rememberAdTags(): void {
+  let found = campaignTagsIn(window.location.search);
+  if (!found && document.referrer) {
+    try {
+      const from = new URL(document.referrer);
+      if (from.origin === window.location.origin && isTrackedPath(from.pathname)) found = campaignTagsIn(from.search);
+    } catch {
+      // not a URL: no tags
+    }
+  }
+  try {
+    if (found) window.sessionStorage.setItem(AD_TAGS_KEY, JSON.stringify(found));
+    else found = adTagsFrom(new URLSearchParams(JSON.parse(window.sessionStorage.getItem(AD_TAGS_KEY) ?? "{}")).toString());
+  } catch {
+    // storage blocked: keep what this page load found
+  }
+  if (found) adTags = found;
+}
+
+/** Ad click ids (Google, Meta, Microsoft): a link with one is a new ad visit even without utm tags. */
+const CLICK_IDS = ["gclid", "gbraid", "wbraid", "gad_source", "fbclid", "msclkid"];
+
+/** The ad tags in a query string, or null when it has no campaign parameter at all (not a new visit). */
+function campaignTagsIn(search: string): Record<string, string> | null {
+  const keys = [...new URLSearchParams(search).keys()];
+  return keys.some((k) => k.startsWith("utm_") || CLICK_IDS.includes(k)) ? adTagsFrom(search) : null;
+}
+
+/** Sends a funnel event, with this tab's ad tags. Properties never hold anything a tenant typed. */
 export function track(event: string, properties: Properties = {}): void {
   if (!KEY || !HOST || !isTrackedPath(window.location.pathname)) return;
-  if (posthog) posthog.capture(event, properties);
-  else if (waiting.length < 20) waiting.push([event, properties]);
+  const withTags = { ...adTags, ...properties };
+  if (posthog) posthog.capture(event, withTags);
+  else if (waiting.length < 20) waiting.push([event, withTags]);
 }
 
 /** Sends start_clicked for taps on any link to /start, with where the link sits on the page. */

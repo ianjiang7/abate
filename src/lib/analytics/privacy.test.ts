@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTrackedPath, mayCapture, scrubEvent, scrubUrl, visitorFromCookie } from "./privacy";
+import { adTagsFrom, isTrackedPath, mayCapture, scrubEvent, scrubUrl, visitorFromCookie } from "./privacy";
 
 const SITE = "https://abate.example";
 const TOKEN = "t".repeat(32);
@@ -72,6 +72,71 @@ describe("scrubEvent", () => {
     });
     expect(event.$set_once).toEqual({ $initial_referrer: "https://www.reddit.com" });
     expect(JSON.stringify(event)).not.toContain(TOKEN);
+  });
+});
+
+describe("keeps ad tags", () => {
+  // Which ad or partner link brought someone stays, as its own properties. URLs still lose their
+  // query string, and search words go, since they can describe the tenant's problem.
+  const SEARCH_TERM = "no heat landlord queens";
+
+  function check(source: string, entrySource: string) {
+    const tags = { utm_source: source, utm_medium: "cpc", utm_campaign: "nov-price", utm_content: "heat-ad" };
+    const event = scrubEvent(
+      {
+        event: "price_buy_tapped",
+        properties: {
+          $current_url: `${SITE}/start?utm_source=${source}&utm_campaign=nov&invite=K7QM4X`,
+          $session_entry_url: `${SITE}/?utm_source=${entrySource}`,
+          ...tags,
+          $session_entry_utm_source: entrySource,
+          gclid: "<masked>",
+          price_arm: "p29",
+          utm_term: SEARCH_TERM,
+          $session_entry_utm_term: SEARCH_TERM,
+          ph_keyword: SEARCH_TERM,
+        },
+        $set_once: { $initial_utm_source: entrySource, $initial_utm_term: SEARCH_TERM },
+      },
+      SITE,
+    );
+    expect(event.properties).toEqual({
+      $current_url: `${SITE}/start`,
+      $session_entry_url: `${SITE}/`,
+      ...tags,
+      $session_entry_utm_source: entrySource,
+      gclid: "<masked>",
+      price_arm: "p29",
+    });
+    expect(event.$set_once).toEqual({ $initial_utm_source: entrySource });
+    expect(JSON.stringify(event)).not.toContain(SEARCH_TERM);
+    expect(JSON.stringify(event)).not.toContain("K7QM4X");
+  }
+
+  it("keeps utm tags and the price, drops the query string and search words", () => {
+    check("google", "meta");
+  });
+
+  it.each(["google", "meta", "test", "partner-bronx"])("works for utm_source=%s", (source) => {
+    check(source, source);
+  });
+});
+
+describe("adTagsFrom (kept before PostHog loads)", () => {
+  it("keeps source, medium, campaign and content", () => {
+    expect(adTagsFrom("?utm_source=google&utm_medium=cpc&utm_campaign=nov-price&utm_content=ad_b&invite=K7QM4X")).toEqual({
+      utm_source: "google",
+      utm_medium: "cpc",
+      utm_campaign: "nov-price",
+      utm_content: "ad_b",
+    });
+  });
+
+  it("never keeps search words or anything that isn't a plain word", () => {
+    expect(adTagsFrom("?utm_term=no+heat+in+apartment&ph_keyword=landlord")).toEqual({});
+    expect(adTagsFrom("?utm_source=" + encodeURIComponent("my landlord at 12 Main St"))).toEqual({});
+    expect(adTagsFrom("?utm_source=" + "a".repeat(65))).toEqual({});
+    expect(adTagsFrom("")).toEqual({});
   });
 });
 

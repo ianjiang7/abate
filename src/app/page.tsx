@@ -51,7 +51,7 @@ export default function Home() {
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate text-pretty sm:text-xl">
             Tell us what&apos;s broken. We&apos;ll send management written follow-ups on a schedule, and nothing goes out until
-            you approve it. It&apos;s free for NYC renters while we pilot it.
+            you approve it. Your first letter is free, and there&apos;s no card to enter.
           </p>
           <div className="mt-9">
             <ButtonLink href="/start" size="lg" block className="sm:w-auto">
@@ -131,7 +131,7 @@ export default function Home() {
             <h2 className="text-[32px] font-bold leading-tight tracking-tight md:text-5xl">Questions</h2>
             <div className="border-t border-line">
               <Question q="Is it free?">
-                Yes. The follow-ups are free while we pilot Abate, and there&apos;s no card to enter.
+                Your first letter is free, and there&apos;s no card to enter.
               </Question>
               <Question q="Is this legal advice?">
                 No. We&apos;re students, not lawyers, and Abate isn&apos;t a law firm. Our messages say what&apos;s broken and since

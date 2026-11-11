@@ -47,6 +47,14 @@ export type CaseRecord = {
   repairMissedAt: string | null;
   fixedOn: IsoDate | null;
   helpRequestedAt: string | null;
+  /**
+   * The price test on the start form (a fake door, nothing is charged). All three are null for
+   * cases created before the test. priceArm is the arm id from src/lib/domain/pricing.ts that was
+   * shown; priceChoice is Buy or the free first letter; priceOkToAsk is the optional box after Buy.
+   */
+  priceArm: string | null;
+  priceChoice: "buy" | "free" | null;
+  priceOkToAsk: boolean | null;
 };
 
 export type MessageRecord = {

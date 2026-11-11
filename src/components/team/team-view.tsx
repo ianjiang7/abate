@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge, Card, CardHeader, Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { teamOverview, type TeamCase } from "@/lib/cases/service";
-import { PASS, type Metrics, type NoticeCell, type NoticeSplit } from "@/lib/cases/metrics";
+import { PASS, type Metrics, type NoticeCell, type NoticeSplit, type PriceCell } from "@/lib/cases/metrics";
 import { hasDatabase } from "@/lib/db/client";
 import { formatShortDate, nyDate } from "@/lib/domain/dates";
 import { getIssueType } from "@/lib/domain/issues";
@@ -203,6 +203,8 @@ function MetricsPanel({ m, invites, helpRequests }: { m: Metrics; invites: numbe
         <Tile label="Ever paused or switched to sending themselves" value={`${m.h2.backedOut}`} note={reasons ? `Reasons: ${reasons}` : `Pass at ${PASS.maxBackedOut} or fewer`} pass={m.h2.offered > 0 ? m.h2.backedOutPass : null} />
       </div>
 
+      <PricePanel cells={m.price} />
+
       <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-slate">Side signals</h3>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <Tile label="Repairs marked fixed" value={`${m.h1.fixed}`} />
@@ -262,6 +264,28 @@ function NoticeSplitPanel({ s, baseline }: { s: NoticeSplit; baseline: number | 
       <p className="mt-2 text-xs text-slate">
         Each case is assigned a group when it starts (balanced within each sender), so we never pick who gets the dollar figure. With a handful of cases these are
         directions, not proof; tenants chose who sends, so compare senders with care.
+      </p>
+    </>
+  );
+}
+
+/** The price test on the start form (a fake door): Buy taps per price, among tenants who finished the form. */
+function PricePanel({ cells }: { cells: PriceCell[] }) {
+  return (
+    <>
+      <h3 className="mt-6 text-sm font-bold uppercase tracking-wider text-slate">Price test · Buy taps by price (nothing is charged)</h3>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {cells.map((c) => (
+          <Tile
+            key={c.arm}
+            label={`Buy · ${c.label}${c.active ? "" : " · retired"}`}
+            value={`${c.buy} of ${c.shown}`}
+            note={`${pct(c.rate)}${c.okToAsk ? ` · ${c.okToAsk} OK to ask 3 questions` : ""}`}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-slate">
+        Only tenants who went on to create a case. The real Buy rate (everyone who saw a price) and the split by ad source are in PostHog.
       </p>
     </>
   );

@@ -4,6 +4,7 @@ import { estimateAbatement } from "./estimate";
 import { issuesPhrase, mostSeriousIssue, sortIssues } from "./issues";
 import { dueSummary, nextAction, type LadderMessage } from "./ladder";
 import { buildMailto, trackingAddress } from "./mailto";
+import { chooseArm, isPriceArmId, PRICE_ARMS, PRICE_COPY, priceArmById, priceEventProps } from "./pricing";
 import { bareUnit, buildMessage, unfilledPlaceholders, type TemplateContext } from "./templates";
 
 describe("dates", () => {
@@ -313,6 +314,81 @@ describe("templates", () => {
     expect(m.body.startsWith("Hello,")).toBe(true);
     expect(m.body).toContain("at 123 Example St, Bronx, NY 10452: no heat or hot water.");
     expect(m.body).not.toContain("followed up");
+  });
+});
+
+describe("price arms", () => {
+  // Fixed weights, so these tests don't change when the live weights are swapped on Nov 16.
+  const withWeights = (weights: Record<string, number>) => PRICE_ARMS.map((a) => ({ ...a, weight: weights[a.id] ?? 0 }));
+  const nov10 = withWeights({ p29: 2, p9: 1 });
+  const nov16 = withWeights({ p29: 2, p49: 1 });
+  const pick = (roll: number, arms = nov10, stored: string | null = null) => chooseArm(stored, roll, arms).id;
+
+  it("picks by weight", () => {
+    expect([0, 0.66].map((r) => pick(r))).toEqual(["p29", "p29"]);
+    expect([0.67, 0.999].map((r) => pick(r))).toEqual(["p9", "p9"]);
+  });
+
+  it("splits evenly spaced rolls 2 to 1", () => {
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 300; i++) {
+      const id = pick(i / 300);
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    expect(counts).toEqual({ p29: 200, p9: 100 });
+  });
+
+  it("never picks a weight-0 arm", () => {
+    for (const arms of [nov10, nov16, PRICE_ARMS]) {
+      for (let i = 0; i < 300; i++) expect(chooseArm(null, i / 300, arms).weight).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps a stored arm that's still running", () => {
+    expect(pick(0, nov10, "p9")).toBe("p9");
+    expect(pick(0.999, nov10, "p29")).toBe("p29");
+  });
+
+  it("re-rolls a retired, unknown or missing arm", () => {
+    for (const stored of ["p49", "zzz", null]) {
+      expect(pick(0, nov10, stored)).toBe("p29");
+      expect(pick(0.9, nov10, stored)).toBe("p9");
+    }
+  });
+
+  it("works with the Nov 16 swap ($9 retired, another price in its place)", () => {
+    expect(pick(0.5, nov16)).toBe("p29");
+    expect(pick(0.9, nov16)).toBe("p49");
+    // A browser that saw $9 before the swap gets a new price.
+    expect(pick(0.9, nov16, "p9")).toBe("p49");
+    expect(pick(0.9, nov16, "p29")).toBe("p29");
+  });
+
+  it("looks arms up by id, retired or not", () => {
+    expect(isPriceArmId("p49")).toBe(true);
+    expect(isPriceArmId("zzz")).toBe(false);
+    expect(isPriceArmId(undefined)).toBe(false);
+    expect(priceArmById("p9")?.label).toBe("$9");
+    expect(priceArmById("")).toBeNull();
+    expect(priceArmById(null)).toBeNull();
+  });
+
+  it("has a config that's safe to ship", () => {
+    const ids = PRICE_ARMS.map((a) => a.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(PRICE_ARMS.some((a) => a.weight > 0)).toBe(true);
+    for (const arm of PRICE_ARMS) {
+      expect(Number.isInteger(arm.weight) && arm.weight >= 0, arm.id).toBe(true);
+      // Longer labels wrap on a 375px phone.
+      expect(arm.button.length, arm.button).toBeLessThanOrEqual(28);
+      const price = arm.label.match(/\$\d+/)?.[0];
+      expect(price, arm.id).toBeDefined();
+      expect(arm.button).toContain(price);
+      expect(arm.line).toContain(price);
+    }
+    const copy = [...PRICE_ARMS.flatMap((a) => [a.label, a.line, a.button]), ...Object.values(PRICE_COPY)];
+    for (const text of copy) expect(text).not.toMatch(/owed|guarantee|will get/i);
+    expect(Object.keys(priceEventProps(PRICE_ARMS[0]))).toEqual(["price_arm"]);
   });
 });
 

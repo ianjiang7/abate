@@ -26,11 +26,19 @@ export default function PrivacyPage() {
         </p>
 
         <Section title="What we collect">
-          Only what your follow-ups need: your address and unit, what needs fixing and when it started, a photo if you add one,
-          when and how you told management, management&apos;s name and email, your name, your monthly rent (to estimate what you may
-          be owed), your email if our team sends for you, an optional phone or email for reminders, and the replies you or
-          management send. On the home page, the start form and this page, we also see which screens you reach (PostHog,
-          below).
+          <p>
+            Only what your follow-ups need: your address and unit, what needs fixing and when it started, a photo if you add
+            one, when you first told management, management&apos;s email, your name, your monthly rent (to estimate what you may
+            be owed), your email if our team sends for you, an optional phone or email for reminders, and the replies you or
+            management send. On the home page, the start form and this page, we also see which screens you reach (PostHog,
+            below).
+          </p>
+          <p className="mt-3">
+            The start form also shows a price for a paid plan. It&apos;s a test: paid plans aren&apos;t open, and nothing is ever
+            charged. We save which price you saw, whether you tapped it or the free option, and whether you said we may ask you
+            3 questions. While a price is being tested, your browser remembers which one you saw, so it usually stays the
+            same if you reload.
+          </p>
         </Section>
 
         <Section title="Who sees it">
@@ -54,16 +62,20 @@ export default function PrivacyPage() {
             <li>
               <strong className="text-ink">PostHog, our analytics service</strong>, shows us which screens people reach on the home
               page, the start form and this page, so we can see where people stop. It records taps and scrolling on those screens,
-              but what you type is hidden in recordings. When you create a case, it learns only who sends your follow-ups and how
-              many problems you picked. It never runs on your case page.
+              but what you type and your estimate are hidden in recordings. On the price step it learns which price you saw and
+              whether you tapped it. If one of our ads or a partner&apos;s link brought you, it learns which one from a tag in the
+              link (like utm_source=google). Your browser keeps that tag until you close the tab, and PostHog&apos;s cookie
+              remembers the first one you arrived with for up to a year. When you create a case, it learns only who sends your follow-ups and how many
+              problems you picked. It never runs on your case page.
             </li>
           </ul>
         </Section>
 
         <Section title="Where it's kept">
           Cases are stored in our database (Supabase) and photos in a private storage bucket. Your case page lives at a private
-          link with no login, so keep the link to yourself. We never sell your information, and we don&apos;t use ads. The only
-          analytics is PostHog, described above.
+          link with no login, so keep the link to yourself. We never sell your information. We advertise on Google and Meta
+          (Instagram and Facebook). Those companies know you tapped an ad, as with any ad, but our site runs no ad pixels or
+          tracking code from them. The only analytics is PostHog, described above.
         </Section>
 
         <Section title="When we delete it">

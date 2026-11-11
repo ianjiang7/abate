@@ -1,8 +1,28 @@
 import { expect, test, type Page } from "@playwright/test";
 import { TEAM_KEY } from "../playwright.config";
+import { PRICE_ARMS, PRICE_COPY } from "../src/lib/domain/pricing";
 
 // Next keeps visited pages mounted but hidden (React Activity), so text lookups filter to visible
 // elements. Role lookups already skip hidden ones.
+
+// The price step is a fake door: no ad pixel, conversion tag or payment provider may ever load.
+const AD_OR_PAYMENT = /googletagmanager|google-analytics|doubleclick|facebook\.net|facebook\.com\/tr|stripe/;
+let adOrPaymentRequests: string[] = [];
+
+test.beforeEach(({ page }) => {
+  adOrPaymentRequests = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (AD_OR_PAYMENT.test(url.host + url.pathname)) adOrPaymentRequests.push(url.host + url.pathname);
+  });
+});
+
+test.afterEach(() => {
+  expect(adOrPaymentRequests).toEqual([]);
+});
+
+// The prices running now. Each test pins one, so runs repeat and still pass after a weight swap.
+const ACTIVE_ARMS = PRICE_ARMS.filter((a) => a.weight > 0);
 
 /** Draws a small "photo" in the browser and returns it as JPEG bytes, like a phone camera would. */
 async function fakePhoto(page: Page): Promise<Buffer> {
@@ -41,8 +61,11 @@ async function startCase(
   page: Page,
   sendMode: "abate" | "self",
   prefix: string,
-  { photo, alsoMold = false, toldBefore = true }: { photo: boolean; alsoMold?: boolean; toldBefore?: boolean },
+  { photo, price, alsoMold = false, toldBefore = true }: { photo: boolean; price: "buy" | "free"; alsoMold?: boolean; toldBefore?: boolean },
 ) {
+  // The browser "remembers" a price before the first page loads, as if it had seen one before.
+  const arm = sendMode === "abate" ? ACTIVE_ARMS[0] : ACTIVE_ARMS[ACTIVE_ARMS.length - 1];
+  await page.addInitScript((id) => localStorage.setItem("abate_price_arm", id), arm.id);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Repair still not fixed/ })).toBeVisible();
   await shot(page, `${prefix}-01-landing`);
@@ -84,11 +107,45 @@ async function startCase(
   await expect(visibleText(page, "Enter your monthly rent.")).toBeVisible();
   await page.getByLabel("Monthly rent").fill("1,850");
   await expect(visibleText(page, toldBefore ? /^Estimated amount you may be owed so far$/ : /^What you may be owed$/)).toBeVisible();
+  // Session replays hide the estimate's amounts.
+  await expect(page.locator(".ph-mask").filter({ hasText: /\$\d/ }).filter({ visible: true }).first()).toBeVisible();
   await shot(page, `${prefix}-03-estimate`);
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 4: who sends
+  // Step 4: the price test, a fake door. Nothing is charged and there's nowhere to enter a card.
+  await expect(page.getByRole("heading", { name: PRICE_COPY.title })).toBeVisible();
+  await expect(visibleText(page, arm.line)).toBeVisible();
+  // Every run picks "No heat or hot water", so the free 311 line shows, masked because it reveals the problem.
+  await expect(page.locator(".ph-mask").filter({ hasText: PRICE_COPY.heat311 }).filter({ visible: true })).toBeVisible();
+  // Only the two choices move the form along.
+  await expect(page.getByRole("button", { name: "Continue" })).toHaveCount(0);
+  await expect(page.locator('input[autocomplete^="cc-"]')).toHaveCount(0);
+  await shot(page, `${prefix}-03b-price`);
+  const okToAsk = page.getByRole("checkbox", { name: /Tell me when paid plans open/ });
+  if (price === "buy") {
+    await page.getByRole("button", { name: arm.button, exact: true }).click();
+    await expect(visibleText(page, PRICE_COPY.bought)).toBeVisible();
+    // Replays never record whether this box is ticked.
+    await expect(okToAsk).toHaveClass(/\bph-no-capture\b/);
+    await okToAsk.check();
+    await page.getByRole("button", { name: "Continue" }).click();
+  } else {
+    await page.getByRole("button", { name: PRICE_COPY.free }).click();
+  }
+
+  // Step 5: who sends
   await expect(page.getByRole("heading", { name: "Who should send the follow-ups?" })).toBeVisible();
+  // Back shows the price step as they left it: either choice is final.
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByRole("heading", { name: PRICE_COPY.title })).toBeVisible();
+  await expect(page.getByRole("button", { name: arm.button, exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: PRICE_COPY.free })).toHaveCount(0);
+  if (price === "buy") await expect(okToAsk).toBeChecked();
+  else await expect(visibleText(page, PRICE_COPY.freePicked)).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("heading", { name: "Who should send the follow-ups?" })).toBeVisible();
+  // Free choosers learn, after choosing, that the pilot gives them the full plan anyway.
+  if (price === "free") await expect(visibleText(page, PRICE_COPY.freeChosen)).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(visibleText(page, "Choose who sends the follow-ups.")).toBeVisible();
   if (sendMode === "abate") {
@@ -122,7 +179,7 @@ async function startCase(
   await shot(page, `${prefix}-04-who-sends`);
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 5: name and address come last.
+  // Step 6: name and address come last.
   await expect(page.getByRole("heading", { name: "Where do you live?" })).toBeVisible();
   await page.getByRole("button", { name: "Create my case" }).click();
   await expect(visibleText(page, "Enter your street address.")).toBeVisible();
@@ -161,7 +218,7 @@ const teamUrl = `/team/${TEAM_KEY}?test=only`;
 const teamItem = (page: Page, code: string) => page.locator("li").filter({ hasText: code }).filter({ visible: true }).first();
 
 test("concierge: the tenant approves, our team sends and reads replies, then the case closes", async ({ page }) => {
-  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true, alsoMold: true, toldBefore: false });
+  const { caseUrl, code } = await startCase(page, "abate", "c", { photo: true, price: "buy", alsoMold: true, toldBefore: false });
   await expect(page.getByRole("heading", { name: "Approve your written notice" })).toBeVisible();
   await expect(visibleText(page, "From:")).toBeVisible();
   // They hadn't told management: the notice is the first report, and the estimate is per day until it goes out.
@@ -239,11 +296,13 @@ test("concierge: the tenant approves, our team sends and reads replies, then the
   // The team page's numbers include this case.
   await page.goto(teamUrl);
   await expect(visibleText(page, "Chose Abate to send for them")).toBeVisible();
+  // The price test's Buy taps, one tile per price.
+  await expect(visibleText(page, /^Buy · /).first()).toBeVisible();
   await shot(page, "c-11-team-results");
 });
 
 test("self-send: the tenant sends from their own email", async ({ page }) => {
-  const { caseUrl } = await startCase(page, "self", "s", { photo: false });
+  const { caseUrl } = await startCase(page, "self", "s", { photo: false, price: "free" });
   await expect(page.getByRole("heading", { name: "Send your written notice" })).toBeVisible();
   // They told management 12 days ago: the notice cites that, and the estimate already counts those days.
   await expect(visibleText(page, /first reported it to you on/)).toBeVisible();
