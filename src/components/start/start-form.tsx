@@ -48,8 +48,6 @@ type Fields = {
   priceArm: string;
   /** "buy" once they tap Buy (it can't be undone), "free" for the free first letter. */
   priceChoice: "buy" | "free" | "";
-  /** The optional "Tell me when paid plans open" box, only shown after Buy. */
-  priceOkToAsk: boolean;
 };
 
 const EMPTY: Fields = {
@@ -74,7 +72,6 @@ const EMPTY: Fields = {
   invite: "",
   priceArm: "",
   priceChoice: "",
-  priceOkToAsk: false,
 };
 
 type Photo = { id: string; file: File; url: string };
@@ -86,7 +83,7 @@ const STEPS = [
   { id: "problems", title: "What needs fixing?", subtitle: "About 2 minutes. Nothing is saved until the last step.", fields: ["issueTypes", "issueDescription", "startedOn"] },
   { id: "told", title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn"] },
   { id: "rent", title: "What's your monthly rent?", subtitle: "We use it to estimate what you may be owed.", fields: ["monthlyRent"] },
-  { id: "price", title: PRICE_COPY.title, subtitle: PRICE_COPY.subtitle, fields: ["priceArm", "priceChoice", "priceOkToAsk"] },
+  { id: "price", title: PRICE_COPY.title, subtitle: PRICE_COPY.subtitle, fields: ["priceArm", "priceChoice"] },
   { id: "sender", title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized", "tenantContact"] },
   { id: "address", title: "Where do you live?", subtitle: "Your name and address go on every message, so management knows which apartment.", fields: ["tenantName", "address", "unit", "photos", "aiConsent"] },
 ] as const;
@@ -294,8 +291,7 @@ export function StartForm() {
     track("price_buy_tapped", priceEventProps(arm));
     settle();
     set("priceChoice", "buy");
-    // The tapped button is gone: move focus to "Paid plans aren't open yet" (screen readers read it)
-    // and bring it and the optional box above the Continue bar.
+    // Focus the availability notice and bring it above the Continue bar.
     requestAnimationFrame(() => {
       boughtRef.current?.focus({ preventScroll: true });
       boughtRef.current?.scrollIntoView({ block: "center" });
@@ -318,14 +314,13 @@ export function StartForm() {
       if (key === "tenantContact" && fields.sendMode !== "self") continue;
       if (key === "issueDescription" && !fields.issueTypes.includes("other")) continue;
       if (key === "firstReportedOn" && !fields.toldManagement) continue;
-      // The price test: nothing to send before a price was shown or picked, and the box only counts after Buy.
+      // The price test: nothing to send before a price was shown or picked.
       if ((key === "priceArm" || key === "priceChoice") && !value) continue;
-      if (key === "priceOkToAsk" && fields.priceChoice !== "buy") continue;
       if (key === "toldManagement") {
         fd.append(key, value ? "yes" : "no");
       } else if (Array.isArray(value)) {
         for (const v of value) fd.append(key, v);
-      } else if (key === "aiConsent" || key === "sendAuthorized" || key === "priceOkToAsk") {
+      } else if (key === "aiConsent" || key === "sendAuthorized") {
         if (value) fd.append(key, "on");
       } else if (key === "monthlyRent") {
         fd.append(key, String(value).replace(/[$,\s]/g, ""));
@@ -525,7 +520,7 @@ export function StartForm() {
 
                 <div ref={boughtRef} tabIndex={-1} role="status" aria-live="polite" className="outline-none">
                   {bought ? (
-                    <Notice tone="good" icon={<Check className="size-5" />}>
+                    <Notice>
                       {PRICE_COPY.bought}
                     </Notice>
                   ) : fields.priceChoice === "free" ? (
@@ -535,21 +530,6 @@ export function StartForm() {
                   ) : null}
                 </div>
 
-                {bought ? (
-                  // The input stays right before its span, so replays mask the sentence; ph-no-capture
-                  // keeps the box's checked state out of them too.
-                  <label className="flex gap-3 rounded-2xl bg-white p-4 ring-1 ring-line">
-                    <input
-                      type="checkbox"
-                      checked={fields.priceOkToAsk}
-                      onChange={(e) => set("priceOkToAsk", e.target.checked)}
-                      className="ph-no-capture mt-0.5 size-5 shrink-0 accent-[#08014E]"
-                    />
-                    <span className="text-[14px] leading-relaxed text-slate">
-                      <span className="font-semibold text-ink">{PRICE_COPY.okToAskLead}</span> {PRICE_COPY.okToAskRest}
-                    </span>
-                  </label>
-                ) : null}
               </>
             ) : null}
 

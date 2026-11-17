@@ -125,9 +125,7 @@ async function startCase(
   if (price === "buy") {
     await page.getByRole("button", { name: arm.button, exact: true }).click();
     await expect(visibleText(page, PRICE_COPY.bought)).toBeVisible();
-    // Replays never record whether this box is ticked.
-    await expect(okToAsk).toHaveClass(/\bph-no-capture\b/);
-    await okToAsk.check();
+    await expect(okToAsk).toHaveCount(0);
     await page.getByRole("button", { name: "Continue" }).click();
   } else {
     await page.getByRole("button", { name: PRICE_COPY.free }).click();
@@ -140,7 +138,7 @@ async function startCase(
   await expect(page.getByRole("heading", { name: PRICE_COPY.title })).toBeVisible();
   await expect(page.getByRole("button", { name: arm.button, exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: PRICE_COPY.free })).toHaveCount(0);
-  if (price === "buy") await expect(okToAsk).toBeChecked();
+  if (price === "buy") await expect(visibleText(page, PRICE_COPY.bought)).toBeVisible();
   else await expect(visibleText(page, PRICE_COPY.freePicked)).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Who should send the follow-ups?" })).toBeVisible();

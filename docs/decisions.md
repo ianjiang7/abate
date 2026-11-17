@@ -3,6 +3,10 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## Nov 17, 2026 · Use Buy now for the price test
+
+The price card records a Buy now click at the displayed price, then shows that the paid plan is out of stock and the pilot is free. We removed the waitlist checkbox so the price test measures the purchase click directly.
+
 ## 2026-11-10: Price test on the start form (fake door, nothing charged)
 
 - **What:** a new step on `/start`, right after the rent and the estimate: "Get the whole

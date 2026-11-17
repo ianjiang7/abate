@@ -19,11 +19,11 @@ export type PriceArm = {
 };
 
 export const PRICE_ARMS: readonly PriceArm[] = [
-  { id: "p29", weight: 2, label: "$29", line: "$29 one time, for this repair", button: "Get the full plan – $29" },
-  { id: "p9", weight: 1, label: "$9", line: "$9 one time, for this repair", button: "Get the full plan – $9" },
-  { id: "p49", weight: 0, label: "$49", line: "$49 one time, for this repair", button: "Get the full plan – $49" },
-  { id: "p19", weight: 0, label: "$19", line: "$19 one time, for this repair", button: "Get the full plan – $19" },
-  { id: "p29_fixed", weight: 0, label: "$29 once fixed", line: "$29, only once your repair is fixed", button: "Full plan – $29 once fixed" },
+  { id: "p29", weight: 2, label: "$29", line: "$29 one time, for this repair", button: "Buy now" },
+  { id: "p9", weight: 1, label: "$9", line: "$9 one time, for this repair", button: "Buy now" },
+  { id: "p49", weight: 0, label: "$49", line: "$49 one time, for this repair", button: "Buy now" },
+  { id: "p19", weight: 0, label: "$19", line: "$19 one time, for this repair", button: "Buy now" },
+  { id: "p29_fixed", weight: 0, label: "$29 once fixed", line: "$29, only once your repair is fixed", button: "Buy now" },
 ];
 
 export const PRICE_COPY = {
@@ -32,13 +32,11 @@ export const PRICE_COPY = {
   body: "You send each letter from your own email in one tap. We write and time them.",
   heat311: "No heat or hot water? You can file a free 311 complaint now, any time.",
   free: "Just the free first letter",
-  bought: "Paid plans aren't open yet. Nothing was charged, and you get the full plan free during the pilot.",
+  bought: "The paid plan is out of stock. Nothing was charged, and you get the full plan free during the pilot.",
   /** On the price step after Back, once the free letter was picked. */
   freePicked: "You picked the free first letter.",
   /** Shown once they pick the free letter (it can't be undone either), so they know what they'll get. */
   freeChosen: "During the pilot you get the full follow-up plan free either way.",
-  okToAskLead: "Tell me when paid plans open.",
-  okToAskRest: "It's OK to ask me 3 quick questions.",
 } as const;
 
 /** Whether this is one of our arm ids, retired or not. */

@@ -383,7 +383,7 @@ describe("price arms", () => {
       expect(arm.button.length, arm.button).toBeLessThanOrEqual(28);
       const price = arm.label.match(/\$\d+/)?.[0];
       expect(price, arm.id).toBeDefined();
-      expect(arm.button).toContain(price);
+      expect(arm.button).toBe("Buy now");
       expect(arm.line).toContain(price);
     }
     const copy = [...PRICE_ARMS.flatMap((a) => [a.label, a.line, a.button]), ...Object.values(PRICE_COPY)];
