@@ -17,6 +17,7 @@ const START = "Start my case";
 const TEAM = ["Ilias", "Rayhan", "Ian", "Omar"];
 
 export default function Home() {
+  const teamEmail = (process.env.TEAM_GMAIL ?? process.env.CC_EMAIL ?? "").trim();
   return (
     <div className="bg-white">
       <header className="sticky top-0 z-20 border-b border-line/70 bg-white">
@@ -176,7 +177,18 @@ export default function Home() {
 
       <footer className="bg-ink">
         <div className="mx-auto flex max-w-5xl flex-col gap-2 border-t border-white/15 px-5 py-8 text-sm text-periwinkle sm:flex-row sm:justify-between">
-          <p>Abate is a student project at NYU Stern, piloting with NYC tenants.</p>
+          <p>
+            Abate is a student project at NYU Stern, piloting with NYC tenants.
+            {teamEmail ? (
+              <>
+                {" "}
+                Questions?{" "}
+                <a href={`mailto:${teamEmail}`} className="underline underline-offset-4 hover:text-white">
+                  {teamEmail}
+                </a>
+              </>
+            ) : null}
+          </p>
           <p>
             Not a law firm. Nothing here is legal advice. ·{" "}
             <Link href="/privacy" className="underline underline-offset-4 hover:text-white">

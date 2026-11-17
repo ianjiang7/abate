@@ -35,8 +35,7 @@ export default function PrivacyPage() {
           </p>
           <p className="mt-3">
             The start form also shows a price for a paid plan. It&apos;s a test: paid plans aren&apos;t open, and nothing is ever
-            charged. We save which price you saw, whether you tapped it or the free option, and whether you said we may ask you
-            3 questions. While a price is being tested, your browser remembers which one you saw, so it usually stays the
+            charged. We save which price you saw, and whether you tapped it or the free option. While a price is being tested, your browser remembers which one you saw, so it usually stays the
             same if you reload.
           </p>
         </Section>

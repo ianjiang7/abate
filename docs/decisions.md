@@ -3,6 +3,22 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## Nov 17, 2026 · Google Ads and the $100 (proposed)
+
+- **What:** spend the $100 credit on about $70 of Google Search ads and about $30 of flyers in
+  buildings with heat complaints, plus free partner and community posts, all tagged with
+  `utm_source`. The plan is in `docs/google-ads.md`.
+- **Still no ad pixels or conversion tags.** Google bids on clicks (Maximize clicks), and we read
+  results in PostHog by `utm_source`. *Why:* the privacy page promises no ad tracking code, and
+  $100 doesn't bring enough sign-ups for Google's automatic bidding to learn from anyway.
+- **Ads never mention prices or the paid plan;** they promote the free first letter. *Why:*
+  advertising an offer that then shows "out of stock" risks Google's rules on unavailable offers,
+  and a price in the ad would bias the price test.
+- **Site changes:** the home page footer shows the team email (from `TEAM_GMAIL`), and the privacy
+  page no longer mentions the "OK to ask me 3 questions" box removed earlier today.
+- **Open:** which single price to show during the ad run (the Nov 16 swap hasn't happened), and
+  the pass line, written down before launch.
+
 ## Nov 17, 2026 · Use Buy now for the price test
 
 The price card records a Buy now click at the displayed price, then shows that the paid plan is out of stock and the pilot is free. We removed the waitlist checkbox so the price test measures the purchase click directly.
