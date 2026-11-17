@@ -7,6 +7,35 @@ portfolio and the Nov 5 memo.
 
 The start-form price test is the paid-interest experiment. We removed the recovery offer from case pages and kept historical requests for the team.
 
+## Nov 17, 2026 · Price-free ad and a clear pricing-test disclosure
+
+- **The Google ad never mentions a price.** It advertises the repair help Abate delivers today:
+  "NYC Rental Repair Help" / "Get written follow-ups for unresolved repairs. Start a case with
+  Abate." *Why:* neither $9 nor $29 can be bought, and Google's misrepresentation policy prohibits
+  advertising unavailable offers. A single price-free ad also means everyone arrives expecting the
+  same offer, so $9 and $29 differ only in the price seen on the start form.
+- **After Buy now, the card says the price was a test** ("This price was a test. Paid plans aren't
+  available yet, and nothing was charged. During the pilot you get the full follow-up plan
+  free."), replacing "The paid plan is out of stock". *Why:* the policy covers the landing page
+  too, and "out of stock" implied a product that exists.
+- **$9 and $29 stay live during the ad run,** replacing the earlier plan to show one price.
+
+## Nov 17, 2026 · Google Ads and the $100 (proposed)
+
+- **What:** spend the $100 credit on about $70 of Google Search ads and about $30 of flyers in
+  buildings with heat complaints, plus free partner and community posts, all tagged with
+  `utm_source`. The plan is in `docs/google-ads.md`.
+- **Still no ad pixels or conversion tags.** Google bids on clicks (Maximize clicks), and we read
+  results in PostHog by `utm_source`. *Why:* the privacy page promises no ad tracking code, and
+  $100 doesn't bring enough sign-ups for Google's automatic bidding to learn from anyway.
+- **Ads never mention prices or the paid plan;** they promote the free first letter. *Why:*
+  advertising an offer that then shows "out of stock" risks Google's rules on unavailable offers,
+  and a price in the ad would bias the price test.
+- **Site changes:** the home page footer shows the team email (from `TEAM_GMAIL`), and the privacy
+  page no longer mentions the "OK to ask me 3 questions" box removed earlier today.
+- **Open:** which single price to show during the ad run (the Nov 16 swap hasn't happened), and
+  the pass line, written down before launch.
+
 ## Nov 17, 2026 · Use Buy now for the price test
 
 The price card records a Buy now click at the displayed price, then shows that the paid plan is out of stock and the pilot is free. We removed the waitlist checkbox so the price test measures the purchase click directly.
