@@ -74,7 +74,8 @@ live.
    the **price step**, a fake door: one price for the whole follow-up plan (each browser keeps the
    one it was given while that price is still being tested; the prices live in
    `src/lib/domain/pricing.ts`), with a Buy button and "Just the free first letter". Nothing is
-   ever charged: Buy now records the click and says the paid plan is out of stock; Free choosers are then told the pilot gives them the full plan anyway. Either
+   ever charged: Buy now records the click and then says plainly that the price was a test, paid plans aren't
+   available and nothing was charged; Free choosers are then told the pilot gives them the full plan anyway. Either
    choice is final, and the form goes on. Then **who sends the follow-ups** (Abate's team, or the
    tenant). Neither choice is pre-selected; the choice measured hypothesis 2 in Sprint 2. Since
    Nov 10 it comes right after a price card that describes sending letters yourself, so later

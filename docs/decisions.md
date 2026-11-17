@@ -3,6 +3,19 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## Nov 17, 2026 · Price-free ad and a clear pricing-test disclosure
+
+- **The Google ad never mentions a price.** It advertises the repair help Abate delivers today:
+  "NYC Rental Repair Help" / "Get written follow-ups for unresolved repairs. Start a case with
+  Abate." *Why:* neither $9 nor $29 can be bought, and Google's misrepresentation policy prohibits
+  advertising unavailable offers. A single price-free ad also means everyone arrives expecting the
+  same offer, so $9 and $29 differ only in the price seen on the start form.
+- **After Buy now, the card says the price was a test** ("This price was a test. Paid plans aren't
+  available yet, and nothing was charged. During the pilot you get the full follow-up plan
+  free."), replacing "The paid plan is out of stock". *Why:* the policy covers the landing page
+  too, and "out of stock" implied a product that exists.
+- **$9 and $29 stay live during the ad run,** replacing the earlier plan to show one price.
+
 ## Nov 17, 2026 · Google Ads and the $100 (proposed)
 
 - **What:** spend the $100 credit on about $70 of Google Search ads and about $30 of flyers in

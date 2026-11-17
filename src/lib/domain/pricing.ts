@@ -32,7 +32,7 @@ export const PRICE_COPY = {
   body: "You send each letter from your own email in one tap. We write and time them.",
   heat311: "No heat or hot water? You can file a free 311 complaint now, any time.",
   free: "Just the free first letter",
-  bought: "The paid plan is out of stock. Nothing was charged, and you get the full plan free during the pilot.",
+  bought: "This price was a test. Paid plans aren't available yet, and nothing was charged. During the pilot you get the full follow-up plan free.",
   /** On the price step after Back, once the free letter was picked. */
   freePicked: "You picked the free first letter.",
   /** Shown once they pick the free letter (it can't be undone either), so they know what they'll get. */

@@ -16,10 +16,10 @@ Ads send strangers through it. Three questions, in order:
 
 **What $100 can and can't tell us.** At a guessed $1 to $5 a click (check Google's Keyword Planner
 for real numbers), $100 buys roughly 20 to 80 clicks, and only some of them reach the price step.
-With 30 people seeing a price, 6 Buy taps (20%) means the real rate is likely somewhere between
-10% and 37%. That's enough to tell "almost nobody would pay" from "a real share would". It's not
-enough to compare $9 with $29. So while the ads run, **show one price** (see the open decision
-below).
+The ad is the same for everyone and never mentions a price, so everyone arrives expecting the same
+offer, and the $9 and $29 groups differ only in the price they see. With a few dozen price views
+the gap between them is a direction, not proof: 6 Buy taps out of 30 (20%) is consistent with a
+real rate anywhere from about 10% to 37%.
 
 A Buy tap on a fake door overstates real payment. Call or email the Buy tappers who created a case
 (`price_choice = 'buy'` in Supabase) and ask what they expected to pay for and whether they would
@@ -84,40 +84,30 @@ space heater, boiler repair.
 Check the **Search terms report** every other day and add new negatives for searches that aren't
 tenants with a repair.
 
-**Responsive search ad** (one per ad group; headlines are 30 characters or fewer, descriptions 90 or fewer)
+**Responsive search ad** (one per ad group). The ad promotes the repair help Abate delivers today
+and **never mentions a price or a paid plan**: neither $9 nor $29 can be bought, and Google's
+[misrepresentation policy](https://support.google.com/adspolicy/answer/6020955) prohibits
+advertising offers that aren't available. Pin the first headline and the first description to
+position 1. Google requires at least 3 headlines and 2 descriptions, so the others fill those
+slots without adding a new claim.
 
-Headlines:
+| | Text | Characters (limit) |
+| --- | --- | --- |
+| Headline 1 (pinned) | NYC Rental Repair Help | 22 (30) |
+| Headline 2 | Written Repair Follow-Ups | 25 (30) |
+| Headline 3 | Repair Not Fixed Yet? | 21 (30) |
+| Description 1 (pinned) | Get written follow-ups for unresolved repairs. Start a case with Abate. | 70 (90) |
+| Description 2 | Tell us what's broken. We draft timed follow-ups, and you approve each one. | 75 (90) |
 
-- Landlord Won't Fix It?
-- No Heat or Hot Water in NYC?
-- Leak, Mold or Pests?
-- Repair Dragging On?
-- We Chase Management for You
-- Stop Chasing Your Landlord
-- Timed Repair Follow-Ups
-- Your First Letter Is Free
-- See What You May Be Owed
-- Rent-Back Estimate in 2 Min
-- You Approve Every Message
-- A Dated Record of Every Step
-- No Card, No Login
-- For NYC Renters
-- Student Pilot at NYU Stern
+Rules for any line added later (Google's policy plus AGENTS.md):
 
-Descriptions:
+- No prices, no paid plan, no "buy". Only what someone can use today.
+- Say "may be owed" and "estimate" if abatement comes up at all. Never "you are owed", "get $X
+  back" or a dollar promise. No legal claims, and nothing that sounds like a law firm.
 
-- Tell us what's broken. We draft timed follow-ups, and you approve each one.
-- Estimate the rent abatement you may be owed while repairs drag on. Not legal advice.
-- Your first letter is free. No login. We keep a dated record of every notice and reply.
-- Built for NYC tenants whose repairs management isn't fixing. Takes about 2 minutes.
-
-Wording rules for any new line (from AGENTS.md):
-
-- Say "may be owed" and "estimate". Never "you are owed", "get $X back" or a dollar promise.
-- No legal claims, and nothing that sounds like a law firm.
-- **Don't put prices or the paid plan in an ad.** Ads promote what's really available: the free
-  first letter. A price in an ad that leads to "out of stock" risks Google's rule against
-  advertising offers that aren't available, and it would bias the price test.
+**The landing page counts too.** Google's misrepresentation policy covers the page the ad sends
+people to, not only the ad. After someone taps Buy now, the price card says plainly that the price
+was a test, paid plans aren't available, and nothing was charged (it used to say "out of stock").
 
 **Sitelinks (optional):** "Start my case" → `/start`, "Privacy" → `/privacy`.
 
@@ -139,8 +129,8 @@ their first letter is read case by case on the team page, by creation time.
 
 ## Before launch
 
-- [ ] **Decide the price for the ad run** (one arm, so the data isn't split). The Nov 16 swap in
-      README.md hasn't happened: `p29` (weight 2) and `p9` (weight 1) are still live.
+- [ ] **Keep $9 and $29 as the live prices for the ad run** and add a PostHog annotation when the
+      ads start. Both are live now (`p29` weight 2, `p9` weight 1); don't swap arms mid-run.
 - [ ] **Confirm the abatement percentages** with legal aid or a tenant attorney. AGENTS.md says to
       do this before real testers see them, and ad visitors are strangers.
 - [ ] **Have the letters reviewed.** If a stranger picks "Abate's team sends", the formal notice and
