@@ -15,7 +15,7 @@ import { trackingAddress } from "@/lib/domain/mailto";
 import { EstimateCard } from "./estimate-card";
 import { NextStepCard, type LatestReply } from "./next-step-card";
 import { PhotosCard } from "./photos-card";
-import { HelpCard, InviteCard, SaveLinkCard, TrackView } from "./share-cards";
+import { InviteCard, SaveLinkCard, TrackView } from "./share-cards";
 import { TimelineCard } from "./timeline-card";
 
 export async function CaseView({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -130,16 +130,11 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         clockNote={clockNote}
       />
 
-      {/* The 25% offer only makes sense when there may be money to recover. */}
-      {(record.status === "fixed" && estimate.high > 0) || action.kind === "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize /> : null}
-
       <TimelineCard items={buildTimeline(record, messages)} progress={ladderProgress(messages, action.kind === "send" ? action.step : null)} today={today} />
 
       <PhotosCard photos={photos} />
 
       {record.status === "open" && record.bbl ? <InviteCard token={token} code={record.code} /> : null}
-
-      {record.status === "open" && action.kind !== "all_sent" ? <HelpCard token={token} requested={Boolean(record.helpRequestedAt)} emphasize={false} /> : null}
     </div>
   );
 }

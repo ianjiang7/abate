@@ -61,7 +61,7 @@ behalf (with the tenant's approval on each one) and reads every reply by hand.
    and at most 1 tester pauses or switches to sending themselves. We also ask how comfortable they
    felt at the day-7 check-in.
 
-Side signals, not pass/fail: neighbor invites, "recover this for 25%" taps, and how often the AI
+Side signals, not pass/fail: neighbor invites and how often the AI
 (reading replies in the background only) agreed with our team. The team page shows all of these
 live.
 
@@ -97,8 +97,7 @@ live.
    reading moves the case along the ladder. Tenants can correct a reading.
 5. **Pause:** a tenant using Abate can pause anytime (with a reason) or switch to sending
    themselves. Both count as backing out for hypothesis 2.
-6. **Invite neighbors**, and two **fake doors**: "we'll recover this for 25%" on the case page, as
-   before, and the price step on the start form (item 1).
+6. **Invite neighbors** from the case page.
 7. **Private case link** (no login) to come back, follow along, or mark the repair fixed.
 
 Data: `cases` (incl. `issue_types`, most serious first, with `issue_type` as the most serious;
@@ -144,7 +143,7 @@ A reply changes the path:
 | Repair scheduled | Confirm the date; check in the day after |
 | Needs access to the unit | Help the tenant offer access times |
 | Disputes or refuses | Formal notice, then the 311 guide |
-| Says it's fixed | Ask the tenant to confirm; if yes, mark fixed and show the fake door |
+| Says it's fixed | Ask the tenant to confirm; if yes, mark fixed |
 | Unclear | Flag for a teammate |
 
 ## Reading replies (concierge)
@@ -181,8 +180,6 @@ A reply changes the path:
 - **Day-7 check-in:** ask "How comfortable were you with Abate contacting your landlord?" and
   keep the quote.
 - **Building-wide cases:** if several neighbors join, the team writes a joint letter by hand.
-- **Recovering money:** we talk to tenants who tap "I'm interested". No negotiation, court or
-  attorney features.
 
 ## Do not build
 

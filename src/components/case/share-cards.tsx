@@ -1,11 +1,10 @@
 "use client";
 
-import { Bookmark, Check, Copy, HandHeart, MessageCircle, Share2, Users } from "lucide-react";
-import { useActionState, useEffect, useState } from "react";
-import { helpAction, trackAction, type CaseActionState } from "@/app/case/[token]/actions";
+import { Bookmark, Check, Copy, MessageCircle, Share2, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { trackAction } from "@/app/case/[token]/actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, Notice } from "@/components/ui/card";
-import { Field, Input } from "@/components/ui/field";
+import { Card, CardHeader } from "@/components/ui/card";
 
 // Count a case view once per page session; Next re-runs effects when a hidden page is shown again
 // and refresh() re-renders the case after every action.
@@ -111,50 +110,6 @@ export function InviteCard({ token, code }: { token: string; code: string }) {
         {copied ? "Invite link copied" : "Invite a neighbor"}
       </Button>
       <p className="mt-3 text-xs text-slate">They get their own private case. We only share your building&apos;s street address, never your apartment or details.</p>
-    </Card>
-  );
-}
-
-/** Fake door: interest in a paid recovery service. Nothing is charged or automated. */
-export function HelpCard({ token, requested, emphasize }: { token: string; requested: boolean; emphasize: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [state, formAction, pending] = useActionState<CaseActionState, FormData>(helpAction.bind(null, token), {});
-
-  if (requested || state.ok) {
-    return (
-      <Card tone="good">
-        <CardHeader icon={<Check className="size-5" />} title="Thanks, we'll be in touch" subtitle="Someone from the Abate team will reach out within two days. Nothing is charged while we pilot." />
-      </Card>
-    );
-  }
-
-  return (
-    <Card emphasis={emphasize}>
-      <CardHeader icon={<HandHeart className="size-5" />} title="Want us to recover this for you?" subtitle="We handle the follow-ups and push for the rent credit you may be owed. You pay 25% of what you get, and only if you get paid." />
-      {!open ? (
-        <Button
-          type="button"
-          block
-          variant={emphasize ? "primary" : "secondary"}
-          onClick={() => {
-            setOpen(true);
-            void trackAction(token, "help_opened", {});
-          }}
-        >
-          I&apos;m interested
-        </Button>
-      ) : (
-        <form action={formAction} className="space-y-3">
-          <Field label="Best phone or email to reach you" htmlFor="help-contact" error={state.errors?.contact}>
-            <Input id="help-contact" name="contact" required maxLength={120} autoComplete="tel" />
-          </Field>
-          {state.message ? <Notice tone="bad">{state.message}</Notice> : null}
-          <Button type="submit" block loading={pending}>
-            Ask the team to reach out
-          </Button>
-          <p className="text-xs text-slate">This is a pilot. We&apos;ll talk it through with you first, and nothing is charged.</p>
-        </form>
-      )}
     </Card>
   );
 }

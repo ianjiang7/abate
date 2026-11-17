@@ -375,15 +375,7 @@ export async function saveContact(token: string, contact: string): Promise<Actio
   return { ok: true };
 }
 
-export async function requestHelp(token: string, contact: string): Promise<ActionResult> {
-  const record = await findCaseByToken(token);
-  if (!record) return NOT_FOUND;
-  await updateCase(record.id, { help_requested_at: new Date().toISOString(), help_contact: contact });
-  await logEvent(record.id, "help_requested", {});
-  return { ok: true };
-}
-
-const CLIENT_EVENTS = new Set(["case_viewed", "draft_shown", "draft_edited", "send_clicked", "copy_clicked", "neighbor_invited", "link_copied", "help_opened"]);
+const CLIENT_EVENTS = new Set(["case_viewed", "draft_shown", "draft_edited", "send_clicked", "copy_clicked", "neighbor_invited", "link_copied"]);
 
 export async function recordClientEvent(token: string, name: string, props: Record<string, unknown>): Promise<void> {
   if (!CLIENT_EVENTS.has(name)) return;

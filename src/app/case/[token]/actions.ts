@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { isCaseToken } from "@/lib/cases/ids";
-import { confirmFixed, correctReply, logReply, pauseCase, recordClientEvent, recordStep, reportNotFixed, requestHelp, resumeCase, saveContact } from "@/lib/cases/service";
+import { confirmFixed, correctReply, logReply, pauseCase, recordClientEvent, recordStep, reportNotFixed, resumeCase, saveContact } from "@/lib/cases/service";
 import { categorySchema, helpSchema, pauseReasonSchema, replySchema } from "@/lib/cases/validation";
 import { isIsoDate, nyDate } from "@/lib/domain/dates";
 import type { ReplyCategory, StepId } from "@/lib/domain/ladder";
@@ -95,20 +95,6 @@ export async function notFixedAction(token: string): Promise<CaseActionState> {
   if (!isCaseToken(token)) return NOT_FOUND;
   try {
     const result = await reportNotFixed(token);
-    if (!result.ok) return { ok: false, message: result.message };
-  } catch {
-    return FAILED;
-  }
-  refresh();
-  return { ok: true };
-}
-
-export async function helpAction(token: string, _prev: CaseActionState, formData: FormData): Promise<CaseActionState> {
-  if (!isCaseToken(token)) return NOT_FOUND;
-  const parsed = helpSchema.safeParse({ contact: text(formData, "contact") });
-  if (!parsed.success) return { ok: false, errors: { contact: parsed.error.issues[0]?.message ?? "Add a phone number or email." } };
-  try {
-    const result = await requestHelp(token, parsed.data.contact);
     if (!result.ok) return { ok: false, message: result.message };
   } catch {
     return FAILED;
