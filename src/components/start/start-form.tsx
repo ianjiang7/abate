@@ -376,9 +376,9 @@ export function StartForm() {
                         <label
                           key={t.id}
                           className={cn(
-                            "flex min-h-[88px] cursor-pointer flex-col items-start justify-between gap-2 rounded-2xl bg-white p-3.5 text-left text-[14px] font-semibold leading-snug ring-1 transition",
+                            "flex min-h-[88px] cursor-pointer flex-col items-start justify-between gap-2 rounded-2xl p-3.5 text-left text-[14px] font-semibold leading-snug ring-1 transition",
                             "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
-                            active ? "ring-2 ring-ink shadow-[var(--shadow-card)]" : "ring-line hover:ring-periwinkle",
+                            active ? "bg-periwinkle-soft ring-2 ring-ink" : "bg-white ring-line hover:ring-periwinkle",
                           )}
                         >
                           <input
@@ -390,13 +390,13 @@ export function StartForm() {
                             className="sr-only"
                           />
                           <span className="flex w-full items-start justify-between gap-2">
-                            <span className={cn("grid size-9 place-items-center rounded-xl", active ? "bg-ink text-white" : "bg-lavender text-ink")}>
+                            <span className={cn("grid size-9 place-items-center rounded-xl", active ? "bg-white text-ink" : "bg-lavender text-ink")}>
                               <IssueIcon type={t.id} />
                             </span>
                             {/* A check mark shows several can be picked, unlike a single choice. */}
                             <span
                               aria-hidden="true"
-                              className={cn("grid size-6 place-items-center rounded-md ring-1", active ? "bg-ink text-white ring-ink" : "bg-white ring-line")}
+                              className={cn("grid size-6 place-items-center rounded-md ring-1", active ? "bg-white text-ink ring-ink" : "bg-white ring-line")}
                             >
                               {active ? <Check className="size-4" /> : null}
                             </span>

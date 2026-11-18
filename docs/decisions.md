@@ -433,3 +433,12 @@ once the owner supplies the event snippet; no invented ID, purchase event, amoun
 Google container configuration remains external: no automatic form/user-data collection or custom tags
 that read tenant input. Map the custom signup event OR configure the direct conversion, not both.
 Source: https://support.google.com/google-ads/answer/12985952 (current Google gtm.js install snippet).
+
+
+## 2026-11-18 — Simplify tenant-page accents
+
+Following owner approval, remove the broad orange top border on blue elements. Status badges use
+pale blue with blue text; selected issues use pale blue surfaces, blue outlines and blue checks.
+Estimate cards and buttons stay solid blue. Tenant headers, progress indicators and supporting
+colors use blues and neutral borders. Orange remains in the landing page's CTA and decorative accents.
+No changes to layout, fonts, case behavior or team-page styling.
