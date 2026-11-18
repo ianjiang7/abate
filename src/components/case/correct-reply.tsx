@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { correctReplyAction, type CaseActionState } from "@/app/case/[token]/actions";
+import { correctReplyAction, type CaseActionState } from "@/app/(private)/case/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";

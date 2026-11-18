@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { upgradeAction, type CaseActionState } from "@/app/case/[token]/actions";
+import { upgradeAction, type CaseActionState } from "@/app/(private)/case/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Card, Notice } from "@/components/ui/card";
 import { priceArmById } from "@/lib/domain/pricing";

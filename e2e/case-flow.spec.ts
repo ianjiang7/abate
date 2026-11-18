@@ -6,7 +6,18 @@ const arm = PRICE_ARMS.find((a) => a.weight > 0)!;
 const text = (page: Page, value: string | RegExp) => page.getByText(value).filter({ visible: true });
 function ago(days: number) { const d = new Date(); d.setDate(d.getDate() - days); return d.toLocaleDateString("en-CA"); }
 const forbidden: string[] = [];
-test.beforeEach(({ page }) => {
+const googleEvents: unknown[] = [];
+test.beforeEach(async ({ page }) => {
+  googleEvents.length = 0;
+  await page.exposeFunction("recordGoogleEvent", (event: unknown) => googleEvents.push(event));
+  // Never contact the live advertising container during tests. Model its persistent listeners.
+  await page.route("https://www.googletagmanager.com/**", (route) => route.fulfill({
+    contentType: "application/javascript",
+    body: `window.googleTestLoaded = true;
+      window.dataLayer.forEach(e => window.recordGoogleEvent(e));
+      const originalPush = window.dataLayer.push.bind(window.dataLayer);
+      window.dataLayer.push = function(e) { window.recordGoogleEvent(e); return originalPush(e); };`,
+  }));
   forbidden.length = 0;
   page.on("request", (r) => { if (/doubleclick|facebook\.net|stripe|google-analytics/.test(r.url())) forbidden.push(r.url()); });
 });
@@ -51,6 +62,9 @@ async function start(page: Page, choice: "free" | "buy", told = true) {
   await page.getByRole("checkbox", { name: /I agree/ }).check();
   await page.getByRole("button", { name: "Create my case" }).click();
   await page.waitForURL(/\/case\/[A-Za-z0-9_-]{32}\?new=1/);
+  expect(googleEvents.filter((e) => (e as { event?: string }).event === "abate_signup_completed")).toEqual([expect.objectContaining({ event: "abate_signup_completed", eventTimeout: 1000 })]);
+  expect(await page.evaluate(() => typeof window.gtag)).toBe("undefined");
+  await expect(page.locator("#abate-google-tag")).toHaveCount(0);
   const url = page.url().replace(/\?new=1$/, "");
   const code = (await text(page, /^Case [A-Z0-9]{6}$/).textContent())!.replace("Case ", "");
   return { url, code };
@@ -101,4 +115,27 @@ test("full plan saves dated replies, team review sets next draft, tenant marks f
   await page.getByRole("button", { name: "Already fixed? Mark it done" }).click();
   await page.getByRole("button", { name: "It's fixed" }).click();
   await expect(page.getByRole("heading", { name: "Fixed. Nice work." })).toBeVisible();
+});
+
+
+test("Google tag stays on public pages and is destroyed on private navigation", async ({ page }) => {
+  await page.goto("/start?invite=PRIVATECODE&utm_term=sensitive");
+  await expect(page.locator("#abate-google-tag")).toHaveCount(1);
+  const settings = await page.evaluate(() => Array.from(window.dataLayer![0] as ArrayLike<unknown>));
+  expect(settings).toEqual(["set", {
+    page_location: "http://localhost:3100/start", page_referrer: "", page_title: "Start your case · Abate", allow_ad_personalization_signals: false,
+  }]);
+  // Exercise Next Link navigation across roots, not just page.goto.
+  await page.goto(`/team/${TEAM_KEY}?test=only`);
+  expect(await page.evaluate(() => typeof window.gtag)).toBe("undefined");
+  await page.goto("/case/invalid-private-token");
+  await page.getByRole("link", { name: "Start a new case" }).click();
+  await expect(page.locator("#abate-google-tag")).toHaveCount(1);
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp("/case/"));
+  expect(await page.evaluate(() => typeof window.gtag)).toBe("undefined");
+  await page.goto("/case/invalid-private-token");
+  expect(await page.evaluate(() => typeof window.gtag)).toBe("undefined");
+  await page.goto("/unknown-private-token");
+  expect(await page.evaluate(() => typeof window.gtag)).toBe("undefined");
 });

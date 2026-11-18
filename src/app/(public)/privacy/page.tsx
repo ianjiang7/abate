@@ -69,11 +69,18 @@ export default function PrivacyPage() {
           </ul>
         </Section>
 
+        <Section title="Google Ads measurement">
+          On the home page, start form and privacy page, we load Google&apos;s tag to measure visits from
+          our ads and completed signups. Google may use cookies and receive device and browser information
+          and ad-click identifiers. Our signup event contains no name, address, rent, repair details,
+          management replies or private case link. We disable ad-personalization signals. Google tracking
+          does not load on private case or team pages. Choosing the Full plan is not recorded as a purchase.
+        </Section>
+
         <Section title="Where it's kept">
           Cases are stored in our database (Supabase) and photos in a private storage bucket. Your case page lives at a private
           link with no login, so keep the link to yourself. We never sell your information. We advertise on Google and Meta
-          (Instagram and Facebook). Those companies know you tapped an ad, as with any ad, but our site runs no ad pixels or
-          tracking code from them. The only analytics is PostHog, described above.
+          (Instagram and Facebook). Google measurement and PostHog are described above. We do not run Meta tracking code on this site.
         </Section>
 
         <Section title="When we delete it">

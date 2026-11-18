@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Check, ClipboardCopy, ExternalLink, Link2, PenLine, Send } from "lucide-react";
 import { startTransition, useActionState, useId, useState, useTransition, type FormEvent } from "react";
-import { claimAction, classifyAction, logReplyAction, markSentAction, mgmtEmailAction, type TeamActionState } from "@/app/team/[key]/actions";
+import { claimAction, classifyAction, logReplyAction, markSentAction, mgmtEmailAction, type TeamActionState } from "@/app/(private)/team/[key]/actions";
 import { REPLY_PLAIN } from "@/components/case/reply-labels";
 import { Button } from "@/components/ui/button";
 import { Badge, Notice } from "@/components/ui/card";

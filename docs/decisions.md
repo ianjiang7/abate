@@ -418,3 +418,18 @@ A four-part review of the concierge changes confirmed 32 findings; all were fixe
 ## 2026-11-18 — Extend the Knicks theme to tenant pages
 
 At Ian's request, intake and private case pages now share the landing page's Work Sans font and blue/orange palette. Scoped tokens leave the team page unchanged. Orange highlights headers, progress, estimate cards, and landing-page calls to action. Removed the public carousel placeholder caption; asset provenance remains documented in public/images/README.md. No case logic or pricing changed.
+
+
+## 2026-11-18 — Public-only Google Ads measurement
+
+Owner explicitly authorized an exception to the no-ad-tags rule. Install the supplied GTM-NG24H978
+snippet on home, intake and privacy only, with ad personalization disabled and sanitized page metadata.
+Separate public/private root layouts force full document transitions, including server redirects and
+back/forward navigation; simply unmounting a script would leave its listeners alive. Referrers are
+suppressed so private links cannot become public tracking metadata. Unknown routes are untracked.
+Successful creation returns its private destination to the form, which emits a payload-free signup
+event before hard navigation. Optional NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO enables the Ads conversion
+once the owner supplies the event snippet; no invented ID, purchase event, amount or enhanced conversion.
+Google container configuration remains external: no automatic form/user-data collection or custom tags
+that read tenant input. Map the custom signup event OR configure the direct conversion, not both.
+Source: https://support.google.com/google-ads/answer/12985952 (current Google gtm.js install snippet).

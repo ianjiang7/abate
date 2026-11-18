@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   experimental: {
+    globalNotFound: true,
     serverActions: {
       // Photos are resized on the phone to roughly 300-600KB each. Vercel rejects bodies over 4.5MB.
       bodySizeLimit: "4mb",

@@ -2,7 +2,7 @@
 
 import { Bookmark, Check, Copy, MessageCircle, Share2, Users } from "lucide-react";
 import { useEffect, useState } from "react";
-import { trackAction } from "@/app/case/[token]/actions";
+import { trackAction } from "@/app/(private)/case/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 

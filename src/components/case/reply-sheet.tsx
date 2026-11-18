@@ -2,7 +2,7 @@
 
 import { MessageSquareReply, X } from "lucide-react";
 import { useActionState, useId, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { replyAction, type CaseActionState } from "@/app/case/[token]/actions";
+import { replyAction, type CaseActionState } from "@/app/(private)/case/[token]/actions";
 import { Button } from "@/components/ui/button";
 import type { MessageRecord } from "@/lib/cases/types";
 import { formatFullDate, nyDate } from "@/lib/domain/dates";

@@ -149,3 +149,21 @@ being tested.
 Import the GitHub repo in Vercel, add the same environment variables, including `TEAM_KEY` (Production and Preview;
 `DATABASE_URL` is only needed locally for migrations), and deploy. Every push to `main` redeploys.
 Testers with an old tab open after a deploy may see an error; reloading the page fixes it.
+
+
+### Google Ads (public pages only)
+
+The owner-authorized container `GTM-NG24H978` loads on `/`, `/start`, and `/privacy`.
+Separate root layouts keep it out of `/case/*`, `/team/*`, and unknown pages, even after navigation.
+The privacy notice discloses Google measurement. No tenant answers or private link are added to events.
+
+Without a direct conversion destination, a successful signup emits the custom data-layer event `abate_signup_completed`. To count it in Ads,
+either map that event to a signup conversion in the container, or set
+`NEXT_PUBLIC_GOOGLE_ADS_SIGNUP_SEND_TO` to the `AW-…/…` value from the signup conversion's event snippet
+and rebuild. Use only one method to avoid duplicate conversions. Do not count Full-plan clicks as purchases.
+No conversion destination has been supplied yet; base-tag installation alone does not configure it.
+
+In Google tag settings, keep enhanced conversions/automatic user-provided data, automatic form tracking,
+and remarketing off; do not add DOM/form variables, tenant information or private URLs to the container.
+Verify published container settings and the conversion with Google Tag Assistant after deployment.
+Browser tests intercept Google requests so test signups do not reach the live Ads account.

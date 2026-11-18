@@ -2,7 +2,7 @@
 
 import { BellRing, CalendarCheck, CalendarClock, Check, ClipboardCopy, Hourglass, Landmark, Mail, PartyPopper, PauseCircle, PenLine, PlayCircle, Send, Sparkles } from "lucide-react";
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
-import { contactAction, fixedAction, notFixedAction, pauseAction, resumeAction, sendAction, trackAction, type CaseActionState } from "@/app/case/[token]/actions";
+import { contactAction, fixedAction, notFixedAction, pauseAction, resumeAction, sendAction, trackAction, type CaseActionState } from "@/app/(private)/case/[token]/actions";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";

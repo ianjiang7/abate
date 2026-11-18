@@ -18,6 +18,16 @@ period. See the research, assumptions, migration, and source links in `docs/deci
 Read this before doing anything in this repo. It is the team's brief for the Sprint 2 MVP
 (NYU Stern BTE Capstone, Oct 8 to Oct 29, 2026). Team: Ilias, Rayhan, Ian, Omar.
 
+## Google Ads update — November 18, 2026
+
+The owner authorized Google tag GTM-NG24H978 on `/`, `/start`, and `/privacy` only.
+Public and private routes have separate root layouts to unload third-party scripts before private
+content renders. Never put Google tags on case/team pages or send tenant answers or secret links.
+Only a successful case save emits `abate_signup_completed`; Full-plan choices are not purchases.
+The Google Ads conversion destination is optional configuration until supplied by the owner.
+Keep enhanced conversions, user-provided data collection, automatic form tracking and remarketing
+off in the Google container. Container changes must preserve these limits.
+
 ## The product in one line
 
 Abate does the chasing for NYC tenants whose repairs management isn't fixing: timed, written
@@ -200,7 +210,7 @@ A reply changes the path:
 ## Do not build
 
 Login, accounts or passwords; payments or fee collection (the price step is a fake door: no
-checkout, card fields or payment provider); ad pixels or conversion tags; admin dashboards or
+checkout, card fields or payment provider); ad pixels or conversion tags beyond the authorized Google Ads public-page integration; admin dashboards or
 settings pages beyond the team page; SMS, WhatsApp or push notifications; anything that sends a
 message to a landlord automatically (a person sends every one, after the tenant approves it);
 access to tenants' own email inboxes; filing anything with 311, HPD or the courts; portfolio-wide

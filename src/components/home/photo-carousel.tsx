@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Pause, Play } from "lucide-react";
 import { useState, type CSSProperties } from "react";
-import styles from "@/app/home.module.css";
+import styles from "@/app/(public)/home.module.css";
 
 // Replace these local placeholder assets with permission-cleared client photos.
 const PHOTOS = ["apartment", "building", "interior", "building", "apartment", "interior"];

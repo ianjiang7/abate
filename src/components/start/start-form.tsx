@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Building2, Camera, Check, Users, X } from "lucid
 import Link from "next/link";
 import { unstable_isUnrecognizedActionError, unstable_rethrow } from "next/navigation";
 import { startTransition, useActionState, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createCaseAction, type StartState } from "@/app/start/actions";
+import { createCaseAction, type StartState } from "@/app/(public)/start/actions";
 import { Logo } from "@/components/brand/logo";
 import { EstimateCard } from "@/components/case/estimate-card";
 import { IssueIcon } from "@/components/issue-icon";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Notice } from "@/components/ui/card";
 import { cn } from "@/components/ui/cn";
 import { Field, Input, MoneyInput, Textarea } from "@/components/ui/field";
+import { trackGoogleSignup } from "@/lib/analytics/google-ads";
 import { track } from "@/lib/analytics/client";
 import type { AddressMatch } from "@/lib/building/types";
 import { stickyPriceArm } from "@/lib/client/price-arm";
@@ -141,8 +142,8 @@ export function StartForm() {
     try {
       result = await createCaseAction(prev, fd);
     } catch (err) {
-      // Let the success redirect through; anything else (a dropped connection, a body the server
-      // rejected, a deploy that replaced this page's actions) must not wipe five steps of answers.
+      // Preserve Next control-flow errors; a dropped connection, rejected body or deployment
+      // must not wipe five steps of answers.
       unstable_rethrow(err);
       submittedRef.current = false;
       return {
@@ -150,6 +151,13 @@ export function StartForm() {
           ? "Abate was just updated. Your answers are still here: reload the page, then tap Create my case again."
           : "We couldn't reach Abate. Your answers are still here. Check your connection and tap Create my case again.",
       };
+    }
+    if (result.casePath) {
+      // Fire only after a successful save, while still on the public page. Always leave even
+      // when a blocker prevents Google from loading. A hard navigation unloads all tags.
+      try { await trackGoogleSignup(); } catch { /* Analytics must never block a case. */ }
+      window.location.assign(result.casePath);
+      return {};
     }
     // Server-side validation errors: jump back to the first step that has one.
     if (result.errors) {
