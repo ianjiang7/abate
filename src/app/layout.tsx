@@ -12,7 +12,7 @@ const workSans = Work_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: "Abate: we chase your landlord so you don't have to",
+    default: "Abate: a clear next step for NYC renters",
     template: "%s · Abate",
   },
   description:

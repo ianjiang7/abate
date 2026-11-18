@@ -1,290 +1,66 @@
-import { Lock, Plus } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { ArrowRight, Check, Plus, ArrowUpRight } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
-import { ButtonLink } from "@/components/ui/button";
-import { cn } from "@/components/ui/cn";
-import { daysBetween } from "@/lib/domain/dates";
-import { estimateAbatement } from "@/lib/domain/estimate";
-import { buildMessage, type TemplateContext } from "@/lib/domain/templates";
+import { PhotoCarousel } from "@/components/home/photo-carousel";
+import styles from "./home.module.css";
 
-// Layout, spacing and type scale follow Monzo's site (the team's pick, Oct 28): big plain headings,
-// one pill button, soft tinted blocks, an accordion FAQ. Abate's own colors, font and words.
-
-/** The one call to action. Same words in the header, the hero and at the bottom. */
-const START = "Start my case";
-
-const TEAM = ["Ilias", "Rayhan", "Ian", "Omar"];
+const FAQ = [
+  ["What is a rent abatement?", "It’s a reduction in rent for a period when serious conditions affected your apartment. You may be able to recover part of the rent you paid. Our estimate is a starting point, not a guarantee or legal advice."],
+  ["Does Abate contact my landlord?", "No. We prepare the drafts; you review, edit, and send each one from your own email. Management replies to you. With the full plan, paste those replies into your private case page for our team to review."],
+  ["What do I get for free?", "Your abatement estimate and your first repair letter. The full plan adds timed follow-up drafts, saved replies with team review, a dated case history, and a 311 guide. You can choose it during signup or upgrade later. Prices are being tested: no card is collected and nothing is charged during the pilot."],
+  ["My problem just started. Can I still use Abate?", "Yes. Start with a written repair request. We wait 7 days after management was told before displaying an estimate, or 1 day for no heat or hot water. That is our display policy, not a legal waiting period. Urgent problems should be reported right away."],
+  ["Who is behind Abate?", "We’re Ilias, Rayhan, Ian, and Omar, four students at NYU Stern. Interviews with NYC renters showed us how much work it takes to keep following up. We built Abate to make the next letter—and the record behind it—easier to manage. We’re not lawyers or a law firm."],
+];
 
 export default function Home() {
-  const teamEmail = (process.env.TEAM_GMAIL ?? process.env.CC_EMAIL ?? "").trim();
-  return (
-    <div className="bg-white">
-      <header className="sticky top-0 z-20 border-b border-line/70 bg-white">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-5">
-          <Logo />
-          <div className="flex items-center gap-7">
-            <nav aria-label="On this page" className="hidden items-center gap-7 text-[15px] font-medium text-slate md:flex">
-              <a href="#how-it-works" className="hover:text-ink">
-                How it works
-              </a>
-              <a href="#sample" className="hover:text-ink">
-                Sample letter
-              </a>
-              <a href="#who-we-are" className="hover:text-ink">
-                Who we are
-              </a>
-              <a href="#questions" className="hover:text-ink">
-                Questions
-              </a>
-            </nav>
-            <ButtonLink href="/start" size="sm" className="min-h-11">
-              {START}
-            </ButtonLink>
-          </div>
+  return <div className={styles.home}>
+    <header className={styles.header}>
+      <Link href="/" aria-label="Abate home" className={styles.brand}><Logo /></Link>
+      <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#plans">Our plans</a><a href="#story">Tenant story</a></nav>
+      <Link className={styles.button} href="/start">Start my case <ArrowUpRight size={18} /></Link>
+    </header>
+    <main>
+      <section className={styles.hero}>
+        <PhotoCarousel />
+        <div className={styles.heroCopy}>
+          <p className={styles.eyebrow}>FOR NEW YORK CITY RENTERS</p>
+          <h1>Better days.<br /><span>Better living.</span></h1>
+          <p className={styles.heroDescription}>Repair still not fixed? Turn the follow-up into a plan.<br className={styles.desktopBreak} /> Get a letter ready to send and see the rent you may be owed.</p>
+          <Link href="/start" className={styles.button}>Start my case <ArrowRight size={19} /></Link>
+          <p className={styles.micro}>Free first letter. No account. No card.</p>
         </div>
-      </header>
+      </section>
 
-      <main>
-        <section className="mx-auto max-w-5xl px-5 pb-14 pt-12 sm:pt-16 md:pb-20 md:pt-24">
-          <h1 className="max-w-4xl text-[44px] font-bold leading-[1.02] tracking-[-0.03em] text-balance sm:text-6xl md:text-[76px]">
-            Repair still not fixed? We&apos;ll do the chasing.
-          </h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate text-pretty sm:text-xl">
-            Tell us what&apos;s broken. We&apos;ll send management written follow-ups on a schedule, and nothing goes out until
-            you approve it. Your first letter is free, and there&apos;s no card to enter.
-          </p>
-          <div className="mt-9">
-            <ButtonLink href="/start" size="lg" block className="sm:w-auto">
-              {START}
-            </ButtonLink>
-            <PrivacyPromise />
+      <section id="story" className={`${styles.story} ${styles.container}`}>
+        <div className={styles.storyIntro}><p className={styles.eyebrow}>A LITTLE LESS RENT. A LOT OF RELIEF.</p><h2>A win for Marissa.<br />And her roommates.</h2></div>
+        <div className={styles.storyResult}><span>$1,000</span><p>off their apartment’s total rent<br />for one month</p></div>
+        <div className={styles.storyText}><p>Marissa and her roommates live in an East Village walk-up. When they faced a broken window and mold, Abate helped them get a rent abatement.</p><p className={styles.storyNote}>One household’s result. Outcomes vary; an abatement is not guaranteed.</p><a href="#how-it-works">See how Abate works <ArrowRight size={18} /></a></div>
+      </section>
+
+      <section id="how-it-works" className={`${styles.how} ${styles.container}`}>
+        <div className={styles.sectionHeading}><p className={styles.eyebrow}>LESS GUESSWORK. A CLEAR NEXT STEP.</p><h2>Your home deserves<br />a follow-through.</h2><p>You know what’s broken. We help you put it in writing—and keep moving.</p></div>
+        <ol className={styles.steps}>
+          <li><span>01</span><div><h3>Tell us what’s going on.</h3><p>Share the problem, when management heard about it, and your rent. See an estimate before you share your name or address.</p></div></li>
+          <li><span>02</span><div><h3>Make your first letter count.</h3><p>A clear draft with your details and a request for a repair date. Check it, make it yours, and send it from your email.</p></div></li>
+          <li><span>03</span><div><h3>Know what comes next.</h3><p>Choose the full plan for timed follow-ups. Save management’s replies for our team to review, with your case history in one place.</p></div></li>
+        </ol>
+      </section>
+
+      <section id="plans" className={styles.plansSection}>
+        <div className={styles.container}>
+          <div className={styles.sectionHeading}><p className={styles.eyebrow}>START SMALL. KEEP GOING IF YOU NEED TO.</p><h2>Your repair. Your plan.</h2><p>You’re always the sender. Choose how much help you want along the way.</p></div>
+          <div className={styles.plans}>
+            <article className={styles.plan}><p className={styles.eyebrow}>THE FIRST STEP</p><h3>Free</h3><p>Put the problem in writing.</p><ul><li><Check />Abatement estimate</li><li><Check />Your first repair letter</li><li><Check />Private link to return to your case</li></ul><Link href="/start" className={styles.outlineButton}>Start with the free letter <ArrowRight size={18} /></Link><p className={styles.planNote}>Follow-ups and reply tracking require the full plan.</p></article>
+            <article className={`${styles.plan} ${styles.fullPlan}`}><p className={styles.eyebrow}>THE FOLLOW-THROUGH</p><h3>Full plan</h3><p>Keep your next move ready.</p><ul><li><Check />Everything in Free</li><li><Check />Timed reminder and formal-notice drafts</li><li><Check />Saved replies, reviewed by our team</li><li><Check />Dated case history and 311 guide</li></ul><Link href="/start" className={styles.button}>Explore the full plan <ArrowRight size={18} /></Link><p className={styles.planNote}>Choose Buy during signup or upgrade from your case.</p></article>
           </div>
-        </section>
-
-        <section id="how-it-works" className="mx-auto max-w-5xl scroll-mt-20 px-5">
-          <div className="rounded-[2rem] bg-lavender px-6 py-10 sm:px-10 sm:py-12 md:px-14 md:py-16">
-            <h2 className="text-[32px] font-bold leading-tight tracking-tight md:text-5xl">How it works</h2>
-            <ol className="mt-8 grid gap-9 md:mt-12 md:grid-cols-3 md:gap-10">
-              <Step n={1} title="Tell us what's broken">
-                The problem, when it started and whether you&apos;ve told management. You&apos;ll see an estimate of the rent you
-                may be owed. No account needed.
-              </Step>
-              <Step n={2} title="Approve each message">
-                We draft a notice, a reminder and a formal notice, a few days apart. You approve each one, and our team sends
-                it with you copied. Rather send them yourself? You can.
-              </Step>
-              <Step n={3} title="We read the replies">
-                Our team reads any reply from management and sets up the next step. Still not fixed after a week? We show you
-                how to file a 311 complaint yourself.
-              </Step>
-            </ol>
-          </div>
-        </section>
-
-        <section id="sample" className="scroll-mt-20 py-16 md:py-24">
-          <div className="mx-auto grid max-w-5xl gap-8 px-5 md:grid-cols-[2fr_3fr] md:gap-14">
-            <div>
-              <h2 className="text-[32px] font-bold leading-tight tracking-tight md:text-5xl">What management receives</h2>
-              <p className="mt-4 text-lg leading-relaxed text-slate">
-                Each message says what&apos;s broken and since when, and asks for a repair date. Some also include an estimate
-                of the rent you may be owed. Here&apos;s a first notice our team would send, with made-up details.
-              </p>
-            </div>
-            <SampleNotice />
-          </div>
-        </section>
-
-        <section id="who-we-are" className="scroll-mt-20 bg-mist py-16 md:py-24">
-          <div className="mx-auto grid max-w-5xl gap-12 px-5 md:grid-cols-2 md:gap-14">
-            <div>
-              <h2 className="text-[32px] font-bold leading-tight tracking-tight md:text-5xl">Who we are</h2>
-              <p className="mt-4 text-lg leading-relaxed text-slate">
-                We&apos;re Ilias, Rayhan, Ian and Omar, four students at NYU Stern. This fall we interviewed 13 NYC tenants
-                about getting repairs done. Reporting the problem was rarely the hard part. Chasing it afterward was.
-              </p>
-              <p className="mt-4 text-lg leading-relaxed text-slate">
-                So that&apos;s the part we take on. While we pilot Abate, one of us reads every reply and sends every message
-                you approve.
-              </p>
-              <ul className="mt-8 flex flex-wrap gap-6">
-                {TEAM.map((name) => (
-                  <li key={name} className="flex flex-col items-center gap-2">
-                    <span aria-hidden="true" className="grid size-14 place-items-center rounded-full bg-ink text-xl font-bold text-white">
-                      {name[0]}
-                    </span>
-                    <span className="text-sm font-semibold">{name}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <figure className="md:self-center">
-              <blockquote className="border-l-4 border-periwinkle pl-5 text-2xl font-semibold leading-snug tracking-tight text-balance md:text-3xl">
-                &ldquo;We had green water in our bathroom sink for a week before the landlord even responded to us.&rdquo;
-              </blockquote>
-              <figcaption className="mt-4 pl-6 text-[15px] text-slate">A tenant we interviewed</figcaption>
-            </figure>
-          </div>
-        </section>
-
-        <section id="questions" className="scroll-mt-20 py-16 md:py-24">
-          <div className="mx-auto grid max-w-5xl gap-8 px-5 md:grid-cols-[2fr_3fr] md:gap-14">
-            <h2 className="text-[32px] font-bold leading-tight tracking-tight md:text-5xl">Questions</h2>
-            <div className="border-t border-line">
-              <Question q="Is it free?">
-                Your first letter is free, and there&apos;s no card to enter.
-              </Question>
-              <Question q="Is this legal advice?">
-                No. We&apos;re students, not lawyers, and Abate isn&apos;t a law firm. Our messages say what&apos;s broken and since
-                when, and ask for a repair date. Any dollar figure we show is an estimate of the rent you may be owed, not a
-                promise.
-              </Question>
-              <Question q="Will management know it's me?">
-                Yes. They need to know whose apartment needs the repair, so every message names you and your address. When our
-                team sends them, they come from Abate, say we&apos;re writing on your behalf, and copy you. Nothing goes out
-                until you approve it, and you can pause anytime. If you&apos;d rather, you can send each one yourself from your
-                own email.
-              </Question>
-              <Question q="What happens to my information?">
-                Our four-person team reads your case, and management sees only the messages you approve or send yourself. We
-                never sell your information, and we delete it when the pilot ends.{" "}
-                <Link href="/privacy" className="font-semibold text-ink underline decoration-periwinkle underline-offset-4">
-                  Our privacy page
-                </Link>{" "}
-                lists what we collect and who sees it, including the AI service that reads replies.
-              </Question>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-ink text-white">
-          <div className="mx-auto max-w-5xl px-5 py-16 md:py-24">
-            <h2 className="max-w-2xl text-[32px] font-bold leading-tight tracking-tight text-balance md:text-5xl">
-              Done chasing management yourself?
-            </h2>
-            <p className="mt-4 max-w-xl text-lg leading-relaxed text-periwinkle-soft">
-              It takes a few minutes. You approve every message, and you can pause anytime.
-            </p>
-            <div className="mt-8">
-              <ButtonLink href="/start" size="lg" variant="secondary" block className="sm:w-auto">
-                {START}
-              </ButtonLink>
-              <PrivacyPromise onDark />
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="bg-ink">
-        <div className="mx-auto flex max-w-5xl flex-col gap-2 border-t border-white/15 px-5 py-8 text-sm text-periwinkle sm:flex-row sm:justify-between">
-          <p>
-            Abate is a student project at NYU Stern, piloting with NYC tenants.
-            {teamEmail ? (
-              <>
-                {" "}
-                Questions?{" "}
-                <a href={`mailto:${teamEmail}`} className="underline underline-offset-4 hover:text-white">
-                  {teamEmail}
-                </a>
-              </>
-            ) : null}
-          </p>
-          <p>
-            Not a law firm. Nothing here is legal advice. ·{" "}
-            <Link href="/privacy" className="underline underline-offset-4 hover:text-white">
-              Privacy
-            </Link>
-          </p>
+          <p className={styles.pilotNote}>We’re testing prices during our student pilot. Your offer appears after your estimate. No payment details are collected and nothing is charged.</p>
+          <p className={styles.safetyNote}>Need to report an urgent repair? <a href="https://portal.311.nyc.gov/" target="_blank" rel="noreferrer">NYC 311 is always free <ArrowUpRight size={14} /></a></p>
         </div>
-      </footer>
-    </div>
-  );
-}
+      </section>
 
-/** Under every Start button. Only claims the privacy page already makes. */
-function PrivacyPromise({ onDark = false }: { onDark?: boolean }) {
-  return (
-    <p className={cn("mt-4 flex gap-2 text-[15px] leading-snug", onDark ? "text-periwinkle-soft" : "text-slate")}>
-      <Lock className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-      <span>
-        We never sell your information, and we delete it when the pilot ends.{" "}
-        <Link href="/privacy" className={cn("font-semibold underline decoration-periwinkle underline-offset-4", onDark ? "text-white" : "text-ink")}>
-          How we keep it private
-        </Link>
-      </span>
-    </p>
-  );
-}
-
-function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
-  return (
-    <li>
-      <p className="text-5xl font-bold leading-none tracking-tight">{n}</p>
-      <h3 className="mt-4 text-xl font-semibold tracking-tight">{title}</h3>
-      <p className="mt-2 leading-relaxed text-slate">{children}</p>
-    </li>
-  );
-}
-
-function Question({ q, children }: { q: string; children: ReactNode }) {
-  return (
-    <details className="group border-b border-line">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 text-lg font-semibold [&::-webkit-details-marker]:hidden">
-        {q}
-        <Plus className="size-5 shrink-0 transition-transform group-open:rotate-45" aria-hidden="true" />
-      </summary>
-      <p className="pb-6 pr-9 leading-relaxed text-slate">{children}</p>
-    </details>
-  );
-}
-
-// A first notice from the real template, with made-up details. Fixed dates, so the page never reads
-// the clock while prerendering. No dollar figure, since only half of first notices carry one.
-const SAMPLE_TOLD_ON = "2026-10-05";
-const SAMPLE_SENT_ON = "2026-10-19";
-const SAMPLE: TemplateContext = {
-  today: SAMPLE_SENT_ON,
-  tenantName: "Jordan Lee",
-  address: "123 Example Street, Brooklyn",
-  unit: "4B",
-  mgmtName: null,
-  issueTypes: ["heat"],
-  startedOn: "2026-10-02",
-  toldBefore: true,
-  firstReportedOn: SAMPLE_TOLD_ON,
-  firstReportedVia: "call",
-  priorFollowups: 0,
-  daysSinceReport: daysBetween(SAMPLE_TOLD_ON, SAMPLE_SENT_ON),
-  estimate: estimateAbatement({ monthlyRent: 1850, issueTypes: ["heat"], noticeOn: SAMPLE_TOLD_ON, endOn: SAMPLE_SENT_ON }),
-  sentOn: {},
-  voice: "abate",
-  estimateInNotice: false,
-};
-
-function SampleNotice() {
-  const { subject, body } = buildMessage("notice", SAMPLE);
-  return (
-    <figure>
-      <div className="overflow-hidden rounded-2xl bg-mist ring-1 ring-line">
-        <div className="space-y-0.5 border-b border-line/80 bg-white/70 px-4 py-3 text-[13px] text-slate">
-          <p>
-            <span className="font-semibold text-ink">From:</span> the Abate team
-          </p>
-          <p>
-            <span className="font-semibold text-ink">To:</span> management
-          </p>
-          <p>
-            <span className="font-semibold text-ink">Cc:</span> {SAMPLE.tenantName}, the tenant
-          </p>
-        </div>
-        <div className="px-4 py-4 sm:px-5">
-          <p className="font-semibold">{subject}</p>
-          <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed text-ink/90">{body}</p>
-        </div>
-      </div>
-      <figcaption className="mt-3 text-sm text-slate">
-        Sample with made-up details. Abate isn&apos;t a law firm, and our messages aren&apos;t legal advice.
-      </figcaption>
-    </figure>
-  );
+      <section className={`${styles.faq} ${styles.container}`} id="questions"><div><p className={styles.eyebrow}>GOOD QUESTIONS.</p><h2>Let’s clear<br />a few things up.</h2></div><div>{FAQ.map(([q, a]) => <details key={q}><summary>{q}<Plus size={20} /></summary><p>{a}</p></details>)}</div></section>
+      <section className={styles.finalCta}><p className={styles.eyebrow}>A BETTER NEXT STEP STARTS HERE.</p><h2>Let’s get it in writing.</h2><Link href="/start" className={styles.button}>Start my case <ArrowRight size={18} /></Link><p>About two minutes. Your first letter is free.</p></section>
+    </main>
+    <footer className={`${styles.footer} ${styles.container}`}><div><Logo /><p>Made for renters. Built in New York.</p></div><p>A student pilot by Ilias, Rayhan, Ian, and Omar at NYU Stern.<br />Not a law firm. Estimates are not legal advice.</p><Link href="/privacy">Privacy <ArrowUpRight size={15} /></Link></footer>
+  </div>;
 }
