@@ -1,7 +1,10 @@
 import { MapPin } from "lucide-react";
 import { notFound } from "next/navigation";
 import { IssueIcon } from "@/components/issue-icon";
-import { Badge, Notice } from "@/components/ui/card";
+import { Badge, Card, Notice } from "@/components/ui/card";
+import { canUseStep, hasFullPlan } from "@/lib/cases/access";
+import { PlanCard } from "./plan-card";
+import { RepliesCard } from "./reply-sheet";
 import { isCaseToken } from "@/lib/cases/ids";
 import { getCaseBundle } from "@/lib/cases/repo";
 import { draftFor } from "@/lib/cases/service";
@@ -11,9 +14,8 @@ import { formatLongDate, formatShortDate, nyDate } from "@/lib/domain/dates";
 import { formatDollars } from "@/lib/domain/estimate";
 import { getIssueType, mostSeriousIssue } from "@/lib/domain/issues";
 import { nextAction, TIMED_STEPS } from "@/lib/domain/ladder";
-import { trackingAddress } from "@/lib/domain/mailto";
 import { EstimateCard } from "./estimate-card";
-import { NextStepCard, type LatestReply } from "./next-step-card";
+import { MarkFixed, NextStepCard, type LatestReply } from "./next-step-card";
 import { PhotosCard } from "./photos-card";
 import { InviteCard, SaveLinkCard, TrackView } from "./share-cards";
 import { TimelineCard } from "./timeline-card";
@@ -52,7 +54,9 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
           ? "Abate is paused, so management hasn't been told yet."
           : "";
 
-  const draft = action.kind === "send" ? draftFor(record, messages, action.step, today) : null;
+  const fullPlan = hasFullPlan(record);
+  const showNext = fullPlan || action.kind === "done" || (action.kind === "send" && canUseStep(record, action.step));
+  const draft = showNext && action.kind === "send" ? draftFor(record, messages, action.step, today) : null;
   const stepIndex = action.kind === "send" ? TIMED_STEPS.findIndex((s) => s.step === action.step) : -1;
 
   // The latest reply, if we haven't answered it yet, so the tenant can see and correct how it was read.
@@ -66,7 +70,7 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
   const fixedSummary =
     record.status === "fixed" && record.fixedOn && clockStarted
       ? `It took ${estimate.days === 1 ? "1 day" : `${estimate.days} days`} after you told management.` +
-        (estimate.high > 0 ? ` For that stretch you may be owed ${formatDollars(estimate.low)}–${formatDollars(estimate.high)}.` : "")
+        (estimate.displayable ? ` The estimated amount you may be owed for that stretch is ${formatDollars(estimate.midpoint)}.` : "")
       : null;
 
   const reportedDays = estimate.days;
@@ -104,13 +108,15 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
       <TrackView token={token} next={action.kind === "send" ? action.step : action.kind} />
       {isNew ? <SaveLinkCard token={token} /> : null}
 
-      <NextStepCard
+      <PlanCard token={token} full={fullPlan} priceArm={record.priceArm} />
+
+      {showNext ? <NextStepCard
         token={token}
         action={action}
         draft={draft}
-        stepNumber={stepIndex >= 0 ? stepIndex + 1 : null}
+        stepNumber={fullPlan && stepIndex >= 0 ? stepIndex + 1 : null}
         to={record.mgmtEmail}
-        cc={trackingAddress(process.env.CC_EMAIL, record.code)}
+        cc={null}
         isDue={action.kind === "send" ? action.dueOn <= today : false}
         dueLabel={action.kind === "send" ? formatShortDate(action.dueOn, today) : null}
         scheduledLabel={record.repairScheduledFor ? formatLongDate(record.repairScheduledFor) : null}
@@ -119,22 +125,35 @@ export async function CaseView({ params, searchParams }: { params: Promise<{ tok
         fixedSummary={fixedSummary}
         hasContact={Boolean(record.tenantContact || record.tenantEmail)}
         draftedOn={today}
-        sendMode={record.sendMode}
+        sendMode="self"
         tenantEmail={record.tenantEmail}
         severalProblems={record.issueTypes.length > 1}
         unreadReplyId={last && last.direction === "incoming" && (!last.classification || last.classification === "unclear") ? last.id : null}
-      />
+      /> : <Notice><p>Your free first letter is saved. Unlock the full plan for the next drafts and reply tracking.</p><MarkFixed token={token} several={record.issueTypes.length > 1} /></Notice>}
+
+      {!fullPlan ? messages.filter((m) => m.direction === "outgoing" && m.step === "notice" && m.sentAt).map((m) => (
+        <Card key={m.id}>
+          <h2 className="text-lg font-bold">Your first letter</h2>
+          <details className="mt-3">
+            <summary className="cursor-pointer font-semibold">Read your saved letter</summary>
+            <p className="mt-3 text-sm font-semibold">{m.subject}</p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{m.body}</p>
+          </details>
+        </Card>
+      )) : null}
 
       <EstimateCard estimate={estimate} fixed={record.status === "fixed"} issueLabel={issue.label} lowPct={issue.low} highPct={issue.high} ofSeveral={otherIssues.length > 0}
         clockStarted={clockStarted}
         clockNote={clockNote}
       />
 
-      <TimelineCard items={buildTimeline(record, messages)} progress={ladderProgress(messages, action.kind === "send" ? action.step : null)} today={today} />
+      {fullPlan ? <RepliesCard token={token} replies={messages.filter((m) => m.direction === "incoming")} /> : null}
+
+      {fullPlan ? <TimelineCard items={buildTimeline(record, messages)} progress={ladderProgress(messages, action.kind === "send" ? action.step : null)} today={today} /> : null}
 
       <PhotosCard photos={photos} />
 
-      {record.status === "open" && record.bbl ? <InviteCard token={token} code={record.code} /> : null}
+      {fullPlan && record.status === "open" && record.bbl ? <InviteCard token={token} code={record.code} /> : null}
     </div>
   );
 }

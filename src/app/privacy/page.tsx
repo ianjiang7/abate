@@ -29,13 +29,12 @@ export default function PrivacyPage() {
           <p>
             Only what your follow-ups need: your address and unit, what needs fixing and when it started, a photo if you add
             one, when you first told management, management&apos;s email, your name, your monthly rent (to estimate what you may
-            be owed), your email if our team sends for you, an optional phone or email for reminders, and the replies you or
-            management send. On the home page, the start form and this page, we also see which screens you reach (PostHog,
+            be owed), an optional phone or email for reminders, and the management replies you paste into your case. On the home page, the start form and this page, we also see which screens you reach (PostHog,
             below).
           </p>
           <p className="mt-3">
             The start form also shows a price for a paid plan. It&apos;s a test: paid plans aren&apos;t open, and nothing is ever
-            charged. We save which price you saw, and whether you tapped it or the free option. While a price is being tested, your browser remembers which one you saw, so it usually stays the
+            charged. We save which price you saw, and whether you tapped it or the free option, and whether you later unlocked the full plan. While a price is being tested, your browser remembers which one you saw, so it usually stays the
             same if you reload.
           </p>
         </Section>
@@ -43,10 +42,10 @@ export default function PrivacyPage() {
         <Section title="Who sees it">
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              <strong className="text-ink">Our four-person team</strong> reads your case to send approved messages and read replies.
+              <strong className="text-ink">Our four-person team</strong> reads your case and the replies you save. You send every letter yourself.
             </li>
             <li>
-              <strong className="text-ink">Your management</strong> sees only the messages you approve (or send yourself).
+              <strong className="text-ink">Your management</strong> sees only the messages you send yourself.
             </li>
             <li>
               <strong className="text-ink">An AI service (Anthropic&apos;s Claude)</strong> reads management&apos;s replies, along with the

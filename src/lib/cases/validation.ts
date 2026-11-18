@@ -63,7 +63,7 @@ export const newCaseSchema = z
     tenantName: z.string().trim().min(2, "Enter the name you sign messages with.").max(120),
     monthlyRent: z.coerce.number({ message: "Enter your monthly rent." }).positive("Enter your monthly rent.").max(50_000),
     tenantContact: optionalText(120),
-    sendMode: z.enum(["abate", "self"], { message: "Choose who sends the follow-ups." }),
+    sendMode: z.string().optional().transform(() => "self" as const),
     tenantEmail: z
       .string()
       .trim()
@@ -106,15 +106,6 @@ export const newCaseSchema = z
     // "Something else" reads as "a repair problem" in letters, so the tenant says what it is.
     if (v.issueTypes.includes("other") && !v.issueDescription) {
       ctx.addIssue({ code: "custom", path: ["issueDescription"], message: "Say what needs fixing." });
-    }
-    if (v.sendMode === "abate") {
-      // Abate can't send anything without management's address.
-      if (!v.mgmtEmail) {
-        ctx.addIssue({ code: "custom", path: ["mgmtEmail"], message: "Add management's email so we can send your follow-ups, or choose to send them yourself." });
-      }
-      if (!v.tenantEmail) ctx.addIssue({ code: "custom", path: ["tenantEmail"], message: "Add your email so we can copy you on every message." });
-      else if (!z.email().safeParse(v.tenantEmail).success) ctx.addIssue({ code: "custom", path: ["tenantEmail"], message: "That email doesn't look right." });
-      if (!v.sendAuthorized) ctx.addIssue({ code: "custom", path: ["sendAuthorized"], message: "Please confirm we can email management for you." });
     }
     if (v.toldBefore) {
       if (!v.firstReportedOn || !isIsoDate(v.firstReportedOn)) {

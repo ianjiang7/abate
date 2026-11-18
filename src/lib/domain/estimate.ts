@@ -13,6 +13,10 @@ export type EstimateInput = {
 
 export type Estimate = {
   days: number;
+  /** Display policy only, not a legal eligibility period. */
+  minimumDays: number;
+  displayable: boolean;
+  midpoint: number;
   dailyRent: number;
   low: number;
   high: number;
@@ -30,8 +34,14 @@ export function estimateAbatement({ monthlyRent, issueTypes, noticeOn, endOn }: 
   // Several problems don't add up: the percentages describe how unlivable the apartment is overall,
   // so the most serious problem sets the range. Adding them would overstate what may be owed.
   const { low, high } = mostSeriousIssue(issueTypes);
+  const minimumDays = issueTypes.includes("heat") ? 1 : 7;
+  const roundedLow = roundTo10(dailyRent * days * low);
+  const roundedHigh = roundTo10(dailyRent * days * high);
   return {
     days,
+    minimumDays,
+    displayable: days >= minimumDays && rent > 0,
+    midpoint: (roundedLow + roundedHigh) / 2,
     dailyRent,
     low: roundTo10(dailyRent * days * low),
     high: roundTo10(dailyRent * days * high),

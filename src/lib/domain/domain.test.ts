@@ -264,7 +264,7 @@ describe("templates", () => {
     const m = buildMessage("formal_notice", ctx);
     expect(m.body).toContain("- October 12, 2026: written notice sent");
     expect(m.body).toContain("warranty of habitability");
-    expect(m.body).toContain("may be between $120 and $300");
+    expect(m.body).toContain("may be $210");
     expect(m.body).not.toMatch(/violation|HPD/);
     expect(m.body).not.toMatch(/you owe|you are owed|will get|lawsuit|sue/i);
   });
@@ -302,10 +302,10 @@ describe("templates", () => {
     expect(future.body).not.toContain("scheduled for");
   });
 
-  it("says 'up to' when an issue's low end is zero", () => {
+  it("uses the midpoint even when the low end is zero", () => {
     const est = estimateAbatement({ monthlyRent: 2000, issueTypes: ["other"], noticeOn: "2026-09-18", endOn: "2026-10-18" });
     const m = buildMessage("formal_notice", { ...ctx, issueTypes: ["other"], estimate: est });
-    expect(m.body).toMatch(/may be up to \$\d+/);
+    expect(m.body).toMatch(/may be \$100 so far/);
     expect(m.body).not.toContain("between $0");
   });
 

@@ -308,6 +308,7 @@ function Composer({ token, to, cc, step, draft, draftedOn, sendMode, tenantEmail
       {byAbate ? (
         <form action={formAction} className="mt-5 grid gap-2.5">
           <input type="hidden" name="step" value={step} />
+          <input type="hidden" name="sendMode" value="self" />
           <input type="hidden" name="draftedOn" value={draftedOn} />
           <input type="hidden" name="subject" value={subject} />
           <input type="hidden" name="body" value={body} />
@@ -344,6 +345,7 @@ function Composer({ token, to, cc, step, draft, draftedOn, sendMode, tenantEmail
       ) : (
         <form action={formAction} className="mt-5 rounded-2xl bg-lavender/70 p-4">
           <input type="hidden" name="step" value={step} />
+          <input type="hidden" name="sendMode" value="self" />
           <input type="hidden" name="draftedOn" value={draftedOn} />
           <input type="hidden" name="subject" value={subject} />
           <input type="hidden" name="body" value={body} />
@@ -586,7 +588,7 @@ function Done({ summary }: { summary: string | null }) {
 }
 
 /** "Already fixed?" for any open state: the super often just shows up without writing back. */
-function MarkFixed({ token, several }: { token: string; several: boolean }) {
+export function MarkFixed({ token, several }: { token: string; several: boolean }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<CaseActionState, FormData>(fixedAction.bind(null, token), {});
   const today = useToday();

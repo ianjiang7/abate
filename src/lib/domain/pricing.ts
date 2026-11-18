@@ -36,7 +36,7 @@ export const PRICE_COPY = {
   /** On the price step after Back, once the free letter was picked. */
   freePicked: "You picked the free first letter.",
   /** Shown once they pick the free letter (it can't be undone either), so they know what they'll get. */
-  freeChosen: "During the pilot you get the full follow-up plan free either way.",
+  freeChosen: "Your free plan includes the estimate and first letter only. You can unlock the full plan from your case page later.",
 } as const;
 
 /** Whether this is one of our arm ids, retired or not. */

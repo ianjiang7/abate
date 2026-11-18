@@ -2,7 +2,7 @@
 
 import { refresh } from "next/cache";
 import { isCaseToken } from "@/lib/cases/ids";
-import { confirmFixed, correctReply, logReply, pauseCase, recordClientEvent, recordStep, reportNotFixed, resumeCase, saveContact } from "@/lib/cases/service";
+import { upgradePlan, confirmFixed, correctReply, logReply, pauseCase, recordClientEvent, recordStep, reportNotFixed, resumeCase, saveContact } from "@/lib/cases/service";
 import { categorySchema, helpSchema, pauseReasonSchema, replySchema } from "@/lib/cases/validation";
 import { isIsoDate, nyDate } from "@/lib/domain/dates";
 import type { ReplyCategory, StepId } from "@/lib/domain/ladder";
@@ -25,6 +25,7 @@ const text = (fd: FormData, key: string) => {
 
 export async function sendAction(token: string, _prev: CaseActionState, formData: FormData): Promise<CaseActionState> {
   if (!isCaseToken(token)) return NOT_FOUND;
+  if (text(formData, "sendMode") !== "self") return { ok: false, message: "Abate now drafts letters for you to send yourself. Refresh this page before continuing." };
   const step = text(formData, "step");
   const subject = text(formData, "subject").trim().slice(0, 300);
   const body = text(formData, "body").trim().slice(0, 10_000);
@@ -151,4 +152,15 @@ export async function trackAction(token: string, name: string, props: Record<str
   } catch {
     // analytics must never break the page
   }
+}
+
+export async function upgradeAction(token: string, _prev: CaseActionState, _formData: FormData): Promise<CaseActionState> {
+  void _prev; void _formData;
+  if (!isCaseToken(token)) return NOT_FOUND;
+  try {
+    const result = await upgradePlan(token);
+    if (!result.ok) return result;
+    refresh();
+    return { ok: true, message: "This price was a test. Nothing was charged. Your full plan is now unlocked for this pilot." };
+  } catch { return FAILED; }
 }

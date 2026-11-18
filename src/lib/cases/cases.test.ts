@@ -45,6 +45,7 @@ const record: CaseRecord = {
   repairMissedAt: null,
   fixedOn: null,
   helpRequestedAt: null,
+  planTier: "full",
   priceArm: null,
   priceChoice: null,
   priceOkToAsk: null,
@@ -228,18 +229,13 @@ describe("newCaseSchema", () => {
     expect(fields).toEqual(new Set(["issueTypes", "mgmtEmail", "aiConsent", "bbl"]));
   });
 
-  it("requires an email and authorization when Abate sends", () => {
-    const r = newCaseSchema.safeParse({ ...valid, sendMode: "abate" });
-    expect(r.success).toBe(false);
-    if (r.success) return;
-    expect(new Set(r.error.issues.map((i) => String(i.path[0])))).toEqual(new Set(["mgmtEmail", "tenantEmail", "sendAuthorized"]));
-    // Abate can't send without management's email.
-    const noMgmt = newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on" });
-    expect(noMgmt.success).toBe(false);
-    if (!noMgmt.success) expect(noMgmt.error.issues.map((i) => String(i.path[0]))).toEqual(["mgmtEmail"]);
-    expect(newCaseSchema.safeParse({ ...valid, sendMode: "abate", tenantEmail: "t@example.com", sendAuthorized: "on", mgmtEmail: "repairs@example.com" }).success).toBe(true);
-    // Self-send tenants can leave it blank.
-    expect(newCaseSchema.safeParse({ ...valid, sendMode: "self" }).success).toBe(true);
+  it("normalizes missing or old sender choices to self-send without retaining authorization", () => {
+    for (const sendMode of [undefined, "abate", "self"]) {
+      const result = newCaseSchema.parse({ ...valid, sendMode, tenantEmail: "t@example.com", sendAuthorized: "on" });
+      expect(result.sendMode).toBe("self");
+      expect(result.tenantEmail).toBeNull();
+      expect(result.sendAuthorized).toBeUndefined();
+    }
   });
 
   it("skips the first-report questions when management hasn't been told yet", () => {
@@ -378,22 +374,13 @@ describe("concierge", () => {
     expect(buildTimeline(abate, [unread]).find((i) => i.kind === "reply")?.detail).toBe("Our team is reading it");
   });
 
-  it("writes in Abate's voice when the team sends", () => {
-    const ctx = templateContext({
-      record: abate,
-      messages: [],
-      today: "2026-10-18",
-      estimate: estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" }),
-    });
+  it("uses the tenant voice even for a former Abate case", () => {
+    const ctx = templateContext({ record: abate, messages: [], today: "2026-10-18",
+      estimate: estimateAbatement({ monthlyRent: 1500, issueTypes: ["heat"], noticeOn: "2026-10-06", endOn: "2026-10-18" }) });
     const notice = buildMessage("notice", ctx);
-    expect(notice.body).toContain("We're writing on behalf of Test Tenant, your tenant at");
-    expect(notice.body).toContain("Test first reported it to you on October 6, 2026");
-    expect(notice.body).toContain("Test is copied on this email.");
-    expect(notice.body).toContain("The Abate team, on behalf of Test Tenant");
-    expect(notice.body).not.toMatch(/\bmy apartment\b|\bI first\b/);
-    const formal = buildMessage("formal_notice", ctx);
-    expect(formal.body).toContain("sent on behalf of Test Tenant");
-    expect(formal.body).toContain("Based on Test's rent");
+    expect(notice.body).toContain("I'm writing");
+    expect(notice.body).toContain("I first reported");
+    expect(notice.body).not.toContain("The Abate team");
   });
 });
 
@@ -497,7 +484,7 @@ describe("hypothesis 1 split: sender vs dollar figure", () => {
   it("puts the dollar estimate in the first notice only for the dollar group, in either voice", () => {
     const abateWith = buildMessage("notice", ctxFor({ ...record, sendMode: "abate", dollarInNotice: true })).body;
     expect(abateWith).toContain("warranty of habitability");
-    expect(abateWith).toContain("Based on Test's rent and how long this has gone on, we estimate that reduction may be between $120 and $300 so far");
+    expect(abateWith).toContain("Based on my rent and how long this has gone on, I estimate that reduction may be $210 so far");
     const tenantWith = buildMessage("notice", ctxFor({ ...record, sendMode: "self", dollarInNotice: true })).body;
     expect(tenantWith).toContain("Based on my rent and how long this has gone on, I estimate");
     for (const dollar of [false, null]) {
@@ -506,7 +493,7 @@ describe("hypothesis 1 split: sender vs dollar figure", () => {
     }
     // The reminder never carries it; the formal notice always does.
     expect(buildMessage("reminder", ctxFor({ ...record, dollarInNotice: true })).body).not.toMatch(/warranty|\$\d/);
-    expect(buildMessage("formal_notice", ctxFor({ ...record, dollarInNotice: false })).body).toContain("may be between $120 and $300");
+    expect(buildMessage("formal_notice", ctxFor({ ...record, dollarInNotice: false })).body).toContain("may be $210");
   });
 
   it("compares responses in the 3 days after the first notice, by sender and dollar group", () => {

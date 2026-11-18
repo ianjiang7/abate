@@ -5,6 +5,7 @@ import { daysBetween, nyDate, type IsoDate } from "@/lib/domain/dates";
 import { issuesPhrase, type ReportChannelId } from "@/lib/domain/issues";
 import { dueSummary, nextAction, type ReplyCategory, type StepId } from "@/lib/domain/ladder";
 import { buildMessage, unfilledPlaceholders, type DraftMessage } from "@/lib/domain/templates";
+import { canUseStep, hasFullPlan } from "./access";
 import { isCaseCode } from "./ids";
 import { computeMetrics, type Metrics } from "./metrics";
 import {
@@ -40,6 +41,7 @@ function replyMode(): "concierge" | "agent" {
 }
 
 export type ActionResult = { ok: true } | { ok: false; message: string };
+const FULL_PLAN_REQUIRED: ActionResult = { ok: false, message: "Unlock the full plan from your case page to use this feature. Nothing is charged during the pilot." };
 const NOT_FOUND: ActionResult = { ok: false, message: "We couldn't find this case." };
 
 export async function createCase(input: NewCaseInput, photos: File[], opts: { isTest: boolean }) {
@@ -74,12 +76,15 @@ export async function refreshNextStep(record: CaseRecord, messages?: MessageReco
   const msgs = messages ?? (await listMessages(record.id));
   const today = nyDate();
   const { ladderCase, ladderMessages } = ladderInputs(record, msgs);
-  const { nextStep, nextDueOn } = dueSummary(nextAction(ladderCase, ladderMessages, today), today);
+  const action = nextAction(ladderCase, ladderMessages, today);
+  const { nextStep, nextDueOn } = !hasFullPlan(record) && !(action.kind === "send" && action.step === "notice")
+    ? { nextStep: null, nextDueOn: null } : dueSummary(action, today);
   await updateCase(record.id, { next_step: nextStep, next_due_on: nextDueOn });
 }
 
 /** The draft for a step, built from the reviewed templates. */
 export function draftFor(record: CaseRecord, messages: MessageRecord[], step: StepId, today: IsoDate): DraftMessage {
+  if (!canUseStep(record, step)) throw new Error("Full plan required.");
   return buildMessage(step, templateContext({ record, messages, today, estimate: caseEstimate(record, messages, today) }));
 }
 
@@ -93,6 +98,7 @@ export type ShownDraft = { draftedOn: IsoDate };
 export async function recordStep(token: string, step: StepId, subject: string, body: string, shown: ShownDraft | null): Promise<ActionResult> {
   const record = await findCaseByToken(token);
   if (!record) return NOT_FOUND;
+  if (!canUseStep(record, step)) return FULL_PLAN_REQUIRED;
   if (record.status === "fixed") return { ok: false, message: "This case is already marked fixed." };
   if (record.pausedAt) return { ok: false, message: "Abate is paused for this case. Resume it first." };
   const all = await listMessages(record.id);
@@ -114,7 +120,7 @@ export async function recordStep(token: string, step: StepId, subject: string, b
   const readyOn = readyOnFor(step, action.dueOn, record, all, today);
 
   const now = new Date().toISOString();
-  const byAbate = record.sendMode === "abate";
+  const byAbate = false;
   try {
     await insertMessage(record.id, {
       direction: "outgoing",
@@ -270,6 +276,7 @@ async function saveReply(
 export async function logReply(token: string, text: string, receivedOn: IsoDate): Promise<ActionResult> {
   const record = await findCaseByToken(token);
   if (!record) return NOT_FOUND;
+  if (!hasFullPlan(record)) return FULL_PLAN_REQUIRED;
   const result = await saveReply(record, text, receivedOn, "tenant", null);
   return result.ok ? { ok: true } : result;
 }
@@ -314,6 +321,7 @@ async function classifyReply(record: CaseRecord, messageId: string, category: Re
 export async function correctReply(token: string, messageId: string, category: ReplyCategory, scheduledFor: IsoDate | null): Promise<ActionResult> {
   const record = await findCaseByToken(token);
   if (!record) return NOT_FOUND;
+  if (!hasFullPlan(record)) return FULL_PLAN_REQUIRED;
   return classifyReply(record, messageId, category, scheduledFor, "tenant");
 }
 
@@ -370,6 +378,7 @@ export async function resumeCase(token: string): Promise<ActionResult> {
 export async function saveContact(token: string, contact: string): Promise<ActionResult> {
   const record = await findCaseByToken(token);
   if (!record) return NOT_FOUND;
+  if (!hasFullPlan(record)) return FULL_PLAN_REQUIRED;
   await updateCase(record.id, { tenant_contact: contact });
   await logEvent(record.id, "contact_added", {});
   return { ok: true };
@@ -392,51 +401,24 @@ export async function recordClientEvent(token: string, name: string, props: Reco
 // ---------------------------------------------------------------------------------------------
 // Team (concierge) operations. Callers must check the team key first.
 
-/** A claim older than this is assumed abandoned (the teammate closed the tab without sending). */
-const CLAIM_MINUTES = 30;
-
-/**
- * A teammate is about to send a message (Open in Gmail or Copy). Re-checks the case right now, so a
- * stale team page can't send something the tenant paused, withdrew or that a teammate is already
- * sending. Pass `force` after checking the team inbox's Sent folder.
- */
-export async function teamClaim(messageId: string, force: boolean): Promise<ActionResult & { claimed?: "recently" }> {
-  const found = await findMessageWithCase(messageId);
-  if (!found || !isPendingSend(found.message)) return { ok: false, message: "This message is no longer waiting to be sent. Refresh the page." };
-  const { record, message } = found;
-  if (record.pausedAt) return { ok: false, message: "The tenant paused this case. Don't send it." };
-  if (record.status === "fixed") return { ok: false, message: "This case is marked fixed. No need to send it." };
-  if (!force && message.claimedAt && Date.now() - Date.parse(message.claimedAt) < CLAIM_MINUTES * 60_000) {
-    return { ok: false, claimed: "recently", message: "A teammate opened this in the last 30 minutes. Check the team inbox's Sent folder before sending it again." };
-  }
-  await updateMessage(record.id, messageId, { claimed_at: new Date().toISOString() });
-  return { ok: true };
+/** Retained action endpoints reject stale tabs from the former concierge flow. */
+export async function teamClaim(_messageId: string, _force: boolean): Promise<ActionResult & { claimed?: "recently" }> {
+  void _messageId; void _force;
+  return { ok: false, message: "Abate no longer sends letters. The tenant sends from their case page." };
+}
+export async function teamMarkSent(_messageId: string): Promise<ActionResult> {
+  void _messageId;
+  return { ok: false, message: "Team sending has ended. Refresh the page." };
 }
 
-/** The team sent an approved message from the team inbox. */
-export async function teamMarkSent(messageId: string): Promise<ActionResult> {
-  const found = await findMessageWithCase(messageId);
-  if (!found || !isPendingSend(found.message)) return { ok: false, message: "That message isn't waiting to be sent." };
-  const { record, message } = found;
-  // A claimed message may already be out even if the tenant paused since; record what really happened.
-  if (!message.claimedAt && record.pausedAt) return { ok: false, message: "The tenant paused this case. Don't send it." };
-  if (!message.claimedAt && record.status === "fixed") return { ok: false, message: "This case is marked fixed. No need to send it." };
-  await updateMessage(record.id, messageId, { sent_at: new Date().toISOString(), sent_by: "team" });
-
-  let updated = record;
-  if (message.step === "missed_repair") {
-    // Clear the missed appointment, unless management has given a new date since the tenant approved.
-    const messages = liveMessages(await listMessages(record.id));
-    const newerDate = messages.some(
-      (m) => m.direction === "incoming" && m.classification === "scheduled" && message.approvedAt && messageTime(m) > message.approvedAt,
-    );
-    if (!newerDate) {
-      await updateCase(record.id, { repair_scheduled_for: null });
-      updated = { ...record, repairScheduledFor: null };
-    }
-  }
-  await refreshNextStep(updated);
-  await logEvent(record.id, "team_sent", { step: message.step });
+/** The price choice at signup stays unchanged for measurement; upgrades are recorded separately. */
+export async function upgradePlan(token: string): Promise<ActionResult> {
+  const record = await findCaseByToken(token);
+  if (!record) return NOT_FOUND;
+  if (hasFullPlan(record)) return { ok: true };
+  await updateCase(record.id, { plan_tier: "full", upgraded_at: new Date().toISOString() });
+  await logEvent(record.id, "plan_upgraded", { price_arm: record.priceArm });
+  await refreshNextStep({ ...record, planTier: "full" });
   return { ok: true };
 }
 
@@ -509,7 +491,7 @@ export async function teamOverview(scope: CaseScope): Promise<TeamOverview> {
   // Paused cases stay out of the send queue, unless a teammate was already sending (to record it).
   const toSend: SendQueueItem[] = open.flatMap((c) =>
     liveMessages(c.messages)
-      .filter((m) => isPendingSend(m) && (!c.record.pausedAt || m.claimedAt))
+      .filter((m) => c.record.sendMode === "abate" && isPendingSend(m) && (!c.record.pausedAt || m.claimedAt))
       .map((message) => ({
         record: c.record,
         message,
@@ -528,7 +510,7 @@ export async function teamOverview(scope: CaseScope): Promise<TeamOverview> {
   });
 
   const waitingOnTenant = open.filter(
-    (c) => !c.record.pausedAt && (c.next.kind === "confirm_fixed" || c.next.kind === "checkin" || (c.next.kind === "send" && c.next.dueOn <= today)),
+    (c) => (hasFullPlan(c.record) || (c.next.kind === "send" && c.next.step === "notice")) && !c.record.pausedAt && (c.next.kind === "confirm_fixed" || c.next.kind === "checkin" || (c.next.kind === "send" && c.next.dueOn <= today)),
   );
   const invites = await countEvents("neighbor_invited", scope);
   const helpRequests = cases.filter((c) => c.record.helpRequestedAt).length;

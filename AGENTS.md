@@ -1,5 +1,19 @@
 # Abate: brief for coding agents
 
+## Current product update — November 17, 2026
+
+This update supersedes the Sprint 2 sending, plan-access, and estimate-display descriptions below.
+All letters are now sent by the tenant; no sender-choice step or team sending is offered. The
+team still reviews pasted management replies. New Free cases have the first letter and estimate
+only; Buy or Upgrade unlocks the Full plan without a charge and discloses the price test. Existing
+cases retain Full access through the migration. Keep server-side access checks and preserve the
+initial `price_choice` when upgrading (`plan_tier` is separate). All pending approvals are withdrawn.
+The landing page alone uses Knicks blue/orange and a photo carousel. Other pages keep their styling.
+Estimates show the midpoint, without daily growth. A numerical estimate is withheld until 7 days
+after notice, or 1 day for no heat/hot water: an explicit product display policy, not a legal waiting
+period. See the research, assumptions, migration, and source links in `docs/decisions.md`.
+
+
 Read this before doing anything in this repo. It is the team's brief for the Sprint 2 MVP
 (NYU Stern BTE Capstone, Oct 8 to Oct 29, 2026). Team: Ilias, Rayhan, Ian, Omar.
 
@@ -315,3 +329,13 @@ prerender. Read the bundled docs in `node_modules/next/dist/docs/` before changi
 Oct 20 standup · Oct 22 first notices out, so cases get 7 days · Oct 23 advisor (refinement and
 user testing) · Oct 29 five-minute live demo, with 10 user tests done · Mon Nov 16: swap the $9
 arm (runbook in README.md).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

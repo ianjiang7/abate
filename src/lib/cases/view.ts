@@ -121,7 +121,7 @@ export function templateContext(args: {
     replyReference: pendingReplyReference(messages),
     repairScheduledFor: record.repairScheduledFor,
     missedBecause: latestIncoming(messages)?.classification === "says_fixed" ? "says_fixed" : "appointment",
-    voice: record.sendMode === "abate" ? "abate" : "tenant",
+    voice: "tenant",
     estimateInNotice: record.dollarInNotice === true,
   };
 }

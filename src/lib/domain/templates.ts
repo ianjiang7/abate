@@ -152,13 +152,13 @@ function recordLine(ctx: TemplateContext): string {
 /** The warranty-of-habitability sentence with the dollar estimate (formal notice, and the "$" first notice). */
 function estimateParagraph(ctx: TemplateContext): string {
   const est = ctx.estimate;
-  if (est.high <= 0) return "";
-  const range = est.low > 0 ? `between ${formatDollars(est.low)} and ${formatDollars(est.high)}` : `up to ${formatDollars(est.high)}`;
+  if (!est.displayable || est.high <= 0) return "";
+  const range = formatDollars(est.midpoint);
   const basis = byAbate(ctx)
     ? `Based on ${firstName(ctx)}'s rent and how long this has gone on, we estimate that reduction may be ${range} so far`
     : `Based on my rent and how long this has gone on, I estimate that reduction may be ${range} so far`;
   const w = words(ctx);
-  return `Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period ${w.aCondition} unrepaired. ${basis}, and it grows each day ${w.problem} ${w.continues}.`;
+  return `Under New York's warranty of habitability, tenants may be entitled to a reduction in rent for the period ${w.aCondition} unrepaired. ${basis}.`;
 }
 
 function referenceLine(ctx: TemplateContext): string {

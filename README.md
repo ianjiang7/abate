@@ -8,6 +8,31 @@ NYU Stern BTE Capstone, Sprint 2 (Oct 8 to Oct 29, 2026). Team: Ilias, Rayhan, I
 The product brief for people and coding agents is [AGENTS.md](AGENTS.md); the sprint plan is in
 [docs/sprint2-plan.md](docs/sprint2-plan.md) and decisions in [docs/decisions.md](docs/decisions.md).
 
+
+## Current flow (November 17)
+
+Tenants send every letter from their own email. Free includes the first letter and an abatement
+estimate; Full adds timed follow-ups, pasted replies with dates and team review, case history, and
+the 311 guide. Buy and Upgrade unlock Full for the pilot without a charge. Existing cases are
+grandfathered into Full. The sender step is gone; signup step IDs are now `problems`, `told`, `rent`,
+`price`, `address`. Initial `price_choice` remains unchanged after upgrading; inspect `plan_tier`,
+`upgraded_at`, and the `plan_upgraded` event for upgrades. Do not pool the new funnel with the old
+concierge experiment described in the historical runbook below.
+
+**Release requirement:** apply `supabase/migrations/20261117000000_self_send_plans.sql` with this
+code release using `npm run db:push`. It grants Full to existing cases, withdraws every unsent
+approval, and makes sending tenant-only. New cases default to Free. Never run the old team send
+queue during the transition. No live migration or deployment is performed by local tests.
+
+Estimates display the average of the low/high estimates and omit daily growth. The app waits 7
+calendar days from notice (1 for no heat/hot water) before showing an amount; this is a display
+policy, not a legal eligibility test. Once shown, all days from notice remain in the calculation.
+Research and limitations are in `docs/decisions.md`.
+
+Landing-page placeholders live in `public/images/placeholder-*.jpg`, referenced by
+`src/components/home/photo-carousel.tsx`. Replace them with permission-cleared client images and
+update the placeholder caption. The carousel supports pause and reduced motion.
+
 ## Run it locally
 
 You need Node 20.9 or newer.

@@ -52,6 +52,8 @@ export type CaseRecord = {
    * cases created before the test. priceArm is the arm id from src/lib/domain/pricing.ts that was
    * shown; priceChoice is Buy or the free first letter; priceOkToAsk is the optional box after Buy.
    */
+  /** Existing cases are grandfathered into full access by migration. */
+  planTier: "free" | "full";
   priceArm: string | null;
   priceChoice: "buy" | "free" | null;
   priceOkToAsk: boolean | null;

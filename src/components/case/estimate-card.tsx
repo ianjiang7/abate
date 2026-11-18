@@ -1,118 +1,36 @@
-import { HandCoins, TrendingUp } from "lucide-react";
+import { HandCoins } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatDollars, type Estimate } from "@/lib/domain/estimate";
 
-export function EstimateCard({
-  estimate,
-  fixed,
-  issueLabel,
-  lowPct,
-  highPct,
-  ofSeveral = false,
-  clockStarted = true,
-  clockNote = "",
-}: {
-  estimate: Estimate;
-  fixed: boolean;
-  issueLabel: string;
-  lowPct: number;
-  highPct: number;
-  /** The tenant listed several problems; the estimate uses the most serious one. */
-  ofSeveral?: boolean;
-  /** False until management is told: tenants who hadn't told them yet start the clock with the first notice. */
-  clockStarted?: boolean;
-  /** Before the clock starts: what the tenant (or our team) does next to start it. */
-  clockNote?: string;
+export function EstimateCard({ estimate, fixed, issueLabel, lowPct, highPct, ofSeveral = false, clockStarted = true, clockNote = "" }: {
+  estimate: Estimate; fixed: boolean; issueLabel: string; lowPct: number; highPct: number;
+  ofSeveral?: boolean; clockStarted?: boolean; clockNote?: string;
 }) {
-  const hasRange = estimate.high > 0;
-  const perDayLow = Math.round(estimate.perDayLow);
-  const perDayHigh = Math.max(1, Math.round(estimate.perDayHigh));
-  const growth = perDayLow > 0 ? `about $${perDayLow}–$${perDayHigh}` : `by up to $${perDayHigh}`;
-
-  if (!clockStarted && fixed) {
-    return (
-      <Card tone="ink">
-        <div className="flex items-center gap-2 text-sm font-semibold text-periwinkle">
-          <HandCoins className="size-4" aria-hidden="true" />
-          What you may be owed
-        </div>
-        <p className="mt-2 text-[15px] leading-relaxed text-periwinkle-soft">
-          It was fixed before management was told, so there&apos;s no estimate for this case.
-        </p>
-      </Card>
-    );
-  }
-
-  if (!clockStarted) {
-    // Nothing is owed for days management didn't know about, so show the daily rate instead.
-    return (
-      <Card tone="ink">
-        <div className="flex items-center gap-2 text-sm font-semibold text-periwinkle">
-          <HandCoins className="size-4" aria-hidden="true" />
-          What you may be owed
-        </div>
-        <p className="mt-2 text-[34px] font-bold leading-tight tracking-tight tabular-nums">
-          {perDayLow > 0 ? `$${perDayLow}–$${perDayHigh}` : `Up to $${perDayHigh}`}
-          <span className="text-xl text-periwinkle"> a day</span>
-        </p>
-        <p className="mt-3 text-[15px] leading-relaxed text-periwinkle-soft">
-          Starts the day your first notice tells management, and adds up each day it stays unfixed.{clockNote ? ` ${clockNote}` : ""}
-        </p>
-        <p className="mt-4 text-xs text-periwinkle-soft">An estimate, not legal advice.</p>
-        <EstimateExplainer issueLabel={issueLabel} lowPct={lowPct} highPct={highPct} ofSeveral={ofSeveral} />
-      </Card>
-    );
-  }
-
+  const showAmount = clockStarted && estimate.displayable;
   return (
     <Card tone="ink">
       <div className="flex items-center gap-2 text-sm font-semibold text-periwinkle">
-        <HandCoins className="size-4" aria-hidden="true" />
-        {fixed ? "Estimated amount you may be owed" : "Estimated amount you may be owed so far"}
+        <HandCoins className="size-4" aria-hidden="true" /> Estimated amount you may be owed
       </div>
-      {hasRange ? (
-        <p className="mt-2 text-[40px] font-bold leading-none tracking-tight tabular-nums">
-          {estimate.low > 0 ? (
-            <>
-              {formatDollars(estimate.low)} <span className="text-periwinkle">–</span> {formatDollars(estimate.high)}
-            </>
-          ) : (
-            <>
-              <span className="text-2xl text-periwinkle">Up to </span>
-              {formatDollars(estimate.high)}
-            </>
-          )}
+      {showAmount ? <>
+        <p className="mt-2 text-[40px] font-bold leading-none tracking-tight tabular-nums">{formatDollars(estimate.midpoint)}</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-periwinkle-soft">For {estimate.days} {estimate.days === 1 ? "day" : "days"} from when you told management{fixed ? " until the repair was fixed" : " through today"}.</p>
+      </> : <>
+        <p className="mt-3 text-2xl font-bold">{!clockStarted ? "Start with your first letter" : "Too early for our estimate"}</p>
+        <p className="mt-3 text-[15px] leading-relaxed text-periwinkle-soft">
+          {!clockStarted ? `We need a date management was told before showing an amount. ${clockNote}` : `Abate shows an estimate after ${estimate.minimumDays === 1 ? "1 day" : `${estimate.minimumDays} days`} from notice. ${fixed ? "This repair was fixed before that point." : "You can request repairs right away."}`}
         </p>
-      ) : (
-        <p className="mt-2 text-2xl font-bold tracking-tight">Building up</p>
-      )}
-      <p className="mt-3 text-[15px] leading-relaxed text-periwinkle-soft">
-        {estimate.days === 1 ? "1 day" : `${estimate.days} days`} since you told management
-        {fixed ? ", until it was fixed." : "."}
-      </p>
-      {!fixed && estimate.perDayHigh > 0 ? (
-        <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-sm font-semibold">
-          <TrendingUp className="size-4" aria-hidden="true" /> Grows {growth} a day while unfixed
+      </>}
+      <p className="mt-4 text-xs leading-relaxed text-periwinkle-soft">An estimate, not legal advice or a guaranteed payment.</p>
+      <details className="mt-4 border-t border-white/15 pt-4 text-sm text-periwinkle-soft">
+        <summary className="cursor-pointer font-semibold text-white">How we estimate this</summary>
+        <p className="mt-3 leading-relaxed">
+          We average the low and high estimates based on your rent, days since management was told, and our {Math.round(lowPct * 100)}–{Math.round(highPct * 100)}% guideline for {issueLabel.toLowerCase()}.
+          {ofSeveral ? " We use the most serious problem; percentages are not added together." : ""} These percentages are team assumptions, not legal standards. The midpoint is not a prediction of an award.
         </p>
-      ) : null}
-      <p className="mt-4 text-xs text-periwinkle-soft">An estimate, not legal advice.</p>
-      <EstimateExplainer issueLabel={issueLabel} lowPct={lowPct} highPct={highPct} ofSeveral={ofSeveral} />
+        <p className="mt-3 leading-relaxed">Our display policy waits 7 days after notice, or 1 day for no heat or hot water. This is not a legal waiting period: eligibility depends on the circumstances. Once shown, the estimate includes the days from your original notice. You do not need to wait to report an urgent condition.</p>
+        <a className="mt-3 inline-block underline underline-offset-4" href="https://ag.ny.gov/publications/residential-tenants-rights-guide" target="_blank" rel="noreferrer">New York tenants’ rights guide</a>
+      </details>
     </Card>
-  );
-}
-
-function EstimateExplainer({ issueLabel, lowPct, highPct, ofSeveral }: { issueLabel: string; lowPct: number; highPct: number; ofSeveral: boolean }) {
-  return (
-    <details className="group mt-4 border-t border-white/15 pt-4 text-sm text-periwinkle-soft">
-      <summary className="cursor-pointer list-none font-semibold text-white marker:hidden">
-        <span className="underline decoration-periwinkle/60 underline-offset-4">How we estimate this</span>
-      </summary>
-      <p className="mt-3 leading-relaxed">
-        New York&apos;s warranty of habitability lets tenants ask for part of their rent back while a serious problem goes unfixed. We multiply your daily rent by the days
-        since management was told, then by {Math.round(lowPct * 100)}–{Math.round(highPct * 100)}% for {issueLabel.toLowerCase()}
-        {ofSeveral ? ", the most serious problem you listed. Several problems don't add up to a bigger percentage" : ""}. These percentages are our own rough
-        guide, not a legal standard. It&apos;s an estimate, not legal advice.
-      </p>
-    </details>
   );
 }

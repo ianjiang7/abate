@@ -39,7 +39,7 @@ type Fields = {
   tenantName: string;
   monthlyRent: string;
   tenantContact: string;
-  sendMode: "abate" | "self" | "";
+  sendMode: "self";
   tenantEmail: string;
   sendAuthorized: boolean;
   aiConsent: boolean;
@@ -65,7 +65,7 @@ const EMPTY: Fields = {
   tenantName: "",
   monthlyRent: "",
   tenantContact: "",
-  sendMode: "",
+  sendMode: "self",
   tenantEmail: "",
   sendAuthorized: false,
   aiConsent: false,
@@ -84,8 +84,7 @@ const STEPS = [
   { id: "told", title: "Have you reached out to management yet?", subtitle: "The clock for what you may be owed starts when management is told.", fields: ["toldManagement", "firstReportedOn"] },
   { id: "rent", title: "What's your monthly rent?", subtitle: "We use it to estimate what you may be owed.", fields: ["monthlyRent"] },
   { id: "price", title: PRICE_COPY.title, subtitle: PRICE_COPY.subtitle, fields: ["priceArm", "priceChoice"] },
-  { id: "sender", title: "Who should send the follow-ups?", subtitle: "Either way, Abate writes every message and times each step.", fields: ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized", "tenantContact"] },
-  { id: "address", title: "Where do you live?", subtitle: "Your name and address go on every message, so management knows which apartment.", fields: ["tenantName", "address", "unit", "photos", "aiConsent"] },
+  { id: "address", title: "Where do you live?", subtitle: "Your name and address go on every message, so management knows which apartment.", fields: ["tenantName", "address", "unit", "mgmtEmail", "tenantContact", "photos", "aiConsent"] },
 ] as const;
 
 type StepId = (typeof STEPS)[number]["id"];
@@ -116,18 +115,8 @@ function validateStep(id: StepId, f: Fields, today: string): Record<string, stri
     if (!rent || rent <= 0) e.monthlyRent = "Enter your monthly rent.";
   }
   // The price step has nothing to check: Buy and the free letter are both fine, and the box is optional.
-  if (id === "sender") {
-    if (!f.sendMode) e.sendMode = "Choose who sends the follow-ups.";
-    // We can't send anything without management's address; self-send tenants can add it in their email app.
-    const mgmtEmail = f.mgmtEmail.trim();
-    if (f.sendMode === "abate" && !mgmtEmail) e.mgmtEmail = "Add management's email so we can send your follow-ups, or choose to send them yourself.";
-    else if (f.sendMode && mgmtEmail && !EMAIL.test(mgmtEmail)) e.mgmtEmail = "That email doesn't look right.";
-    if (f.sendMode === "abate") {
-      if (!EMAIL.test(f.tenantEmail.trim())) e.tenantEmail = "Add your email so we can copy you on every message.";
-      if (!f.sendAuthorized) e.sendAuthorized = "Please confirm we can email management for you.";
-    }
-  }
   if (id === "address") {
+    if (f.mgmtEmail.trim() && !EMAIL.test(f.mgmtEmail.trim())) e.mgmtEmail = "That email doesn't look right.";
     if (f.tenantName.trim().length < 2) e.tenantName = "Enter the name you sign messages with.";
     if (f.address.trim().length < 5) e.address = "Enter your street address.";
     if (!f.aiConsent) e.aiConsent = "Please agree so we can set up your case.";
@@ -221,15 +210,6 @@ export function StartForm() {
     track("form_step_viewed", { step: step + 1, step_id: STEPS[step].id, title: STEPS[step].title });
   }, [step]);
 
-  const switchToSelf = () => {
-    setFields((f) => ({ ...f, sendMode: "self", tenantEmail: "", sendAuthorized: false }));
-    setErrors((e) => {
-      const next = { ...e };
-      for (const key of ["sendMode", "mgmtEmail", "tenantEmail", "sendAuthorized"]) delete next[key];
-      return next;
-    });
-  };
-
   const set = <K extends keyof Fields>(key: K, value: Fields[K]) => {
     setFields((f) => ({ ...f, [key]: value }));
     setErrors((e) => {
@@ -310,8 +290,7 @@ export function StartForm() {
     for (const [key, value] of Object.entries(fields)) {
       // Answers to questions that are hidden now (after switching who sends, or unpicking
       // "Something else") stay behind.
-      if ((key === "tenantEmail" || key === "sendAuthorized") && fields.sendMode !== "abate") continue;
-      if (key === "tenantContact" && fields.sendMode !== "self") continue;
+      if ((key === "tenantEmail" || key === "sendAuthorized")) continue;
       if (key === "issueDescription" && !fields.issueTypes.includes("other")) continue;
       if (key === "firstReportedOn" && !fields.toldManagement) continue;
       // The price test: nothing to send before a price was shown or picked.
@@ -503,6 +482,8 @@ export function StartForm() {
                 <Card>
                   <p className="text-2xl font-bold tracking-tight">{arm.line}</p>
                   <p className="mt-2 text-[15px] leading-relaxed text-slate">{PRICE_COPY.body}</p>
+                  <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate"><li>Reminder and formal-notice drafts, timed for your case</li><li>Saved management replies, reviewed by our team</li><li>A dated case history and step-by-step 311 guide</li></ul>
+                  <p className="mt-4 border-t border-line pt-4 text-sm">Free includes your abatement estimate and first letter only. You can upgrade later.</p>
                   {/* Masked in session replays: it shows they picked no heat or hot water. */}
                   {fields.issueTypes.includes("heat") ? <Notice className="ph-mask mt-4">{PRICE_COPY.heat311}</Notice> : null}
                 </Card>
@@ -533,125 +514,6 @@ export function StartForm() {
               </>
             ) : null}
 
-            {current.id === "sender" ? (
-              <>
-                {/* Said only after the free choice, which is final, so it can't sway the tap; Buy tappers were told on the price step. */}
-                {fields.priceChoice === "free" ? <Notice icon={<Check className="size-5" />}>{PRICE_COPY.freeChosen}</Notice> : null}
-                <fieldset data-invalid={errors.sendMode ? "true" : undefined} aria-describedby={errors.sendMode ? "sendMode-error" : undefined} className="space-y-3">
-                  <legend className="sr-only">Who sends the follow-ups</legend>
-                  {(
-                    [
-                      {
-                        id: "abate",
-                        title: "Abate's team sends them for me",
-                        body: "You approve every message first. We email management from our team address, copy you on everything, and keep the record. You can pause anytime.",
-                      },
-                      {
-                        id: "self",
-                        title: "I'll send them myself",
-                        body: "We draft each message and tell you when it's time. You send it from your own email.",
-                      },
-                    ] as const
-                  ).map((o) => {
-                    const active = fields.sendMode === o.id;
-                    return (
-                      <label
-                        key={o.id}
-                        className={cn(
-                          "flex cursor-pointer gap-3 rounded-2xl bg-white p-4 ring-1 transition",
-                          "has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink",
-                          active ? "ring-2 ring-ink shadow-[var(--shadow-card)]" : "ring-line hover:ring-periwinkle",
-                        )}
-                      >
-                        <input
-                      type="radio"
-                      name="sendMode"
-                      value={o.id}
-                      checked={active}
-                      onChange={() =>
-                        // Switching to self-send drops the Abate-only answers and their errors, so a "required"
-                        // error doesn't stay on management's email once it's optional.
-                        o.id === "self" ? switchToSelf() : set("sendMode", o.id)
-                      }
-                      className="mt-1 size-5 shrink-0 accent-[#08014E]"
-                    />
-                        <span>
-                          <span className="block font-semibold">{o.title}</span>
-                          <span className="mt-1 block text-[14px] leading-relaxed text-slate">{o.body}</span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                  {errors.sendMode ? (
-                    <p id="sendMode-error" role="alert" className="text-sm font-medium text-bad">
-                      {errors.sendMode}
-                    </p>
-                  ) : null}
-                </fieldset>
-
-                {fields.sendMode ? (
-                  <Field
-                    label="Management's email"
-                    htmlFor="mgmtEmail"
-                    optional={fields.sendMode === "self"}
-                    error={errors.mgmtEmail}
-                    hint={
-                      fields.sendMode === "abate"
-                        ? "We send every follow-up here. Check your lease, a rent receipt, or an email from management."
-                        : "We'll put it in the To line of each message for you."
-                    }
-                  >
-                    <Input
-                      id="mgmtEmail"
-                      type="email"
-                      inputMode="email"
-                      value={fields.mgmtEmail}
-                      onChange={(e) => set("mgmtEmail", e.target.value)}
-                      placeholder="repairs@example.com"
-                      autoComplete="off"
-                      maxLength={200}
-                      aria-invalid={Boolean(errors.mgmtEmail)}
-                    />
-                  </Field>
-                ) : null}
-
-                {fields.sendMode === "abate" ? (
-                  <>
-                    <Field label="Your email" htmlFor="tenantEmail" error={errors.tenantEmail} hint="We copy you on every message we send, so you see exactly what management gets.">
-                      <Input id="tenantEmail" type="email" inputMode="email" value={fields.tenantEmail} onChange={(e) => set("tenantEmail", e.target.value)} autoComplete="email" maxLength={200} aria-invalid={Boolean(errors.tenantEmail)} />
-                    </Field>
-                    <label className={cn("flex gap-3 rounded-2xl bg-white p-4 ring-1", errors.sendAuthorized ? "ring-bad" : "ring-line")}>
-                      <input
-                        type="checkbox"
-                        checked={fields.sendAuthorized}
-                        onChange={(e) => set("sendAuthorized", e.target.checked)}
-                        aria-invalid={Boolean(errors.sendAuthorized)}
-                        aria-describedby={errors.sendAuthorized ? "sendAuthorized-error" : undefined}
-                        className="mt-0.5 size-5 shrink-0 accent-[#08014E]"
-                      />
-                      <span className="text-[14px] leading-relaxed text-slate">
-                        <span className="font-semibold text-ink">I authorize Abate</span> to email my building&apos;s management about this repair on my behalf.
-                        I&apos;ll approve each message before it&apos;s sent.
-                      </span>
-                    </label>
-                    {errors.sendAuthorized ? (
-                      <p id="sendAuthorized-error" role="alert" className="-mt-3 text-sm font-medium text-bad">
-                        {errors.sendAuthorized}
-                      </p>
-                    ) : null}
-                  </>
-                ) : null}
-
-                {/* Abate tenants are emailed reminders at the address they just gave; self-send tenants
-                    gave none, so this is our only way to reach them. */}
-                {fields.sendMode === "self" ? (
-                  <Field label="Phone or email for reminders" htmlFor="tenantContact" optional hint="Our team will remind you when your next step is ready. We never share it.">
-                    <Input id="tenantContact" value={fields.tenantContact} onChange={(e) => set("tenantContact", e.target.value)} autoComplete="tel" maxLength={120} />
-                  </Field>
-                ) : null}
-              </>
-            ) : null}
-
             {current.id === "address" ? (
               <>
                 {inviteBuilding ? (
@@ -675,6 +537,13 @@ export function StartForm() {
                 <Field label="Apartment" htmlFor="unit" optional hint="So your landlord knows exactly which unit.">
                   <Input id="unit" value={fields.unit} onChange={(e) => set("unit", e.target.value)} placeholder="e.g. 4B" autoComplete="address-line2" maxLength={20} />
                 </Field>
+                <Field label="Management's email" htmlFor="mgmtEmail" optional error={errors.mgmtEmail} hint="We'll put it in the To line. You send every letter from your own email.">
+                  <Input id="mgmtEmail" type="email" value={fields.mgmtEmail} onChange={(e) => set("mgmtEmail", e.target.value)} maxLength={200} aria-invalid={Boolean(errors.mgmtEmail)} />
+                </Field>
+                {bought ? <Field label="Phone or email for reminders" htmlFor="tenantContact" optional hint="Our team can remind you when your next step is ready.">
+                  <Input id="tenantContact" value={fields.tenantContact} onChange={(e) => set("tenantContact", e.target.value)} maxLength={120} />
+                </Field> : null}
+                {fields.priceChoice === "free" ? <Notice>{PRICE_COPY.freeChosen}</Notice> : null}
                 <PhotoPicker photos={photos} setPhotos={setPhotos} error={errors.photos} clearError={() => setErrors((e) => ({ ...e, photos: "" }))} />
                 <label className={cn("flex gap-3 rounded-2xl bg-white p-4 ring-1", errors.aiConsent ? "ring-bad" : "ring-line")}>
                   <input
