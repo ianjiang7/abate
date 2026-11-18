@@ -8,7 +8,8 @@ team still reviews pasted management replies. New Free cases have the first lett
 only; Buy or Upgrade unlocks the Full plan without a charge and discloses the price test. Existing
 cases retain Full access through the migration. Keep server-side access checks and preserve the
 initial `price_choice` when upgrading (`plan_tier` is separate). All pending approvals are withdrawn.
-The landing page alone uses Knicks blue/orange and a photo carousel. Other pages keep their styling.
+The landing page uses Knicks blue/orange and a photo carousel. Intake and private case pages share
+that palette and Work Sans font (Nov 18); the team page keeps its existing styling.
 Estimates show the midpoint, without daily growth. A numerical estimate is withheld until 7 days
 after notice, or 1 day for no heat/hot water: an explicit product display policy, not a legal waiting
 period. See the research, assumptions, migration, and source links in `docs/decisions.md`.

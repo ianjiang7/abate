@@ -74,3 +74,31 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Tenant-facing palette; the team page retains its existing tokens. */
+.tenant-theme {
+  --color-ink: #006bb6;
+  --color-ink-soft: #00528d;
+  --color-slate: #52606e;
+  --color-periwinkle: #ffb779;
+  --color-periwinkle-soft: #e6f2fb;
+  --color-lavender: #eef6fc;
+  --color-mist: #f7fafc;
+  --color-line: #cedce6;
+  --color-steel: #f58426;
+  --brand-mark: #006bb6;
+  --brand-outline: #ffb779;
+  --shadow-card: 0 2px 12px rgb(0 70 120 / 0.06);
+  --shadow-lift: 0 10px 35px rgb(0 70 120 / 0.15);
+  min-height: 100dvh;
+  background: var(--color-mist);
+  color: #142233;
+  font-family: var(--font-sans);
+}
+.tenant-theme h1, .tenant-theme h2 { letter-spacing: -.035em; }
+.tenant-theme header { border-bottom: 3px solid #f58426; }
+.tenant-theme input[type="checkbox"], .tenant-theme input[type="radio"] { accent-color: #006bb6; }
+.tenant-theme .bg-gradient-to-r { background: #f58426; }
+.tenant-theme header .h-1\.5.bg-ink { background: #f58426; }
+.tenant-theme .bg-ink { border-top: 3px solid #f58426; }
+.tenant-theme button.bg-ink, .tenant-theme a.bg-ink { border-top: 0; }

@@ -121,3 +121,11 @@
   .footer { align-items: flex-start; flex-direction: column; gap: 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .photo { animation-play-state: paused; } .carouselControls button { display: none; } }
+
+/* Knicks orange anchors the blue palette without sacrificing text contrast. */
+.header { border-bottom: 3px solid var(--orange); }
+.hero .eyebrow::before { content: ""; display: block; width: 40px; height: 4px; background: var(--orange); margin: 0 auto 14px; }
+.heroCopy > .button, .finalCta .button { background: var(--orange); color: #142233; }
+.heroCopy > .button:hover, .finalCta .button:hover { background: #ff9c4a; }
+.steps li > span { color: #a74600; border-bottom: 3px solid var(--orange); align-self: flex-start; padding-bottom: 6px; }
+.finalCta { border-top: 6px solid var(--orange); }

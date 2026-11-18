@@ -31,7 +31,7 @@ Research and limitations are in `docs/decisions.md`.
 
 Landing-page placeholders live in `public/images/placeholder-*.jpg`, referenced by
 `src/components/home/photo-carousel.tsx`. Replace them with permission-cleared client images and
-update the placeholder caption. The carousel supports pause and reduced motion.
+keep the assets’ documented provenance current. The carousel supports pause and reduced motion.
 
 ## Run it locally
 

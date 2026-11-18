@@ -16,7 +16,6 @@ export function PhotoCarousel() {
       </div>)}
     </div>
     <div className={styles.carouselControls}>
-      <span>Apartment imagery · placeholders</span>
       <button type="button" onClick={() => setPaused(!paused)} aria-label={paused ? "Play photo carousel" : "Pause photo carousel"} aria-pressed={paused}>
         {paused ? <Play size={15} /> : <Pause size={15} />} <span>{paused ? "Play" : "Pause"}</span>
       </button>

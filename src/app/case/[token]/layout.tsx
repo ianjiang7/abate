@@ -5,7 +5,7 @@ import { Logo } from "@/components/brand/logo";
 // header, phone-width column and footer. It reads no request data, so it stays in the static shell.
 export default function CaseLayout({ children }: LayoutProps<"/case/[token]">) {
   return (
-    <div className="mx-auto min-h-dvh max-w-md px-4 pb-16">
+    <div className="tenant-theme"><div className="mx-auto min-h-dvh max-w-md px-4 pb-16">
       <header className="flex items-center justify-between py-4">
         <Link href="/" aria-label="Abate home" className="rounded-xl">
           <Logo />
@@ -17,6 +17,6 @@ export default function CaseLayout({ children }: LayoutProps<"/case/[token]">) {
         <p>Anyone with this link can see this case, so share it carefully.</p>
         <p>Abate is an NYU Stern student pilot. Not a law firm; nothing here is legal advice.</p>
       </footer>
-    </div>
+    </div></div>
   );
 }

@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function StartPage() {
-  return <StartForm />;
+  return <div className="tenant-theme"><StartForm /></div>;
 }
