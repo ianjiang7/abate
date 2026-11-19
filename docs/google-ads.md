@@ -97,7 +97,7 @@ slots without adding a new claim.
 | Headline 2 | Written Repair Follow-Ups | 25 (30) |
 | Headline 3 | Repair Not Fixed Yet? | 21 (30) |
 | Description 1 (pinned) | Get written follow-ups for unresolved repairs. Start a case with Abate. | 70 (90) |
-| Description 2 | Tell us what's broken. We draft timed follow-ups, and you approve each one. | 75 (90) |
+| Description 2 | Tell us what's broken. We draft the follow-ups, and you send them from your email. | 82 (90) |
 
 Rules for any line added later (Google's policy plus AGENTS.md):
 
@@ -108,6 +108,9 @@ Rules for any line added later (Google's policy plus AGENTS.md):
 **The landing page counts too.** Google's misrepresentation policy covers the page the ad sends
 people to, not only the ad. After someone taps Buy now, the price card says plainly that the price
 was a test, paid plans aren't available, and nothing was charged (it used to say "out of stock").
+
+Since Nov 17 every tenant sends their own letters, so no line may say Abate sends, chases or
+contacts management for them.
 
 **Sitelinks (optional):** "Start my case" → `/start`, "Privacy" → `/privacy`.
 
@@ -139,3 +142,31 @@ their first letter is read case by case on the team page, by creation time.
       by hand.
 - [ ] Set `TEAM_GMAIL` on Vercel, so the home page shows a contact address.
 - [ ] Click the ad's final URL on a phone with `utm_source=test` and walk the form.
+
+## Reddit Ads
+
+Same rules as Google: no prices, no paid plan, no money promises. Reddit's auto-written headline
+"Get your apartment fixed and get paid" can't run: it promises money, and an abatement isn't
+guaranteed.
+
+- **Objective: Traffic**, not Sales. Sales optimizes for conversions reported by the Reddit pixel,
+  and we don't install ad pixels (AGENTS.md, privacy page). Don't add the pixel code to the site.
+- **Location:** New York, NY only. Remove "United States" and "New York" (the state), or the ad
+  runs nationwide.
+- **Communities:** keep r/Stuytown, r/nyc, r/TenantHelp, r/Renters, r/renting; add r/NYCapartments,
+  r/AskNYC, r/Brooklyn, r/Queens, r/bronx, r/astoria. Drop r/nyu and r/columbia (mostly students in
+  dorms, and classmates). Exclude landlord communities such as r/Landlord if Reddit offers exclusions.
+- **Budget:** Reddit's minimum is above $5 a day; $6 a day for 5 days is $30.
+- **Destination:** `https://abate-mu.vercel.app/?utm_source=reddit&utm_medium=paid&utm_campaign=nov-reddit`
+- **Comments:** someone reads and replies each day, with facts about the product only, never legal
+  advice. Turn comments off if nobody can.
+
+Headlines (Reddit shows one per ad; add several to the dynamic set):
+
+- Landlord ignoring your repair? Get a follow-up letter ready to send in about 2 minutes.
+- No heat or hot water in NYC? Put it in writing today. Your first letter is free.
+- Leak, mold or pests still not fixed? Abate drafts the follow-ups. You send them from your email.
+- NYC renters: turn "we'll look into it" into a written, dated follow-up plan.
+
+Images are 1:1 (1080×1080) and 4:5 (1080×1350), in three designs: the letter, the follow-up
+schedule, and no heat.
