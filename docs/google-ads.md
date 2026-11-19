@@ -164,29 +164,42 @@ their first letter is read case by case on the team page, by creation time.
 
 ## Reddit Ads
 
-Same rules as Google: no prices, no paid plan, no money promises. Reddit's auto-written headline
-"Get your apartment fixed and get paid" can't run: it promises money, and an abatement isn't
-guaranteed.
+Reddit shows only a headline and an image, with no description, to people who have never heard of
+us. So each image explains Abate by itself (what it is, who it's for, the three value props, and
+that it's free to start), and each headline is a complete sentence about what Abate does.
+
+Same rules as Google: no prices, no paid plan, no money promises. Reddit's auto-written headlines
+can't run: "Get your apartment fixed and get paid" promises money, and "Get the rent abatement you
+deserve" says the tenant is owed it. An abatement isn't guaranteed.
 
 - **Objective: Traffic**, not Sales. Sales optimizes for conversions reported by the Reddit pixel,
   and we don't install ad pixels (AGENTS.md, privacy page). Don't add the pixel code to the site.
 - **Location:** New York, NY only. Remove "United States" and "New York" (the state), or the ad
   runs nationwide.
-- **Communities:** keep r/Stuytown, r/nyc, r/TenantHelp, r/Renters, r/renting; add r/NYCapartments,
-  r/AskNYC, r/Brooklyn, r/Queens, r/bronx, r/astoria. Drop r/nyu and r/columbia (mostly students in
+- **Communities:** keep r/Stuytown, r/nyc, r/newyorkcity, r/AskNYC, r/TenantHelp, r/Renters,
+  r/renting; add r/NYCapartments, r/Brooklyn, r/Queens, r/bronx, r/astoria. Drop r/nyu and r/columbia (mostly students in
   dorms, and classmates). Exclude landlord communities such as r/Landlord if Reddit offers exclusions.
-- **Budget:** Reddit's minimum is above $5 a day; $6 a day for 5 days is $30.
+- **Budget:** Reddit's minimum is above $5 a day. Set the end date so daily budget × days fits
+  what's left of the $100 (for example $8 a day for 7 days is $56). Ignore Reddit's suggestion of
+  $50 a day.
 - **Destination:** `https://abate-mu.vercel.app/?utm_source=reddit&utm_medium=paid&utm_campaign=nov-reddit`
 - **Comments:** someone reads and replies each day, with facts about the product only, never legal
   advice. Turn comments off if nobody can.
 
-Headlines (Reddit rotates them in the dynamic set; each leads with one value prop):
+Headlines (one per image; Reddit rotates them in the dynamic set):
 
-- Repair dragging on? See the rent abatement you may be owed, and keep a dated record of every email you send.
-- Landlord ignoring your repair? Get follow-up emails ready to send, with every date saved in one place.
-- NYC renters: estimate what you may be owed for an unresolved repair. Free first letter, no card.
-- Ask management for a repair date in writing, on a schedule. Abate drafts the emails; you send them.
+| Headline | Image | Characters (limit 300) |
+| --- | --- | --- |
+| Landlord not fixing something in your NYC apartment? Abate writes the follow-up emails for you to send, keeps a dated record of each one, and estimates the rent you may be owed back. Free to start. | how-it-works | 197 |
+| NYC renters: when a serious repair goes unfixed, you may be able to get part of your rent back. It's called a rent abatement. See a free estimate and get a letter for your landlord in 2 minutes. | rent-back | 194 |
+| Tired of chasing your landlord about a repair? Abate writes each follow-up email, tells you when to send it, and saves every reply with its date. Your first letter is free. | follow-ups | 172 |
 
-Images are 1:1 (1080×1080) and 4:5 (1080×1350), one design per value prop: the estimate (the
-app's real estimate screen), the dated record (a case history with made-up dates), and the emails
-(the first letter and the follow-up schedule).
+Images are 1:1 (1080×1080) and 4:5 (1080×1350), three designs, each with the Abate name, "For NYC
+renters", a plain question, one sentence on what Abate does, and a "Start free" bar:
+
+- **How it works:** "Landlord not fixing your apartment?" and three steps: tell us what's broken,
+  send the emails we write, keep proof and see what you may be owed.
+- **Rent back:** "Repair dragging on? You may be owed rent back." explains what a rent abatement is
+  and shows an example estimate ($385 for $1,850 rent and a ceiling leak reported 21 days ago, the
+  app's own result for those answers), labeled an estimate, not legal advice.
+- **Follow-ups:** "Tired of chasing your landlord?" and the day 0, 3, 5 and 7 schedule.
