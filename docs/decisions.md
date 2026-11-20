@@ -3,6 +3,18 @@
 Newest first. One entry per decision: what we decided, why, and its status. This feeds the
 portfolio and the Nov 5 memo.
 
+## Nov 19, 2026 · Ads lead with the three value props
+
+- **What:** every Google and Reddit ad, and every ad image, now covers what people would pay us
+  for: the follow-up emails to send management, a dated record of every email and reply, and an
+  estimate of the rent abatement they may be owed. The two outcomes behind them are rent back and
+  quicker replies from management. Copy and images are listed in `docs/google-ads.md`.
+- **Wording limits:** "may be owed" and "estimate", never "get paid" or "pay less rent" (it
+  could read as permission to withhold rent). No "faster" claims: quicker replies are the
+  hypothesis we're testing, and Google treats unsupported claims as misrepresentation.
+- *Why:* the earlier ads talked only about the letters, so they left out two of the three reasons
+  to pay.
+
 ## Nov 17, 2026 · Retire the 25% recovery offer
 
 The start-form price test is the paid-interest experiment. We removed the recovery offer from case pages and kept historical requests for the team.

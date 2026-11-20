@@ -84,30 +84,52 @@ space heater, boiler repair.
 Check the **Search terms report** every other day and add new negatives for searches that aren't
 tenants with a repair.
 
-**Responsive search ad** (one per ad group). The ad promotes the repair help Abate delivers today
-and **never mentions a price or a paid plan**: neither $9 nor $29 can be bought, and Google's
-[misrepresentation policy](https://support.google.com/adspolicy/answer/6020955) prohibits
-advertising offers that aren't available. Pin the first headline and the first description to
-position 1. Google requires at least 3 headlines and 2 descriptions, so the others fill those
-slots without adding a new claim.
+**Responsive search ad** (one per ad group). Every ad covers the three things people would pay us
+for: **the follow-up emails** to send management, **a dated record** of every email and reply,
+and **an estimate of the rent abatement** they may be owed. The two outcomes we sell are rent
+back and quicker replies, but neither is promised: an abatement isn't guaranteed, and whether
+written follow-ups get faster replies is the hypothesis we're testing.
 
-| | Text | Characters (limit) |
-| --- | --- | --- |
-| Headline 1 (pinned) | NYC Rental Repair Help | 22 (30) |
-| Headline 2 | Written Repair Follow-Ups | 25 (30) |
-| Headline 3 | Repair Not Fixed Yet? | 21 (30) |
-| Description 1 (pinned) | Get written follow-ups for unresolved repairs. Start a case with Abate. | 70 (90) |
-| Description 2 | Tell us what's broken. We draft timed follow-ups, and you approve each one. | 75 (90) |
+The ad **never mentions a price or a paid plan**: neither $9 nor $29 can be bought, and Google's
+[misrepresentation policy](https://support.google.com/adspolicy/answer/6020955) prohibits
+advertising offers that aren't available. Pin headline 1 and description 1 to position 1 and let
+Google rotate the rest.
+
+| | Text | Covers | Characters (limit) |
+| --- | --- | --- | --- |
+| Headline 1 (pinned) | NYC Rental Repair Help | All three | 22 (30) |
+| Headline 2 | See What You May Be Owed | Estimate | 24 (30) |
+| Headline 3 | A Dated Record of Every Email | Record | 29 (30) |
+| Headline 4 | Repair Emails, Ready to Send | Emails | 28 (30) |
+| Headline 5 | Rent Abatement Estimate | Estimate | 23 (30) |
+| Headline 6 | Ask for a Repair Date | Emails | 21 (30) |
+| Headline 7 | Your First Letter Is Free | Emails | 25 (30) |
+| Headline 8 | Repair Not Fixed Yet? | Hook | 21 (30) |
+| Description 1 (pinned) | Get written follow-ups for unresolved repairs. Start a case with Abate. | Emails | 71 (90) |
+| Description 2 | Estimate the rent abatement you may be owed, and keep a dated record of every email. | Estimate, record | 84 (90) |
+| Description 3 | Tell us what's broken. We draft the follow-ups, and you send them from your email. | Emails | 82 (90) |
+| Description 4 | Ask management for a repair date in writing, on a schedule. Not legal advice. | Emails | 77 (90) |
+
+Images (1200×628 for both "marketing image" and "landscape", 1200×1200 square, 960×1200
+portrait): the headline, the three value props as check marks, the app's real estimate screen,
+and a case history with made-up dates.
 
 Rules for any line added later (Google's policy plus AGENTS.md):
 
 - No prices, no paid plan, no "buy". Only what someone can use today.
 - Say "may be owed" and "estimate" if abatement comes up at all. Never "you are owed", "get $X
-  back" or a dollar promise. No legal claims, and nothing that sounds like a law firm.
+  back", "get paid" or a dollar promise. No legal claims, and nothing that sounds like a law firm.
+- Never "pay less rent": tenants could read it as permission to withhold rent, which can lead to
+  an eviction case.
+- Never "get it fixed faster": quicker replies are what we're testing, not a proven result. "Ask
+  for a repair date in writing, on a schedule" says it without the claim.
 
 **The landing page counts too.** Google's misrepresentation policy covers the page the ad sends
 people to, not only the ad. After someone taps Buy now, the price card says plainly that the price
 was a test, paid plans aren't available, and nothing was charged (it used to say "out of stock").
+
+Since Nov 17 every tenant sends their own letters, so no line may say Abate sends, chases or
+contacts management for them.
 
 **Sitelinks (optional):** "Start my case" → `/start`, "Privacy" → `/privacy`.
 
@@ -139,3 +161,45 @@ their first letter is read case by case on the team page, by creation time.
       by hand.
 - [ ] Set `TEAM_GMAIL` on Vercel, so the home page shows a contact address.
 - [ ] Click the ad's final URL on a phone with `utm_source=test` and walk the form.
+
+## Reddit Ads
+
+Reddit shows only a headline and an image, with no description, to people who have never heard of
+us. So each image explains Abate by itself (what it is, who it's for, the three value props, and
+that it's free to start), and each headline is a complete sentence about what Abate does.
+
+Same rules as Google: no prices, no paid plan, no money promises. Reddit's auto-written headlines
+can't run: "Get your apartment fixed and get paid" promises money, and "Get the rent abatement you
+deserve" says the tenant is owed it. An abatement isn't guaranteed.
+
+- **Objective: Traffic**, not Sales. Sales optimizes for conversions reported by the Reddit pixel,
+  and we don't install ad pixels (AGENTS.md, privacy page). Don't add the pixel code to the site.
+- **Location:** New York, NY only. Remove "United States" and "New York" (the state), or the ad
+  runs nationwide.
+- **Communities:** keep r/Stuytown, r/nyc, r/newyorkcity, r/AskNYC, r/TenantHelp, r/Renters,
+  r/renting; add r/NYCapartments, r/Brooklyn, r/Queens, r/bronx, r/astoria. Drop r/nyu and r/columbia (mostly students in
+  dorms, and classmates). Exclude landlord communities such as r/Landlord if Reddit offers exclusions.
+- **Budget:** Reddit's minimum is above $5 a day. Set the end date so daily budget × days fits
+  what's left of the $100 (for example $8 a day for 7 days is $56). Ignore Reddit's suggestion of
+  $50 a day.
+- **Destination:** `https://abate-mu.vercel.app/?utm_source=reddit&utm_medium=paid&utm_campaign=nov-reddit`
+- **Comments:** someone reads and replies each day, with facts about the product only, never legal
+  advice. Turn comments off if nobody can.
+
+Headlines (one per image; Reddit rotates them in the dynamic set):
+
+| Headline | Image | Characters (limit 300) |
+| --- | --- | --- |
+| Landlord not fixing something in your NYC apartment? Abate writes the follow-up emails for you to send, keeps a dated record of each one, and estimates the rent you may be owed back. Free to start. | how-it-works | 197 |
+| NYC renters: when a serious repair goes unfixed, you may be able to get part of your rent back. It's called a rent abatement. See a free estimate and get a letter for your landlord in 2 minutes. | rent-back | 194 |
+| Tired of chasing your landlord about a repair? Abate writes each follow-up email, tells you when to send it, and saves every reply with its date. Your first letter is free. | follow-ups | 172 |
+
+Images are 1:1 (1080×1080) and 4:5 (1080×1350), three designs, each with the Abate name, "For NYC
+renters", a plain question, one sentence on what Abate does, and a "Start free" bar:
+
+- **How it works:** "Landlord not fixing your apartment?" and three steps: tell us what's broken,
+  send the emails we write, keep proof and see what you may be owed.
+- **Rent back:** "Repair dragging on? You may be owed rent back." explains what a rent abatement is
+  and shows an example estimate ($385 for $1,850 rent and a ceiling leak reported 21 days ago, the
+  app's own result for those answers), labeled an estimate, not legal advice.
+- **Follow-ups:** "Tired of chasing your landlord?" and the day 0, 3, 5 and 7 schedule.
